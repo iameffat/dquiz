@@ -97,22 +97,21 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
                     
                     $email_subject_encoded = "=?UTF-8?B?".base64_encode($email_subject)."?=";
 
-                    // --- Debugging Mail Parameters ---
-                    // error_log("Attempting to send email to: " . $to);
-                    // error_log("Subject: " . $email_subject_encoded);
-                    // error_log("Headers: " . $headers);
-                    // error_log("Body: " . $email_body);
-                    // error_log("Reset Link: " . $reset_link);
-                    // ---------------------------------
+                   error_log("--- Forgot Password Email Attempt ---");
+error_log("To: " . $to);
+error_log("Subject Encoded: " . $email_subject_encoded);
+// error_log("Body: " . $email_body); // Body can be long, log selectively if needed
+error_log("Headers: " . $headers);
+error_log("Reset Link Generated: " . $reset_link);
 
-                    if (mail($to, $email_subject_encoded, $email_body, $headers)) {
-                        $message = "যদি আপনার প্রদত্ত ইমেইলটি আমাদের সিস্টেমে রেজিস্টার্ড থাকে, তবে পাসওয়ার্ড পুনরুদ্ধারের জন্য একটি লিঙ্ক আপনার ইমেইলে পাঠানো হয়েছে। লিঙ্কটি ১ ঘণ্টা পর্যন্ত সক্রিয় থাকবে। অনুগ্রহ করে আপনার ইনবক্স এবং স্প্যাম/জাঙ্ক ফোল্ডার চেক করুন।";
-                        $message_type = "success";
-                    } else {
-                        error_log("PHP mail() function failed for: {$to}. Check mail server logs and PHP configuration.");
-                        $message = "ইমেইল পাঠাতে একটি টেকনিক্যাল সমস্যা হয়েছে। অনুগ্রহ করে কিছুক্ষণ পর আবার চেষ্টা করুন অথবা সাইট এডমিনের সাথে যোগাযোগ করুন।";
-                        $message_type = "danger";
-                    }
+if (mail($to, $email_subject_encoded, $email_body, $headers)) {
+    // ... success logic ...
+} else {
+    $mail_error = error_get_last(); // Get the last error if mail() fails
+    error_log("PHP mail() function FAILED for: {$to}. Last error: " . print_r($mail_error, true));
+    $message = "ইমেইল পাঠাতে একটি টেকনিক্যাল সমস্যা হয়েছে। অনুগ্রহ করে কিছুক্ষণ পর আবার চেষ্টা করুন অথবা সাইট এডমিনের সাথে যোগাযোগ করুন। (Error Ref: FPMAIL)";
+    $message_type = "danger";
+}
 
                 } catch (Exception $e) {
                     $conn->rollback();
