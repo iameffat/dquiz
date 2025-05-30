@@ -1,5 +1,5 @@
 <?php
-$page_title = "হোম - দ্বীনিলাইফ কুইজ";
+$page_title = "DeeneLife Quiz";
 $base_url = ''; // Root directory
 require_once 'includes/db_connect.php'; // ডাটাবেস কানেকশন ও সেশন শুরু
 require_once 'includes/functions.php';   // কমন ফাংশন

@@ -105,7 +105,7 @@ $og_image_to_display = isset($page_og_image) ? htmlspecialchars($page_og_image) 
             <div class="collapse navbar-collapse" id="navbarNav">
                 <ul class="navbar-nav ms-auto">
                     <li class="nav-item">
-                        <a class="nav-link" href="<?php echo isset($base_url) ? $base_url : ''; ?>index.php">DeeneLife Quiz</a>
+                        <a class="nav-link" href="<?php echo isset($base_url) ? $base_url : ''; ?>index.php">হোম</a>
                     </li>
                     <li class="nav-item">
                         <a class="nav-link" href="<?php echo isset($base_url) ? $base_url : ''; ?>quizzes.php">সকল কুইজ</a>
