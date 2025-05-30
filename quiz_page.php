@@ -240,7 +240,7 @@ require_once 'includes/header.php';
             <?php endforeach; ?>
             <div class="text-center mt-4">
                 <button type="submit" name="submit_quiz" class="btn btn-primary btn-lg">সাবমিট করুন</button>
-            </div>
+            </div><br>
         <?php endif; ?>
     </form>
 </div>
