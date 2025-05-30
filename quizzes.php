@@ -221,7 +221,7 @@ require_once 'includes/header.php'; // header.php এখন $page_specific_style
                     list($attempted_live, $attempt_id_live) = hasUserAttemptedQuiz($conn, $user_id_for_check, $quiz['id']);
                 ?>
                 <div class="col">
-                    <div class="card h-100 shadow-sm quiz-card live-quiz-card"> {/* live-quiz-card ক্লাস যোগ করা হয়েছে */}
+                    <div class="card h-100 shadow-sm quiz-card live-quiz-card">
                         <div class="card-body d-flex flex-column">
                             <h5 class="card-title"><?php echo escape_html($quiz['title']); ?></h5>
                             <p class="card-text text-muted small">
