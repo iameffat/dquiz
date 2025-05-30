@@ -1,6 +1,6 @@
 </main> <footer class="footer mt-auto py-3 bg-light">
     <div class="container text-center">
-        <span class="text-muted"><?php echo date("Y"); ?> DeeneLife Quiz | Powered by DeeneLife Team</span>
+        <span class="text-muted"><?php echo date("Y"); ?> Powered by DeeneLife Team</span>
     </div>
 </footer>
 
