@@ -1,0 +1,9 @@
+<IfModule mod_rewrite.c>
+    RewriteEngine On
+    RewriteBase /
+
+    # URL q/{numeric_id} কে quiz_page.php?id={numeric_id} তে পাঠাবে
+    RewriteCond %{REQUEST_FILENAME} !-f
+    RewriteCond %{REQUEST_FILENAME} !-d
+    RewriteRule ^q/([0-9]+)/?$ quiz_page.php?id=$1 [L,QSA]
+</IfModule>
