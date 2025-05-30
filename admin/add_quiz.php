@@ -11,7 +11,11 @@ $success_message = "";
 // Define the upload path for question images
 define('QUESTION_IMAGE_UPLOAD_DIR', '../uploads/question_images/');
 if (!is_dir(QUESTION_IMAGE_UPLOAD_DIR)) {
-    mkdir(QUESTION_IMAGE_UPLOAD_DIR, 0777, true);
+    if (!mkdir(QUESTION_IMAGE_UPLOAD_DIR, 0777, true) && !is_dir(QUESTION_IMAGE_UPLOAD_DIR)) {
+        // Fallback if mkdir fails, check if it was created by a concurrent process
+        // Log this error or handle it appropriately for your environment
+        $errors[] = "ছবি আপলোডের জন্য ডিরেক্টরি তৈরি করা যায়নি: " . QUESTION_IMAGE_UPLOAD_DIR;
+    }
 }
 
 
@@ -23,12 +27,10 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
     $quiz_live_start = !empty($_POST['quiz_live_start']) ? trim($_POST['quiz_live_start']) : NULL;
     $quiz_live_end = !empty($_POST['quiz_live_end']) ? trim($_POST['quiz_live_end']) : NULL;
 
-    // Validate quiz details
     if (empty($quiz_title)) $errors[] = "কুইজের শিরোনাম আবশ্যক।";
     if ($quiz_duration <= 0) $errors[] = "কুইজের সময় অবশ্যই ০ মিনিটের বেশি হতে হবে।";
     if (!in_array($quiz_status, ['draft', 'live', 'archived'])) $errors[] = "অবৈধ কুইজ স্ট্যাটাস।";
 
-    // Validate questions (at least one question)
     if (!isset($_POST['questions']) || empty($_POST['questions'])) {
         $errors[] = "কুইজে কমপক্ষে একটি প্রশ্ন থাকতে হবে।";
     } else {
@@ -36,19 +38,18 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
             if (empty(trim($question_data['text']))) {
                 $errors[] = "প্রশ্ন #" . ($q_idx + 1) . ": প্রশ্নের লেখা খালি রাখা যাবে না।";
             }
-            // Image validation (optional based on your requirements)
+            
             if (isset($_FILES['questions']['name'][$q_idx]['image_url']) && $_FILES['questions']['error'][$q_idx]['image_url'] == UPLOAD_ERR_OK) {
-                $file_tmp_name = $_FILES['questions']['tmp_name'][$q_idx]['image_url'];
-                $file_name = $_FILES['questions']['name'][$q_idx]['image_url'];
-                $file_size = $_FILES['questions']['size'][$q_idx]['image_url'];
-                $file_type = $_FILES['questions']['type'][$q_idx]['image_url'];
+                $file_name_check = $_FILES['questions']['name'][$q_idx]['image_url'];
+                $file_size_check = $_FILES['questions']['size'][$q_idx]['image_url'];
+                $file_type_check = $_FILES['questions']['type'][$q_idx]['image_url']; // Get MIME type
                 $allowed_types = ['image/jpeg', 'image/png', 'image/gif', 'image/webp'];
                 $max_file_size = 5 * 1024 * 1024; // 5MB
 
-                if (!in_array($file_type, $allowed_types)) {
-                    $errors[] = "প্রশ্ন #" . ($q_idx + 1) . ": অনুমোদিত ছবির ধরণ JPEG, PNG, WEBP বা GIF.";
+                if (!in_array(strtolower($file_type_check), $allowed_types)) {
+                    $errors[] = "প্রশ্ন #" . ($q_idx + 1) . ": অনুমোদিত ছবির ধরণ JPEG, PNG, WEBP বা GIF. আপনি দিয়েছেন: " . $file_type_check;
                 }
-                if ($file_size > $max_file_size) {
+                if ($file_size_check > $max_file_size) {
                     $errors[] = "প্রশ্ন #" . ($q_idx + 1) . ": ছবির ফাইল সাইজ 5MB এর বেশি হতে পারবে না।";
                 }
             } elseif (isset($_FILES['questions']['error'][$q_idx]['image_url']) && $_FILES['questions']['error'][$q_idx]['image_url'] != UPLOAD_ERR_NO_FILE) {
@@ -90,16 +91,53 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
                 $q_explanation = isset($question_data['explanation']) ? trim($question_data['explanation']) : NULL;
                 $q_image_url = NULL;
 
-                // Handle image upload for the question
                 if (isset($_FILES['questions']['name'][$q_idx]['image_url']) && $_FILES['questions']['error'][$q_idx]['image_url'] == UPLOAD_ERR_OK) {
                     $file_tmp_name = $_FILES['questions']['tmp_name'][$q_idx]['image_url'];
                     $file_name = basename($_FILES['questions']['name'][$q_idx]['image_url']);
+                    $file_type = $_FILES['questions']['type'][$q_idx]['image_url'];
                     $file_ext = strtolower(pathinfo($file_name, PATHINFO_EXTENSION));
+                    
+                    // Ensure the extension matches a safe list if relying on it, though $file_type is better
+                    $safe_extensions = ['jpg', 'jpeg', 'png', 'gif', 'webp'];
+                    if (!in_array($file_ext, $safe_extensions)) {
+                        throw new Exception("প্রশ্ন #" . ($q_idx + 1) . ": অবৈধ ফাইল এক্সটেনশন।");
+                    }
+
                     $new_file_name = "q_img_" . $quiz_id . "_" . time() . "_" . uniqid() . "." . $file_ext;
                     $upload_path = QUESTION_IMAGE_UPLOAD_DIR . $new_file_name;
 
                     if (move_uploaded_file($file_tmp_name, $upload_path)) {
-                        $q_image_url = 'uploads/question_images/' . $new_file_name; // Path relative to project root
+                        $q_image_url = 'uploads/question_images/' . $new_file_name;
+
+                        // ছবির কম্প্রেশন শুরু
+                        if (strtolower($file_type) == 'image/jpeg' || strtolower($file_type) == 'image/jpg') {
+                            if (function_exists('imagecreatefromjpeg') && function_exists('imagejpeg')) {
+                                $source_image = imagecreatefromjpeg($upload_path);
+                                if ($source_image) {
+                                    imagejpeg($source_image, $upload_path, 75); // 75% কোয়ালিটিতে JPEG সেভ করুন
+                                    imagedestroy($source_image);
+                                }
+                            }
+                        } elseif (strtolower($file_type) == 'image/png') {
+                             if (function_exists('imagecreatefrompng') && function_exists('imagepng')) {
+                                $source_image = imagecreatefrompng($upload_path);
+                                if ($source_image) {
+                                    imagealphablending($source_image, false); 
+                                    imagesavealpha($source_image, true);    
+                                    imagepng($source_image, $upload_path, 6); 
+                                    imagedestroy($source_image);
+                                }
+                            }
+                        } elseif (strtolower($file_type) == 'image/webp') {
+                            if (function_exists('imagecreatefromwebp') && function_exists('imagewebp')) {
+                                $source_image = imagecreatefromwebp($upload_path);
+                                if ($source_image) {
+                                    imagewebp($source_image, $upload_path, 80); 
+                                    imagedestroy($source_image);
+                                }
+                            }
+                        }
+                        // GIF কম্প্রেশন GD তে সহজ নয় এবং সাধারণত ভালো ফল দেয় না।
                     } else {
                         throw new Exception("প্রশ্ন #" . ($q_idx + 1) . ": ছবি আপলোড করতে ব্যর্থ।");
                     }
@@ -107,7 +145,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
 
                 $sql_question = "INSERT INTO questions (quiz_id, question_text, image_url, explanation, order_number) VALUES (?, ?, ?, ?, ?)";
                 $stmt_question = $conn->prepare($sql_question);
-                $order_num = $q_idx + 1;
+                $order_num = $q_idx + 1; // Simple order based on form submission order
                 $stmt_question->bind_param("isssi", $quiz_id, $q_text, $q_image_url, $q_explanation, $order_num);
                 
                 if (!$stmt_question->execute()) {
@@ -211,11 +249,11 @@ require_once 'includes/header.php';
                 <div class="card-body">
                     <div class="mb-3">
                         <label for="question_text_0" class="form-label">প্রশ্নের লেখা <span class="text-danger">*</span></label>
-                        <textarea class="form-control" name="questions[0][text]" rows="2" required></textarea>
+                        <textarea class="form-control" id="question_text_0" name="questions[0][text]" rows="2" required></textarea>
                     </div>
                     <div class="mb-3">
                         <label for="question_image_0" class="form-label">প্রশ্ন সম্পর্কিত ছবি (ঐচ্ছিক)</label>
-                        <input type="file" class="form-control" name="questions[0][image_url]" accept="image/jpeg,image/png,image/gif,image/webp">
+                        <input type="file" class="form-control" id="question_image_0" name="questions[0][image_url]" accept="image/jpeg,image/png,image/gif,image/webp">
                         <small class="form-text text-muted">অনুমোদিত ছবির ধরণ: JPG, PNG, GIF, WEBP. সর্বোচ্চ সাইজ: 5MB.</small>
                     </div>
                     <div class="options-container mb-3">
@@ -223,7 +261,7 @@ require_once 'includes/header.php';
                         <?php for ($i = 0; $i < 4; $i++): ?>
                         <div class="input-group mb-2">
                             <div class="input-group-text">
-                                <input class="form-check-input mt-0" type="radio" name="questions[0][correct_option]" value="<?php echo $i; ?>" aria-label="সঠিক উত্তর" required>
+                                <input class="form-check-input mt-0" type="radio" name="questions[0][correct_option]" value="<?php echo $i; ?>" aria-label="সঠিক উত্তর <?php echo $i + 1; ?>" required>
                             </div>
                             <input type="text" class="form-control" name="questions[0][options][<?php echo $i; ?>]" placeholder="অপশন <?php echo $i + 1; ?>" required>
                         </div>
@@ -231,7 +269,7 @@ require_once 'includes/header.php';
                     </div>
                     <div class="mb-3">
                         <label for="question_explanation_0" class="form-label">ব্যাখ্যা (ঐচ্ছিক)</label>
-                        <textarea class="form-control" name="questions[0][explanation]" rows="2"></textarea>
+                        <textarea class="form-control" id="question_explanation_0" name="questions[0][explanation]" rows="2"></textarea>
                     </div>
                 </div>
             </div>
@@ -247,86 +285,86 @@ require_once 'includes/header.php';
 document.addEventListener('DOMContentLoaded', function () {
     const questionsContainer = document.getElementById('questions_container');
     const addQuestionBtn = document.getElementById('add_question_btn');
-    let questionIndex = document.querySelectorAll('.question-block').length -1;
+    let questionIndex = 0; // Start with 0 for the first block if it's pre-rendered or for the first dynamic one
 
     function updateQuestionBlocks() {
         const questionBlocks = document.querySelectorAll('.question-block');
         questionBlocks.forEach((block, index) => {
+            // Update the displayed question number
             block.querySelector('.question-number').textContent = index + 1;
+
+            // Update name attributes for dynamic indexing
             block.querySelectorAll('[name^="questions["]').forEach(input => {
                 const oldName = input.getAttribute('name');
                 const newName = oldName.replace(/questions\[\d+\]/, `questions[${index}]`);
                 input.setAttribute('name', newName);
-                // If it's a file input, ensure its ID is also unique if needed, or that labels point correctly
-                if(input.type === 'file') {
-                    input.id = `question_image_${index}`; // Example: update ID for label if using 'for'
-                }
             });
+            
+            // Update IDs and label 'for' attributes to maintain uniqueness and association
+            block.querySelectorAll('textarea, input[type="file"], input[type="radio"], input[type="text"]').forEach(el => {
+                const oldId = el.getAttribute('id');
+                if (oldId) {
+                    const newId = oldId.replace(/_\d+$/, `_${index}`);
+                    el.setAttribute('id', newId);
+                    // Find label associated with this input if it exists
+                    const label = block.querySelector(`label[for="${oldId}"]`);
+                    if (label) {
+                        label.setAttribute('for', newId);
+                    }
+                }
+                // Specifically update radio button names to be unique per group but indexed
+                if (el.type === 'radio' && el.name.includes('[correct_option]')) {
+                    el.name = `questions[${index}][correct_option]`;
+                }
+                 // Specifically update file input names
+                if (el.type === 'file' && el.name.includes('[image_url]')) {
+                     el.name = `questions[${index}][image_url]`;
+                }
+
+            });
+
+            // Show remove button only if more than one question exists
             const removeBtn = block.querySelector('.remove-question');
             if (removeBtn) {
                 removeBtn.style.display = questionBlocks.length > 1 ? 'inline-block' : 'none';
             }
         });
+         questionIndex = questionBlocks.length -1; // Update the global index
     }
     
     addQuestionBtn.addEventListener('click', function () {
-        questionIndex++;
-        const firstQuestionBlock = document.querySelector('.question-block');
+        const currentBlocks = document.querySelectorAll('.question-block');
+        let nextIndex = currentBlocks.length; // Determine the next index based on current count
+
+        const firstQuestionBlock = document.querySelector('.question-block'); // Template
         const newQuestionBlock = firstQuestionBlock.cloneNode(true);
-
-        newQuestionBlock.dataset.questionIndex = questionIndex;
+        newQuestionBlock.dataset.questionIndex = nextIndex;
         
-        newQuestionBlock.querySelectorAll('textarea, input[type="text"]').forEach(input => input.value = '');
-        // Clear file input specifically
-        const fileInput = newQuestionBlock.querySelector('input[type="file"]');
-        if (fileInput) {
-            fileInput.value = null; // Or fileInput.value = '';
-        }
-        newQuestionBlock.querySelectorAll('input[type="radio"]').forEach(radio => radio.checked = false);
-
-        // Update name attributes and IDs for the new block
-        newQuestionBlock.querySelectorAll('[name^="questions["]').forEach(input => {
-            const oldName = input.getAttribute('name');
-            const newName = oldName.replace(/questions\[\d+\]/, `questions[${questionIndex}]`);
-            input.setAttribute('name', newName);
-
-            // Update IDs for labels and inputs if they follow a pattern like name_index
-            const oldId = input.getAttribute('id');
-            if (oldId) {
-                 const newId = oldId.replace(/_\d+$/, `_${questionIndex}`);
-                 input.setAttribute('id', newId);
-                 const labelFor = newQuestionBlock.querySelector(`label[for="${oldId}"]`);
-                 if (labelFor) {
-                     labelFor.setAttribute('for', newId);
-                 }
-            }
+        newQuestionBlock.querySelectorAll('textarea, input[type="text"], input[type="file"]').forEach(input => input.value = '');
+        newQuestionBlock.querySelectorAll('input[type="radio"]').forEach(radio => {
+            radio.checked = false;
+            // Ensure the first radio button in the new block is checked by default for usability
+            // if (radio.value === "0") radio.checked = true; 
         });
-        
-        const removeBtn = newQuestionBlock.querySelector('.remove-question');
-        if (removeBtn) {
-            removeBtn.style.display = 'inline-block';
-            removeBtn.addEventListener('click', function () {
-                newQuestionBlock.remove();
-                // After removing, re-calculate questionIndex to prevent gaps if last element is removed
-                // and then a new one is added. Or, more simply, just ensure unique indices.
-                // For simplicity, current questionIndex will just keep incrementing.
-                // Re-numbering and button visibility update:
-                updateQuestionBlocks();
-            });
+        // Ensure the first radio in the new block is checked
+        const firstRadio = newQuestionBlock.querySelector('input[name$="[correct_option]"][value="0"]');
+        if (firstRadio) {
+            firstRadio.checked = true;
         }
         
         questionsContainer.appendChild(newQuestionBlock);
-        updateQuestionBlocks(); // Update numbering and remove button visibility
+        updateQuestionBlocks(); // Update all numbering and names
     });
 
-    document.querySelectorAll('.question-block .remove-question').forEach(btn => {
-        btn.addEventListener('click', function() {
-            this.closest('.question-block').remove();
+    questionsContainer.addEventListener('click', function(event) {
+        if (event.target.classList.contains('remove-question')) {
+            event.target.closest('.question-block').remove();
             updateQuestionBlocks();
-        });
+        }
     });
 
-    updateQuestionBlocks();
+    // Initial setup
+    updateQuestionBlocks(); 
 });
 </script>
 
