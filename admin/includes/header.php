@@ -3,21 +3,6 @@
 // $admin_base_url should be set by the calling page (e.g., '' if in admin root, '../' if in admin/something/)
 $current_admin_base_url = isset($admin_base_url) ? $admin_base_url : '';
 
-$current_page_url = (isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] === 'on' ? "https" : "http") . "://" . $_SERVER['HTTP_HOST'] . $_SERVER['REQUEST_URI'];
-
-// Default SEO values (can be overridden by individual pages)
-$default_page_title = 'দ্বীনিলাইফ কুইজ';
-$default_page_description = 'দ্বীনিলাইফ কুইজে অংশগ্রহণ করে আপনার ইসলামিক জ্ঞান পরীক্ষা করুন এবং বৃদ্ধি করুন। ইসলামিক প্রশ্ন ও উত্তর, প্রতিযোগিতা এবং আরও অনেক কিছু।';
-$default_page_keywords = 'ইসলামিক কুইজ, দ্বীনি কুইজ, বাংলা কুইজ, ইসলামিক জ্ঞান, deenilife quiz, dquiz, religious quiz, online quiz';
-// UPDATED: Default Open Graph image path
-$default_og_image = $base_url . 'assets/images/ogq.jpg'; 
-
-$page_title_to_display = isset($page_title) ? htmlspecialchars($page_title) . ' - ' . $default_page_title : $default_page_title;
-$page_description_to_display = isset($page_description) ? htmlspecialchars($page_description) : $default_page_description;
-$page_keywords_to_display = isset($page_keywords) ? htmlspecialchars($page_keywords) : $default_page_keywords;
-// Allow individual pages to override the OG image, otherwise use the new default
-$og_image_to_display = isset($page_og_image) ? htmlspecialchars($page_og_image) : $default_og_image;
-
 ?>
 <!DOCTYPE html>
 <html lang="bn">
@@ -36,22 +21,6 @@ $og_image_to_display = isset($page_og_image) ? htmlspecialchars($page_og_image) 
     <meta name="apple-mobile-web-app-title" content="Quiz DeeneLife" />
     <link rel="manifest" href="<?php echo isset($base_url) ? $base_url : ''; ?>assets/images/icons/site.webmanifest" />
     <script async src="https://www.googletagmanager.com/gtag/js?id=G-RMVK2X0HZJ"></script>
-
-    <meta property="og:type" content="website">
-    <meta property="og:url" content="<?php echo $current_page_url; ?>">
-    <meta property="og:title" content="<?php echo $page_title_to_display; ?>">
-    <meta property="og:description" content="<?php echo $page_description_to_display; ?>">
-    <meta property="og:image" content="<?php echo $og_image_to_display; ?>">
-    <meta property="og:image:width" content="1200"> 
-    <meta property="og:image:height" content="630"> 
-    <meta property="og:site_name" content="দ্বীনিলাইফ কুইজ">
-
-    <meta name="twitter:card" content="summary_large_image">
-    <meta property="twitter:url" content="<?php echo $current_page_url; ?>">
-    <meta name="twitter:title" content="<?php echo $page_title_to_display; ?>">
-    <meta name="twitter:description" content="<?php echo $page_description_to_display; ?>">
-    <meta name="twitter:image" content="<?php echo $og_image_to_display; ?>">
-
 <script>
   window.dataLayer = window.dataLayer || [];
   function gtag(){dataLayer.push(arguments);}

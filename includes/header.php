@@ -5,9 +5,6 @@ if (session_status() == PHP_SESSION_NONE) {
 // If db_connect.php is not already included, include it.
 // This is a safeguard, ideally, it's included in the main page script before the header.
 if (!isset($conn)) {
-    // Adjust the path based on where header.php is included from.
-    // This path assumes header.php is in 'includes/' and the calling script is in the root.
-    // For admin pages, the path would need to be '../includes/db_connect.php'
     $db_connect_path = 'includes/db_connect.php';
     if (file_exists($db_connect_path)) {
         require_once $db_connect_path;
@@ -15,22 +12,69 @@ if (!isset($conn)) {
         require_once '../' . $db_connect_path;
     }
 }
+
+// Define base URL if not already defined by the calling page
+if (!isset($base_url)) {
+    $base_url = ''; // Assuming header.php is included from files in the root
+}
+
+// Construct the full current URL for OG tags
+$current_page_url = (isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] === 'on' ? "https" : "http") . "://" . $_SERVER['HTTP_HOST'] . $_SERVER['REQUEST_URI'];
+
+// Default SEO values (can be overridden by individual pages)
+$default_page_title = 'দ্বীনিলাইফ কুইজ';
+$default_page_description = 'দ্বীনিলাইফ কুইজে অংশগ্রহণ করে আপনার ইসলামিক জ্ঞান পরীক্ষা করুন এবং বৃদ্ধি করুন। ইসলামিক প্রশ্ন ও উত্তর, প্রতিযোগিতা এবং আরও অনেক কিছু।';
+$default_page_keywords = 'ইসলামিক কুইজ, দ্বীনি কুইজ, বাংলা কুইজ, ইসলামিক জ্ঞান, deenilife quiz, dquiz, religious quiz, online quiz';
+// UPDATED: Default Open Graph image path
+$default_og_image = $base_url . 'assets/images/ogq.jpg'; 
+
+$page_title_to_display = isset($page_title) ? htmlspecialchars($page_title) . ' - ' . $default_page_title : $default_page_title;
+$page_description_to_display = isset($page_description) ? htmlspecialchars($page_description) : $default_page_description;
+$page_keywords_to_display = isset($page_keywords) ? htmlspecialchars($page_keywords) : $default_page_keywords;
+// Allow individual pages to override the OG image, otherwise use the new default
+$og_image_to_display = isset($page_og_image) ? htmlspecialchars($page_og_image) : $default_og_image;
+
 ?>
 <!DOCTYPE html>
 <html lang="bn">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title><?php echo isset($page_title) ? $page_title . ' - দ্বীনিলাইফ কুইজ' : 'দ্বীনিলাইফ কুইজ'; ?></title>
-    <link href="<?php echo isset($base_url) ? $base_url : ''; ?>assets/css/bootstrap.min.css" rel="stylesheet">
+    
+    <title><?php echo $page_title_to_display; ?></title>
+
+    <link rel="icon" href="<?php echo $base_url; ?>favicon.ico" type="image/x-icon">
+    <link rel="shortcut icon" href="<?php echo $base_url; ?>favicon.ico" type="image/x-icon">
+    <link rel="apple-touch-icon" sizes="180x180" href="<?php echo $base_url; ?>assets/images/icons/apple-touch-icon.png">
+    <link rel="icon" type="image/png" sizes="32x32" href="<?php echo $base_url; ?>assets/images/icons/favicon-32x32.png">
+    <link rel="icon" type="image/png" sizes="16x16" href="<?php echo $base_url; ?>assets/images/icons/favicon-16x16.png">
+    <link rel="manifest" href="<?php echo $base_url; ?>site.webmanifest"> 
+    <meta name="theme-color" content="#ffffff"> 
+
+    <meta name="description" content="<?php echo $page_description_to_display; ?>">
+    <meta name="keywords" content="<?php echo $page_keywords_to_display; ?>">
+    <meta name="author" content="দ্বীনিলাইফ টিম"> 
+    <meta name="robots" content="index, follow">
+    <link rel="canonical" href="<?php echo $current_page_url; ?>" />
+
+    <meta property="og:type" content="website">
+    <meta property="og:url" content="<?php echo $current_page_url; ?>">
+    <meta property="og:title" content="<?php echo $page_title_to_display; ?>">
+    <meta property="og:description" content="<?php echo $page_description_to_display; ?>">
+    <meta property="og:image" content="<?php echo $og_image_to_display; ?>">
+    <meta property="og:image:width" content="1200"> 
+    <meta property="og:image:height" content="630"> 
+    <meta property="og:site_name" content="দ্বীনিলাইফ কুইজ">
+
+    <meta name="twitter:card" content="summary_large_image">
+    <meta property="twitter:url" content="<?php echo $current_page_url; ?>">
+    <meta name="twitter:title" content="<?php echo $page_title_to_display; ?>">
+    <meta name="twitter:description" content="<?php echo $page_description_to_display; ?>">
+    <meta name="twitter:image" content="<?php echo $og_image_to_display; ?>">
+
+    <link href="<?php echo $base_url; ?>assets/css/bootstrap.min.css" rel="stylesheet">
     <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+Bengali:wght@400;700&display=swap" rel="stylesheet">
-    <link href="<?php echo isset($base_url) ? $base_url : ''; ?>assets/css/style.css" rel="stylesheet">
-    <link rel="icon" type="image/png" href="<?php echo isset($base_url) ? $base_url : ''; ?>assets/images/icons/favicon-96x96.png" sizes="96x96" />
-    <link rel="icon" type="image/svg+xml" href="<?php echo isset($base_url) ? $base_url : ''; ?>assets/images/icons/favicon.svg" />
-    <link rel="shortcut icon" href="<?php echo isset($base_url) ? $base_url : ''; ?>assets/images/icons/favicon.ico" />
-    <link rel="apple-touch-icon" sizes="180x180" href="<?php echo isset($base_url) ? $base_url : ''; ?>assets/images/icons/apple-touch-icon.png" />
-    <meta name="apple-mobile-web-app-title" content="Quiz DeeneLife" />
-    <link rel="manifest" href="<?php echo isset($base_url) ? $base_url : ''; ?>assets/images/icons/site.webmanifest" />
+    <link href="<?php echo $base_url; ?>assets/css/style.css" rel="stylesheet">
     <script async src="https://www.googletagmanager.com/gtag/js?id=G-RMVK2X0HZJ"></script>
 <script>
   window.dataLayer = window.dataLayer || [];
