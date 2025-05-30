@@ -5,9 +5,12 @@ require_once '../includes/db_connect.php';
 require_once 'includes/auth_check.php';
 require_once '../includes/functions.php';
 
+define('QUESTION_IMAGE_UPLOAD_DIR_EDIT', '../uploads/question_images/'); // Relative to admin folder
+define('QUESTION_IMAGE_BASE_URL_EDIT', '../'); // To construct full path for display from admin folder
+
 $quiz_id = isset($_GET['id']) ? intval($_GET['id']) : 0;
 $quiz = null;
-$questions_data = []; // This will hold existing questions with their options
+$questions_data = [];
 $errors = [];
 
 if ($quiz_id <= 0) {
@@ -21,44 +24,53 @@ if ($quiz_id <= 0) {
 if (isset($_GET['action']) && $_GET['action'] == 'delete_question' && isset($_GET['question_id'])) {
     $question_id_to_delete = intval($_GET['question_id']);
     
-    // Ensure the question belongs to the current quiz for security
-    $sql_check_q = "SELECT id FROM questions WHERE id = ? AND quiz_id = ?";
-    $stmt_check_q = $conn->prepare($sql_check_q);
-    $stmt_check_q->bind_param("ii", $question_id_to_delete, $quiz_id);
-    $stmt_check_q->execute();
-    if ($stmt_check_q->get_result()->num_rows === 1) {
-        // First, delete options related to the question
+    $conn->begin_transaction();
+    try {
+        // Fetch image_url before deleting question to remove file
+        $sql_get_image = "SELECT image_url FROM questions WHERE id = ? AND quiz_id = ?";
+        $stmt_get_image = $conn->prepare($sql_get_image);
+        $stmt_get_image->bind_param("ii", $question_id_to_delete, $quiz_id);
+        $stmt_get_image->execute();
+        $image_result = $stmt_get_image->get_result();
+        $image_row = $image_result->fetch_assoc();
+        $stmt_get_image->close();
+
+        if (!$image_row) {
+            throw new Exception("প্রশ্নটি এই কুইজের নয় অথবা খুঁজে পাওয়া যায়নি।");
+        }
+
+        // Delete options
         $sql_delete_options = "DELETE FROM options WHERE question_id = ?";
         $stmt_delete_options = $conn->prepare($sql_delete_options);
         $stmt_delete_options->bind_param("i", $question_id_to_delete);
-        if (!$stmt_delete_options->execute()) {
-             $_SESSION['flash_message'] = "প্রশ্নের অপশন ডিলিট করতে সমস্যা হয়েছে: " . $stmt_delete_options->error;
-             $_SESSION['flash_message_type'] = "danger";
-             $stmt_delete_options->close();
-             $stmt_check_q->close();
-             header("Location: edit_quiz.php?id=" . $quiz_id);
-             exit;
-        }
+        if (!$stmt_delete_options->execute()) throw new Exception("অপশন ডিলিট করতে সমস্যা: " . $stmt_delete_options->error);
         $stmt_delete_options->close();
 
-        // Then, delete the question itself
+        // Delete the question
         $sql_delete_q = "DELETE FROM questions WHERE id = ?";
         $stmt_delete_q = $conn->prepare($sql_delete_q);
         $stmt_delete_q->bind_param("i", $question_id_to_delete);
-        if ($stmt_delete_q->execute()) {
-            $_SESSION['flash_message'] = "প্রশ্ন (ID: {$question_id_to_delete}) সফলভাবে ডিলিট করা হয়েছে।";
-            $_SESSION['flash_message_type'] = "success";
-        } else {
-            $_SESSION['flash_message'] = "প্রশ্ন ডিলিট করতে সমস্যা হয়েছে: " . $stmt_delete_q->error;
-            $_SESSION['flash_message_type'] = "danger";
-        }
+        if (!$stmt_delete_q->execute()) throw new Exception("প্রশ্ন ডিলিট করতে সমস্যা: " . $stmt_delete_q->error);
         $stmt_delete_q->close();
-    } else {
-        $_SESSION['flash_message'] = "অবৈধ প্রশ্ন অথবা কুইজের সাথে সম্পর্কযুক্ত নয়।";
-        $_SESSION['flash_message_type'] = "warning";
+        
+        // Delete image file if exists
+        if ($image_row && !empty($image_row['image_url'])) {
+            $image_path_to_delete = QUESTION_IMAGE_UPLOAD_DIR_EDIT . basename($image_row['image_url']);
+            if (file_exists($image_path_to_delete)) {
+                unlink($image_path_to_delete);
+            }
+        }
+        
+        $conn->commit();
+        $_SESSION['flash_message'] = "প্রশ্ন (ID: {$question_id_to_delete}) সফলভাবে ডিলিট করা হয়েছে।";
+        $_SESSION['flash_message_type'] = "success";
+
+    } catch (Exception $e) {
+        $conn->rollback();
+        $_SESSION['flash_message'] = "প্রশ্ন ডিলিট করার সময় ত্রুটি: " . $e->getMessage();
+        $_SESSION['flash_message_type'] = "danger";
     }
-    $stmt_check_q->close();
-    header("Location: edit_quiz.php?id=" . $quiz_id); // Refresh page
+    header("Location: edit_quiz.php?id=" . $quiz_id);
     exit;
 }
 
@@ -81,11 +93,11 @@ if ($stmt_quiz_load = $conn->prepare($sql_quiz)) {
     $stmt_quiz_load->close();
 }
 
-// Handle Form Submission for updating quiz (metadata, existing questions, new questions)
+// Handle Form Submission for updating quiz
 if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['update_full_quiz'])) {
     $conn->begin_transaction();
     try {
-        // 1. Update Quiz Metadata
+        // 1. Update Quiz Metadata (same as before)
         $quiz_title = trim($_POST['quiz_title']);
         $quiz_description = trim($_POST['quiz_description']);
         $quiz_duration = intval($_POST['quiz_duration']);
@@ -100,7 +112,6 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['update_full_quiz'])) {
             $errors[] = "লাইভ শেষের সময় অবশ্যই শুরুর সময়ের পরে হতে হবে।";
         }
 
-
         if (empty($errors)) {
             $sql_update_meta = "UPDATE quizzes SET title = ?, description = ?, duration_minutes = ?, status = ?, live_start_datetime = ?, live_end_datetime = ? WHERE id = ?";
             $stmt_update_meta = $conn->prepare($sql_update_meta);
@@ -109,40 +120,81 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['update_full_quiz'])) {
             $stmt_update_meta->close();
         }
 
+
         // 2. Update Existing Questions & Options
         if (isset($_POST['existing_questions'])) {
             foreach ($_POST['existing_questions'] as $q_id => $q_data) {
                 $q_text = trim($q_data['text']);
                 $q_explanation = isset($q_data['explanation']) ? trim($q_data['explanation']) : NULL;
                 $q_order = isset($q_data['order_number']) ? intval($q_data['order_number']) : 0;
-                
+                $current_image_url = isset($q_data['current_image_url']) ? $q_data['current_image_url'] : null;
+                $new_image_url = $current_image_url; // Assume current image stays unless changed or removed
+
                 if (empty($q_text)) { $errors[] = "বিদ্যমান প্রশ্ন (ID: $q_id) এর লেখা খালি রাখা যাবে না।"; continue; }
 
-                $sql_update_q = "UPDATE questions SET question_text = ?, explanation = ?, order_number = ? WHERE id = ? AND quiz_id = ?";
+                // Handle image removal for existing question
+                if (isset($q_data['remove_image']) && $q_data['remove_image'] == '1') {
+                    if (!empty($current_image_url)) {
+                        $image_path_to_delete = QUESTION_IMAGE_UPLOAD_DIR_EDIT . basename($current_image_url);
+                        if (file_exists($image_path_to_delete)) {
+                            unlink($image_path_to_delete);
+                        }
+                    }
+                    $new_image_url = NULL;
+                }
+
+                // Handle image change for existing question
+                if (isset($_FILES['existing_questions_files']['name'][$q_id]['image_url']) && $_FILES['existing_questions_files']['error'][$q_id]['image_url'] == UPLOAD_ERR_OK) {
+                    $file_tmp_name = $_FILES['existing_questions_files']['tmp_name'][$q_id]['image_url'];
+                    $file_name = basename($_FILES['existing_questions_files']['name'][$q_id]['image_url']);
+                    // Basic validation for uploaded image
+                    $file_type = $_FILES['existing_questions_files']['type'][$q_id]['image_url'];
+                    $file_size = $_FILES['existing_questions_files']['size'][$q_id]['image_url'];
+                    $allowed_types = ['image/jpeg', 'image/png', 'image/gif', 'image/webp'];
+                    $max_file_size = 5 * 1024 * 1024; // 5MB
+                    if (!in_array($file_type, $allowed_types) || $file_size > $max_file_size) {
+                        throw new Exception("প্রশ্ন (ID: $q_id): অবৈধ ফাইল টাইপ বা সাইজ।");
+                    }
+
+                    // Delete old image if exists and a new one is uploaded
+                    if (!empty($current_image_url) && $new_image_url !== NULL) { // ensure new_image_url wasn't set to NULL by remove_image
+                        $image_path_to_delete = QUESTION_IMAGE_UPLOAD_DIR_EDIT . basename($current_image_url);
+                        if (file_exists($image_path_to_delete)) {
+                            unlink($image_path_to_delete);
+                        }
+                    }
+                    
+                    $file_ext = strtolower(pathinfo($file_name, PATHINFO_EXTENSION));
+                    $uploaded_file_name = "q_img_" . $quiz_id . "_" . $q_id . "_" . time() . "." . $file_ext;
+                    $upload_path = QUESTION_IMAGE_UPLOAD_DIR_EDIT . $uploaded_file_name;
+
+                    if (move_uploaded_file($file_tmp_name, $upload_path)) {
+                        $new_image_url = 'uploads/question_images/' . $uploaded_file_name; // Path relative to project root
+                    } else {
+                        throw new Exception("প্রশ্ন (ID: $q_id): নতুন ছবি আপলোড করতে ব্যর্থ।");
+                    }
+                }
+                
+                $sql_update_q = "UPDATE questions SET question_text = ?, image_url = ?, explanation = ?, order_number = ? WHERE id = ? AND quiz_id = ?";
                 $stmt_update_q = $conn->prepare($sql_update_q);
-                $stmt_update_q->bind_param("ssiii", $q_text, $q_explanation, $q_order, $q_id, $quiz_id);
+                $stmt_update_q->bind_param("sssiii", $q_text, $new_image_url, $q_explanation, $q_order, $q_id, $quiz_id);
                 if (!$stmt_update_q->execute()) throw new Exception("বিদ্যমান প্রশ্ন (ID: $q_id) আপডেট করতে সমস্যা: " . $stmt_update_q->error);
                 $stmt_update_q->close();
 
-                // Update options for this question
+                // Update options (same as before)
                 if (isset($q_data['options']) && isset($q_data['correct_option'])) {
                     $correct_option_id_from_post = $q_data['correct_option']; 
-                    
                     foreach ($q_data['options'] as $opt_id => $opt_text_val) {
                         $opt_text = trim($opt_text_val);
                         if (empty($opt_text)) { $errors[] = "প্রশ্ন (ID: $q_id) এর অপশন (ID: $opt_id) খালি রাখা যাবে না।"; continue; }
-                        
                         $is_correct = ($opt_id == $correct_option_id_from_post) ? 1 : 0;
-                        
                         $sql_update_opt = "UPDATE options SET option_text = ?, is_correct = ? WHERE id = ? AND question_id = ?";
                         $stmt_update_opt = $conn->prepare($sql_update_opt);
                         $stmt_update_opt->bind_param("siii", $opt_text, $is_correct, $opt_id, $q_id);
                         if (!$stmt_update_opt->execute()) throw new Exception("অপশন (ID: $opt_id) আপডেট করতে সমস্যা: " . $stmt_update_opt->error);
                         $stmt_update_opt->close();
                     }
-                } else {
-                     $errors[] = "প্রশ্ন (ID: $q_id) এর জন্য অপশন বা সঠিক উত্তর পাওয়া যায়নি।";
-                }
+                } else { $errors[] = "প্রশ্ন (ID: $q_id) এর জন্য অপশন বা সঠিক উত্তর পাওয়া যায়নি।"; }
             }
         }
         
@@ -150,17 +202,42 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['update_full_quiz'])) {
         if (isset($_POST['new_questions'])) {
             foreach ($_POST['new_questions'] as $nq_idx => $nq_data) {
                 $nq_text = trim($nq_data['text']);
+                if (empty($nq_text)) continue; // Skip if no text
+
                 $nq_explanation = isset($nq_data['explanation']) ? trim($nq_data['explanation']) : NULL;
                 $nq_order = isset($nq_data['order_number']) ? intval($nq_data['order_number']) : 0;
-                
-                if (empty($nq_text)) { /* errors[] = "নতুন প্রশ্ন #" . ($nq_idx + 1) . " এর লেখা খালি রাখা যাবে না।"; */ continue; } // Skip if no text
+                $nq_image_url = NULL;
+
                 if (empty($nq_data['options']) || count($nq_data['options']) < 2) { $errors[] = "নতুন প্রশ্ন #" . ($nq_idx + 1) . " এর জন্য কমপক্ষে ২টি অপশন দিন।"; continue; }
                 if (!isset($nq_data['correct_option_new']) || $nq_data['correct_option_new'] === '') { $errors[] = "নতুন প্রশ্ন #" . ($nq_idx + 1) . " এর সঠিক উত্তর নির্বাচন করুন।"; continue; }
 
-                // Determine order number for new question
-                // If order number is provided and not 0, use it. Otherwise, calculate.
+                // Handle image upload for new question
+                if (isset($_FILES['new_questions_files']['name'][$nq_idx]['image_url']) && $_FILES['new_questions_files']['error'][$nq_idx]['image_url'] == UPLOAD_ERR_OK) {
+                    $file_tmp_name = $_FILES['new_questions_files']['tmp_name'][$nq_idx]['image_url'];
+                    $file_name = basename($_FILES['new_questions_files']['name'][$nq_idx]['image_url']);
+                     // Basic validation for uploaded image
+                    $file_type = $_FILES['new_questions_files']['type'][$nq_idx]['image_url'];
+                    $file_size = $_FILES['new_questions_files']['size'][$nq_idx]['image_url'];
+                    $allowed_types = ['image/jpeg', 'image/png', 'image/gif', 'image/webp'];
+                    $max_file_size = 5 * 1024 * 1024; // 5MB
+                    if (!in_array($file_type, $allowed_types) || $file_size > $max_file_size) {
+                        throw new Exception("নতুন প্রশ্ন #" . ($nq_idx + 1) . ": অবৈধ ফাইল টাইপ বা সাইজ।");
+                    }
+
+                    $file_ext = strtolower(pathinfo($file_name, PATHINFO_EXTENSION));
+                    // Unique name for new question image
+                    $new_q_file_name = "q_img_" . $quiz_id . "_new_" . time() . "_" . $nq_idx . "." . $file_ext;
+                    $upload_path = QUESTION_IMAGE_UPLOAD_DIR_EDIT . $new_q_file_name;
+
+                    if (move_uploaded_file($file_tmp_name, $upload_path)) {
+                        $nq_image_url = 'uploads/question_images/' . $new_q_file_name;
+                    } else {
+                        throw new Exception("নতুন প্রশ্ন #" . ($nq_idx + 1) . ": ছবি আপলোড করতে ব্যর্থ।");
+                    }
+                }
+
                 $new_order_num = $nq_order;
-                if ($nq_order == 0) {
+                if ($nq_order == 0) { /* Calculate max order logic (same as before) */ 
                     $sql_max_order = "SELECT MAX(order_number) as max_o FROM questions WHERE quiz_id = ?";
                     $stmt_max_order = $conn->prepare($sql_max_order);
                     $stmt_max_order->bind_param("i", $quiz_id);
@@ -170,19 +247,18 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['update_full_quiz'])) {
                     $stmt_max_order->close();
                 }
 
-
-                $sql_insert_nq = "INSERT INTO questions (quiz_id, question_text, explanation, order_number) VALUES (?, ?, ?, ?)";
+                $sql_insert_nq = "INSERT INTO questions (quiz_id, question_text, image_url, explanation, order_number) VALUES (?, ?, ?, ?, ?)";
                 $stmt_insert_nq = $conn->prepare($sql_insert_nq);
-                $stmt_insert_nq->bind_param("issi", $quiz_id, $nq_text, $nq_explanation, $new_order_num);
+                $stmt_insert_nq->bind_param("isssi", $quiz_id, $nq_text, $nq_image_url, $nq_explanation, $new_order_num);
                 if (!$stmt_insert_nq->execute()) throw new Exception("নতুন প্রশ্ন যোগ করতে সমস্যা: " . $stmt_insert_nq->error);
                 $new_question_id = $stmt_insert_nq->insert_id;
                 $stmt_insert_nq->close();
 
+                // Insert options for new question (same as before)
                 $correct_new_opt_idx = intval($nq_data['correct_option_new']); 
                 foreach ($nq_data['options'] as $nopt_idx => $nopt_text_val) {
                     $nopt_text = trim($nopt_text_val);
-                    if (empty($nopt_text)) { /* errors[] = "নতুন প্রশ্ন #" . ($nq_idx + 1) . ", অপশন #" . ($nopt_idx + 1) . " খালি রাখা যাবে না।"; */ continue; } // Skip empty options
-                    
+                    if (empty($nopt_text)) continue;
                     $is_correct_new = ($nopt_idx == $correct_new_opt_idx) ? 1 : 0;
                     $sql_insert_nopt = "INSERT INTO options (question_id, option_text, is_correct) VALUES (?, ?, ?)";
                     $stmt_insert_nopt = $conn->prepare($sql_insert_nopt);
@@ -193,9 +269,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['update_full_quiz'])) {
             }
         }
 
-        if (!empty($errors)) {
-            throw new Exception("কিছু তথ্যগত ত্রুটি রয়েছে।"); 
-        }
+        if (!empty($errors)) throw new Exception("কিছু তথ্যগত ত্রুটি রয়েছে।"); 
 
         $conn->commit();
         $_SESSION['flash_message'] = "কুইজ সফলভাবে আপডেট করা হয়েছে।";
@@ -206,21 +280,20 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['update_full_quiz'])) {
     } catch (Exception $e) {
         $conn->rollback();
         $errors[] = "একটি গুরুতর ত্রুটি ঘটেছে: " . $e->getMessage();
-        // To repopulate form with POST data on error:
+        // Repopulate form (same as before)
         $quiz['title'] = $_POST['quiz_title'] ?? $quiz['title'];
         $quiz['description'] = $_POST['quiz_description'] ?? $quiz['description'];
         $quiz['duration_minutes'] = $_POST['quiz_duration'] ?? $quiz['duration_minutes'];
         $quiz['status'] = $_POST['quiz_status'] ?? $quiz['status'];
         $quiz['live_start_datetime'] = $_POST['quiz_live_start'] ?? $quiz['live_start_datetime'];
         $quiz['live_end_datetime'] = $_POST['quiz_live_end'] ?? $quiz['live_end_datetime'];
-        // Repopulating questions would be more complex here, usually involves re-fetching or careful handling
     }
 }
 
 
-// Fetch existing questions and their options for this quiz
-$questions_data = []; // Re-initialize to ensure fresh data
-$sql_questions_load = "SELECT * FROM questions WHERE quiz_id = ? ORDER BY order_number ASC, id ASC";
+// Fetch existing questions and their options for this quiz (include image_url)
+$questions_data = [];
+$sql_questions_load = "SELECT id, question_text, image_url, explanation, order_number FROM questions WHERE quiz_id = ? ORDER BY order_number ASC, id ASC";
 if ($stmt_q_load = $conn->prepare($sql_questions_load)) {
     $stmt_q_load->bind_param("i", $quiz_id);
     $stmt_q_load->execute();
@@ -253,27 +326,18 @@ require_once 'includes/header.php';
     <?php if (!empty($errors)): ?>
     <div class="alert alert-danger alert-dismissible fade show" role="alert">
         <strong>ত্রুটি!</strong> অনুগ্রহ করে নিচের সমস্যাগুলো সমাধান করুন:
-        <ul>
-            <?php foreach ($errors as $error): ?>
-            <li><?php echo $error; ?></li>
-            <?php endforeach; ?>
-        </ul>
+        <ul><?php foreach ($errors as $error): ?><li><?php echo $error; ?></li><?php endforeach; ?></ul>
         <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
     </div>
     <?php endif; ?>
     
-    <?php
-    // Display flash messages
-    if (isset($_SESSION['flash_message'])) {
-        display_flash_message('flash_message', 'flash_message_type');
-    }
-    ?>
+    <?php display_flash_message('flash_message', 'flash_message_type'); ?>
 
-    <form action="edit_quiz.php?id=<?php echo $quiz_id; ?>" method="post" id="editQuizForm">
+    <form action="edit_quiz.php?id=<?php echo $quiz_id; ?>" method="post" id="editQuizForm" enctype="multipart/form-data">
         <div class="card mb-4">
             <div class="card-header">কুইজের বিবরণ (এডিট)</div>
             <div class="card-body">
-                <div class="mb-3">
+                 <div class="mb-3">
                     <label for="quiz_title" class="form-label">শিরোনাম <span class="text-danger">*</span></label>
                     <input type="text" class="form-control" id="quiz_title" name="quiz_title" value="<?php echo htmlspecialchars($quiz['title']); ?>" required>
                 </div>
@@ -317,10 +381,12 @@ require_once 'includes/header.php';
                         <span>বিদ্যমান প্রশ্ন #<span class="existing-question-number"><?php echo $q_item['order_number']; ?></span> (ID: <?php echo $q_item['id']; ?>)</span>
                         <a href="edit_quiz.php?id=<?php echo $quiz_id; ?>&action=delete_question&question_id=<?php echo $q_item['id']; ?>" 
                            class="btn btn-sm btn-danger remove-existing-question" 
-                           onclick="return confirm('আপনি কি নিশ্চিতভাবে এই প্রশ্নটি এবং এর অপশনগুলো ডিলিট করতে চান?');">প্রশ্ন সরান</a>
+                           onclick="return confirm('আপনি কি নিশ্চিতভাবে এই প্রশ্নটি এবং এর অপশনগুলো ডিলিট করতে চান? যদি ছবির সাথে যুক্ত থাকে, সেটিও ডিলিট হয়ে যাবে।');">প্রশ্ন সরান</a>
                     </div>
                     <div class="card-body">
                         <input type="hidden" name="existing_questions[<?php echo $q_item['id']; ?>][id]" value="<?php echo $q_item['id']; ?>">
+                        <input type="hidden" name="existing_questions[<?php echo $q_item['id']; ?>][current_image_url]" value="<?php echo htmlspecialchars($q_item['image_url']); ?>">
+
                         <div class="row">
                             <div class="col-md-9 mb-3">
                                 <label class="form-label">প্রশ্নের লেখা <span class="text-danger">*</span></label>
@@ -331,6 +397,22 @@ require_once 'includes/header.php';
                                 <input type="number" class="form-control" name="existing_questions[<?php echo $q_item['id']; ?>][order_number]" value="<?php echo htmlspecialchars($q_item['order_number']); ?>" min="1">
                             </div>
                         </div>
+
+                        <div class="mb-3">
+                            <label class="form-label">প্রশ্ন সম্পর্কিত ছবি (ঐচ্ছিক)</label>
+                            <?php if (!empty($q_item['image_url'])): ?>
+                                <div class="mb-2">
+                                    <img src="<?php echo QUESTION_IMAGE_BASE_URL_EDIT . htmlspecialchars($q_item['image_url']); ?>" alt="Question Image" style="max-width: 200px; max-height: 150px; border: 1px solid #ddd; padding: 5px;">
+                                    <div class="form-check mt-1">
+                                        <input class="form-check-input" type="checkbox" name="existing_questions[<?php echo $q_item['id']; ?>][remove_image]" value="1" id="remove_image_<?php echo $q_item['id']; ?>">
+                                        <label class="form-check-label" for="remove_image_<?php echo $q_item['id']; ?>">এই ছবিটি মুছে ফেলুন</label>
+                                    </div>
+                                </div>
+                            <?php endif; ?>
+                            <input type="file" class="form-control" name="existing_questions_files[<?php echo $q_item['id']; ?>][image_url]" accept="image/jpeg,image/png,image/gif,image/webp">
+                             <small class="form-text text-muted">নতুন ছবি আপলোড করলে আগেরটি (যদি থাকে) প্রতিস্থাপিত হবে। ছবি মুছতে উপরের চেকবক্সটি সিলেক্ট করুন।</small>
+                        </div>
+                        
                         <div class="options-container mb-3">
                             <label class="form-label">অপশন ও সঠিক উত্তর <span class="text-danger">*</span></label>
                             <?php 
@@ -350,13 +432,6 @@ require_once 'includes/header.php';
                                        placeholder="অপশন <?php echo $opt_idx + 1; ?>" required>
                             </div>
                             <?php endforeach; ?>
-                             <?php if (count($q_item['options']) < 4): 
-                                for ($k = count($q_item['options']); $k < 4; $k++): ?>
-                                <div class="input-group mb-2">
-                                    <div class="input-group-text"><input class="form-check-input mt-0" type="radio" name="<?php echo $radio_group_name; ?>" value="new_<?php echo $k; ?>" disabled></div>
-                                    <input type="text" class="form-control" placeholder="অপশন <?php echo $k + 1; ?> (প্রয়োজনে যোগ করুন)" disabled>
-                                </div>
-                                <?php endfor; endif; ?>
                         </div>
                         <div class="mb-3">
                             <label class="form-label">ব্যাখ্যা (ঐচ্ছিক)</label>
@@ -387,6 +462,11 @@ require_once 'includes/header.php';
                             <label class="form-label">প্রশ্নের ক্রম (ঐচ্ছিক)</label>
                              <input type="number" class="form-control" name="new_questions[0][order_number]" placeholder="যেমন: <?php echo count($questions_data) + 1; ?>" min="1">
                         </div>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">প্রশ্ন সম্পর্কিত ছবি (ঐচ্ছিক)</label>
+                        <input type="file" class="form-control" name="new_questions_files[0][image_url]" accept="image/jpeg,image/png,image/gif,image/webp">
+                        <small class="form-text text-muted">অনুমোদিত ছবির ধরণ: JPG, PNG, GIF, WEBP. সর্বোচ্চ সাইজ: 5MB.</small>
                     </div>
                     <div class="options-container mb-3">
                         <label class="form-label">অপশন ও সঠিক উত্তর <span class="text-danger">*</span></label>
@@ -426,7 +506,7 @@ document.addEventListener('DOMContentLoaded', function () {
     
     let newQuestionCounter = 0; 
 
-    function updateNewQuestionBlock(block, currentIndex) {
+    function updateNewQuestionBlockAttributes(block, currentIndex) {
         block.querySelector('.new-question-number').textContent = currentIndex + 1; 
         block.dataset.newQuestionIndex = currentIndex; 
 
@@ -434,23 +514,20 @@ document.addEventListener('DOMContentLoaded', function () {
             let oldName = input.getAttribute('name');
             let newName = oldName.replace(/new_questions\[\d+\]/, `new_questions[${currentIndex}]`);
             input.setAttribute('name', newName);
-            // For new questions, ensure textarea and text inputs are required only if it's not a dummy template part
-            if (input.tagName.toLowerCase() === 'textarea' && newName.includes('[text]')) {
-                input.required = true;
-            } else if (input.type === 'text' && newName.includes('[options]')) {
-                 input.required = true;
-            }
+            if (input.tagName.toLowerCase() === 'textarea' && newName.includes('[text]')) input.required = true;
+            else if (input.type === 'text' && newName.includes('[options]')) input.required = true;
         });
         
+        // Update file input name for new questions
+        const fileInput = block.querySelector('input[type="file"][name^="new_questions_files["]');
+        if (fileInput) {
+            fileInput.setAttribute('name', `new_questions_files[${currentIndex}][image_url]`);
+        }
+
         const radioGroupName = `new_questions[${currentIndex}][correct_option_new]`;
-        let firstRadio = true;
         block.querySelectorAll('input[type="radio"]').forEach(radio => {
             radio.setAttribute('name', radioGroupName);
-            radio.required = true; // A correct option must be chosen
-            if (firstRadio) { // Check the first option by default for new questions
-                // radio.checked = true; // Optional: Check first by default
-                firstRadio = false;
-            }
+            radio.required = true;
         });
     }
 
@@ -458,30 +535,18 @@ document.addEventListener('DOMContentLoaded', function () {
         const newClonedBlock = templateNewQuestionBlock.cloneNode(true);
         newClonedBlock.style.display = 'block'; 
         
-        updateNewQuestionBlock(newClonedBlock, newQuestionCounter);
+        updateNewQuestionBlockAttributes(newClonedBlock, newQuestionCounter);
         newQuestionCounter++;
         
-        newClonedBlock.querySelectorAll('textarea, input[type="text"]').forEach(input => input.value = '');
+        newClonedBlock.querySelectorAll('textarea, input[type="text"], input[type="file"]').forEach(input => input.value = '');
         newClonedBlock.querySelectorAll('input[type="radio"]').forEach(radio => radio.checked = false);
-        // Default check first radio of new block
         const firstRadioInClone = newClonedBlock.querySelector('input[type="radio"]');
         if(firstRadioInClone) firstRadioInClone.checked = true;
 
         newClonedBlock.querySelector('.remove-new-question').addEventListener('click', function () {
             newClonedBlock.remove();
-            // Re-number displayed indices of new questions if needed (visual only)
-            let displayIdx = 0;
-            newQuestionsContainer.querySelectorAll('.new-question-block:not([style*="display:none"])').forEach(visibleBlock => {
-                displayIdx++; // This only makes sense if you're adjusting numbers after deletion.
-                              // Simpler approach is to let numbers be non-sequential on client after deletion
-                              // as backend will handle array keys.
-                // visibleBlock.querySelector('.new-question-number').textContent = displayIdx;
-            });
-             if (newQuestionsContainer.querySelectorAll('.new-question-block:not([style*="display:none"])').length === 0 && document.getElementById('no_existing_questions_message')) {
-                 // Show "no existing questions" only if also no new questions are visible
-             }
-
-
+            // Consider re-indexing or re-numbering if strict sequential numbering is important after deletion.
+            // For simplicity, we are not re-calculating 'newQuestionCounter' on removal here.
         });
         
         newQuestionsContainer.appendChild(newClonedBlock);

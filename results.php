@@ -110,7 +110,7 @@ function prepare_results_data($conn, $current_attempt_id, $current_quiz_id, $cur
 
         $sql_review = "
             SELECT 
-                q.id AS question_id, q.question_text, q.explanation,
+                q.id AS question_id, q.question_text, q.image_url, q.explanation,
                 ua.selected_option_id AS user_selected_option_id,
                 (SELECT GROUP_CONCAT(CONCAT(o.id, '::', o.option_text, '::', o.is_correct) SEPARATOR '||') 
                  FROM options o WHERE o.question_id = q.id ORDER BY o.id) AS all_options_details
@@ -210,28 +210,24 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['quiz_id']) && isset($_
         $correct_options_map = []; 
         $all_questions_map = []; 
         while($qo_row = $qo_results->fetch_assoc()){
-            $all_questions_map[$qo_row['question_id']] = true; // Populate map of all question IDs in the quiz
+            $all_questions_map[$qo_row['question_id']] = true; 
             if($qo_row['is_correct'] == 1){
                 $correct_options_map[$qo_row['question_id']] = $qo_row['option_id'];
             }
         }
         $stmt_qo->close();
 
-        // Iterate over all questions that BELONG to the quiz
         foreach ($all_questions_map as $question_id_loop => $val) {
             $selected_option_id = isset($submitted_answers[$question_id_loop]) ? intval($submitted_answers[$question_id_loop]) : null;
             $is_correct_answer = 0;
 
-            if ($selected_option_id !== null) { // If an answer was submitted for this question
+            if ($selected_option_id !== null) { 
                 if (isset($correct_options_map[$question_id_loop]) && $correct_options_map[$question_id_loop] == $selected_option_id) {
                     $is_correct_answer = 1;
                     $questions_answered_correctly++;
                 }
             }
             
-            // Save the answer (or lack thereof) to user_answers
-            // This uses INSERT. If save_answer_ajax.php is used, this should be an UPSERT.
-            // Based on current quiz_page.php, AJAX save is not implemented, so INSERT is fine.
             if ($selected_option_id === null) {
                  $stmt_insert_answer_final = $conn->prepare("INSERT INTO user_answers (attempt_id, question_id, selected_option_id, is_correct) VALUES (?, ?, NULL, ?)");
                  if(!$stmt_insert_answer_final) throw new Exception("ব্যবহারকারীর উত্তর সংরক্ষণ स्टेटमेंट প্রস্তুত করতে সমস্যা হয়েছে (NULL): " . $conn->error);
@@ -257,13 +253,10 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['quiz_id']) && isset($_
 
         $conn->commit();
         
-        // After successful commit, prepare data for display
         $results_display_data = prepare_results_data($conn, $attempt_id, $quiz_id, $user_id);
         if ($results_display_data['success']) {
             extract($results_display_data); 
         } else {
-            // If data preparation fails, redirect to quizzes page with a generic message
-            // The specific error from prepare_results_data would have set a flash message
             header("Location: quizzes.php");
             exit;
         }
@@ -280,7 +273,6 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['quiz_id']) && isset($_
 } elseif ($_SERVER["REQUEST_METHOD"] == "GET" && isset($_GET['attempt_id']) && isset($_GET['quiz_id'])) {
     $attempt_id = intval($_GET['attempt_id']);
     $quiz_id = intval($_GET['quiz_id']);
-    // $user_id is already set from session
 
     if ($quiz_id <= 0 || $attempt_id <= 0) {
         $_SESSION['flash_message'] = "অবৈধ আইডি প্রদান করা হয়েছে।";
@@ -288,16 +280,12 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['quiz_id']) && isset($_
         header("Location: quizzes.php");
         exit;
     }
-    
-    // Flash messages from previous actions (e.g., login redirect) will be handled by display_flash_message in header
-    
+        
     $results_display_data = prepare_results_data($conn, $attempt_id, $quiz_id, $user_id);
 
     if ($results_display_data['success']) {
         extract($results_display_data); 
     } else {
-        // If data preparation fails (e.g. attempt not found, not authorized),
-        // prepare_results_data would have set a flash message. Redirect to quizzes.
         header("Location: quizzes.php");
         exit;
     }
@@ -309,14 +297,13 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['quiz_id']) && isset($_
     exit;
 }
 
-// $page_title should now be set from extract($results_display_data)
 require_once 'includes/header.php';
 ?>
 
 <style>
 @media print {
     @page {
-        margin: 0!important; /* Changed from none to 0 for better compatibility */
+        margin: 0!important; 
         size: A4;
     }
     body * {
@@ -341,23 +328,22 @@ require_once 'includes/header.php';
     .badge { 
         border: 1px solid #ccc;
         padding: 0.3em 0.5em;
-        background-color: #fff !important; /* Ensure visibility on print */
-        color: #000 !important; /* Ensure visibility on print */
+        background-color: #fff !important; 
+        color: #000 !important; 
     }
      .badge.bg-success-subtle, .badge.bg-danger-subtle, .badge.bg-warning-subtle {
-        border: 1px solid #ccc !important; /* Ensure border for all badges */
+        border: 1px solid #ccc !important; 
     }
     .text-success-emphasis { color: #0f5132 !important; }
     .text-danger-emphasis { color: #58151c !important; }
     .text-warning-emphasis { color: #664d03 !important; }
 
     .btn, .alert:not(.print-header-message), .timer-progress-bar, footer, header, .navbar, .footer, 
-    .feedback-message, .text-center.mb-4:has(h3), .text-center.mb-4:has(a.btn-info), /* Hide score/time and ranking button block more specifically */
+    .feedback-message, .text-center.mb-4:has(h3), .text-center.mb-4:has(a.btn-info), 
     hr,
-    .card.shadow-sm > .card-header.bg-light, /* Hide main card header */
-    /* .card.shadow-sm > .card-body.p-4 > .text-center.mb-4, // Already targeted more specifically above */
+    .card.shadow-sm > .card-header.bg-light, 
     .card.shadow-sm > .card-body.p-4 > hr, 
-    .card.shadow-sm > .card-body.p-4 > .text-center.mt-4 /* Hide bottom navigation buttons */
+    .card.shadow-sm > .card-body.p-4 > .text-center.mt-4 
      {
         display: none !important;
     }
@@ -370,15 +356,19 @@ require_once 'includes/header.php';
         font-weight: bold;
         width: 100%;
     }
-    .print-header-message { /* Any alert that needs to be visible in print */
+    .print-header-message { 
         visibility: visible;
-        display: block !important; /* Override display none */
+        display: block !important; 
     }
 
     .answer-review {
         column-count: 2;
         column-gap: 20px;
         font-size: 10pt;
+    }
+    .question-image-review { /* Style for images in print review */
+        max-height: 120px; /* Adjust as needed for print layout */
+        margin-bottom: 5px;
     }
 
     .answer-review .card {
@@ -387,17 +377,17 @@ require_once 'includes/header.php';
         width: 100%; 
         margin-bottom: 15px !important; 
         font-size: inherit; 
-        border: 1px solid #ddd !important; /* Add border to question cards for print */
+        border: 1px solid #ddd !important; 
     }
     .answer-review .card-header, .answer-review .card-body {
         padding: 0.5rem !important;
         font-size: inherit;
-        border: none !important; /* Remove internal borders of card-header/body for print */
+        border: none !important; 
     }
     .answer-review .list-group-item {
         padding: 0.3rem 0.5rem !important;
         font-size: 0.9em; 
-        border: 1px solid #eee !important; /* Ensure borders for options */
+        border: 1px solid #eee !important; 
     }
     .answer-review .card-header strong {
         font-size: 1.1em; 
@@ -406,15 +396,27 @@ require_once 'includes/header.php';
         padding: 0.3rem !important;
         font-size: 0.9em;
         margin-top: 0.5rem !important;
-        background-color: #f8f9fa !important; /* Ensure bg color for explanation */
+        background-color: #f8f9fa !important; 
         border: 1px solid #ddd !important;
     }
-    #printableArea > h3.mt-4.mb-3 { /* "উত্তর পর্যালোচনা" heading */
+    #printableArea > h3.mt-4.mb-3 { 
         display: none !important;
     }
-    .container.mt-5 > .card.shadow-sm > .card-body.p-4 > .text-center.my-3:has(button) { /* Print button div */
+    .container.mt-5 > .card.shadow-sm > .card-body.p-4 > .text-center.my-3:has(button) { 
         display: none !important;
     }
+}
+.question-image-review { /* General style for images in review on screen */
+    max-width: 100%;
+    height: auto;
+    max-height: 200px; /* Adjust for screen */
+    margin-bottom: 10px;
+    border-radius: 4px;
+    display: block;
+    margin-left: auto;
+    margin-right: auto;
+    border: 1px solid #eee;
+    padding: 3px;
 }
 </style>
 
@@ -445,11 +447,9 @@ require_once 'includes/header.php';
                             if ($now < $live_end) {
                                 $show_ranking_now = false; 
                             }
-                        } catch (Exception $e) {
-                            // Invalid date format, assume ranking can be shown
-                        }
+                        } catch (Exception $e) { /* Invalid date format, show ranking */ }
                     } else {
-                         $show_ranking_now = true; // Live quiz, no end date, show ranking
+                         $show_ranking_now = true; 
                     }
                 }
                 
@@ -476,6 +476,11 @@ require_once 'includes/header.php';
                                 <strong>প্রশ্ন <?php echo $index + 1; ?>:</strong> <?php echo nl2br(htmlspecialchars($question['question_text'])); ?>
                             </div>
                             <div class="card-body">
+                                <?php if (!empty($question['image_url'])): ?>
+                                    <div class="mb-2 text-center">
+                                        <img src="<?php echo $base_url . escape_html($question['image_url']); ?>" alt="প্রশ্ন সম্পর্কিত ছবি" class="img-fluid question-image-review">
+                                    </div>
+                                <?php endif; ?>
                                 <ul class="list-group list-group-flush">
                                     <?php 
                                     $user_correct_for_this_q = false;
@@ -487,12 +492,10 @@ require_once 'includes/header.php';
                                         $user_correct_for_this_q = true;
                                     }
                                     ?>
-
                                     <?php foreach ($question['options_list'] as $option): ?>
                                         <?php
                                         $option_class = 'list-group-item';
                                         $option_label = '';
-
                                         if ($option['id'] == $question['user_selected_option_id']) { 
                                             if ($option['is_correct'] == 1) {
                                                 $option_class .= ' correct-user-answer'; 

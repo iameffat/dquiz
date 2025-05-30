@@ -179,3 +179,38 @@ main {
 .answer-review .list-group-item .fw-bold { /* For the (আপনার সঠিক উত্তর) text */
     font-size: 0.9em;
 }
+/* For images displayed during quiz taking (quiz_page.php) */
+.question-image {
+    max-width: 100%;
+    height: auto;
+    margin-bottom: 15px; /* Space between image and options */
+    border-radius: 5px;
+    box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+    display: block; /* Helps with centering if margin auto is used */
+    margin-left: auto;
+    margin-right: auto;
+}
+
+/* For images displayed during results review (results.php) */
+.question-image-review {
+    max-width: 100%; /* Ensures responsiveness */
+    max-height: 250px; /* Constrain max height for review page */
+    height: auto;
+    margin-bottom: 10px;
+    border-radius: 4px;
+    display: block;
+    margin-left: auto;
+    margin-right: auto;
+    border: 1px solid #eee;
+    padding: 3px;
+}
+
+/* Admin panel image previews (edit_quiz.php) */
+.admin-question-image-preview {
+    max-width: 200px;
+    max-height: 150px;
+    border: 1px solid #ddd;
+    padding: 5px;
+    border-radius: 4px;
+    margin-bottom: 5px;
+}
