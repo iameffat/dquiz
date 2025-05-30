@@ -251,12 +251,26 @@ document.addEventListener('DOMContentLoaded', function() {
     const timerDisplay = document.getElementById('timer');
     const progressIndicator = document.getElementById('progress_indicator');
     const totalQuestions = <?php echo $total_questions; ?>;
-    const answeredQuestionLocks = new Set(); 
+    const answeredQuestionLocks = new Set(); // Stores question IDs that are locked
 
     let timeLeft = <?php echo $quiz_duration_seconds; ?>;
 
     function updateTimerDisplay() {
-        // ... (Timer display logic as in the provided file)
+        const minutes = Math.floor(timeLeft / 60);
+        const seconds = timeLeft % 60;
+        timerDisplay.textContent = `সময়: ${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
+        if (timeLeft <= 60 && timeLeft > 0) { 
+            timerDisplay.classList.add('critical');
+        } else if (timeLeft <= 0) {
+            timerDisplay.classList.remove('critical'); 
+            timerDisplay.textContent = "সময় শেষ!";
+            if (quizForm && !quizForm.dataset.submitted) {
+                quizForm.dataset.submitted = 'true'; 
+                quizForm.submit();
+            }
+            clearInterval(timerInterval);
+        }
+        if (timeLeft > 0) timeLeft--; else timeLeft = 0; 
     }
 
     updateTimerDisplay(); 
@@ -265,49 +279,20 @@ document.addEventListener('DOMContentLoaded', function() {
     const questionCards = document.querySelectorAll('.question-card');
 
     questionCards.forEach(questionCard => {
-        const questionIdFromCard = questionCard.dataset.questionId; 
+        const questionId = questionCard.dataset.questionId; // Get questionId from card
         const radiosInThisGroup = questionCard.querySelectorAll(`.question-option-radio`);
 
         radiosInThisGroup.forEach(radio => {
             radio.addEventListener('change', function() {
-                if (this.checked && !answeredQuestionLocks.has(questionIdFromCard)) {
-                    // --- AJAX Call to save_answer_ajax.php ---
-                    const questionId = this.dataset.questionId;
-                    const selectedOptionId = this.value;
-                    const attemptId = document.querySelector('input[name="attempt_id"]').value;
+                // 'this' is the radio button that just got checked
+                if (this.checked && !answeredQuestionLocks.has(questionId)) {
+                    // This is the FIRST time an answer is selected for this question
 
-                    const xhr = new XMLHttpRequest();
-                    xhr.open('POST', 'save_answer_ajax.php', true);
-                    xhr.setRequestHeader('Content-type', 'application/x-www-form-urlencoded');
-                    
-                    xhr.onload = function() {
-                        if (xhr.status === 200) {
-                            // console.log('Answer saved via AJAX for question:', questionId);
-                            try {
-                                const response = JSON.parse(xhr.responseText);
-                                if(response.status !== 'success') {
-                                    // console.warn('Server responded with an error:', response.message);
-                                }
-                            } catch (e) {
-                                // console.warn('Could not parse AJAX response:', xhr.responseText);
-                            }
-                        } else {
-                            // console.error('Failed to save answer via AJAX. Status:', xhr.status);
-                        }
-                    };
-                    xhr.onerror = function() {
-                        // console.error('Network error during AJAX answer save.');
-                    };
-
-                    const params = `attempt_id=${attemptId}&question_id=${questionId}&selected_option_id=${selectedOptionId}`;
-                    xhr.send(params);
-                    // --- End of AJAX Call ---
-
-                    // UI updates for selected option and locking
+                    // 1. Style all options in this group
                     const allLabelsInQuestion = questionCard.querySelectorAll('.question-option-wrapper label');
                     allLabelsInQuestion.forEach(lbl => {
                         lbl.classList.remove('selected-option-display', 'border-primary', 'border-2');
-                        lbl.style.opacity = '1';
+                        lbl.style.opacity = '1'; // Reset opacity
                     });
 
                     radiosInThisGroup.forEach(r => {
@@ -325,26 +310,41 @@ document.addEventListener('DOMContentLoaded', function() {
                             }
                         }
                     });
-                    
-                    answeredQuestionLocks.add(questionIdFromCard);
+
+                    // 2. Lock this question
+                    answeredQuestionLocks.add(questionId);
+
+                    // 3. Update progress
                     progressIndicator.textContent = `উত্তর: ${answeredQuestionLocks.size}/${totalQuestions}`;
 
+                    // 4. Add 'click' event listeners to all OTHER radios in THIS group
+                    //    to prevent them from being checked.
                     radiosInThisGroup.forEach(otherRadioInGroup => {
-                        if (otherRadioInGroup !== this) {
+                        if (otherRadioInGroup !== this) { // Don't add to the one just selected
                             otherRadioInGroup.addEventListener('click', function preventClickOnOthers(event) {
                                 event.preventDefault();
                             });
+                            // Optionally, make labels of other options less interactive visually
                             const otherLabel = otherRadioInGroup.closest('.question-option-wrapper').querySelector('label');
                             if(otherLabel) otherLabel.style.cursor = 'default';
                         }
                     });
-                    const selectedLabel = this.closest('.question-option-wrapper').querySelector('label');
-                    if(selectedLabel) selectedLabel.style.cursor = 'default';
+                    // Make the selected label also non-interactive if desired after locking
+                     const selectedLabel = this.closest('.question-option-wrapper').querySelector('label');
+                     if(selectedLabel) selectedLabel.style.cursor = 'default';
+
+
+                } else if (this.checked && answeredQuestionLocks.has(questionId)) {
+                    // This case should ideally not be reached if the click prevention on other radios works.
+                    // It means a 'change' event occurred on a question that's already locked.
+                    // This could happen if the user clicks the *already selected* radio again.
+                    // In this scenario, no action is needed as the state isn't changing.
                 }
             });
         });
     });
 
+    // Prevent form resubmission on page refresh/back
     if (window.history.replaceState) {
         window.history.replaceState(null, null, window.location.href);
     }
