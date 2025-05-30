@@ -17,7 +17,7 @@ if (!isset($_SESSION["loggedin"]) || $_SESSION["loggedin"] !== true) {
     exit;
 }
 
-$user_id = $_SESSION['user_id'];
+$user_id = $_SESSION['user_id']; // User ID from session
 $quiz_id = 0;
 $attempt_id = 0;
 $total_score = 0;
@@ -25,14 +25,12 @@ $total_questions_in_quiz = 0;
 $time_taken_seconds = null;
 $feedback_message = "";
 $feedback_class = "";
-$quiz_info_result = null; // এই ভ্যারিয়েবল কুইজের তথ্য ধারণ করবে
+$quiz_info_result = null; 
 $review_questions = [];
-$page_title = "কুইজের ফলাফল"; // ডিফল্ট পেইজ টাইটেল
+$page_title = "কুইজের ফলাফল"; // Default page title
 
-// Function to fetch and prepare result display data (অপরিবর্তিত)
+// Function to fetch and prepare result display data
 function prepare_results_data($conn, $current_attempt_id, $current_quiz_id, $current_user_id) {
-    // ... (এই ফাংশনের ভেতরের কোড অপরিবর্তিত থাকবে) ...
-    // শুধু page_title সেট করার পর quiz_info_result ও রিটার্ন করুন
     $display_data = [
         'success' => false,
         'quiz_id' => $current_quiz_id,
@@ -42,7 +40,7 @@ function prepare_results_data($conn, $current_attempt_id, $current_quiz_id, $cur
         'time_taken_seconds' => null,
         'feedback_message' => '',
         'feedback_class' => '',
-        'quiz_info_result' => null, // Added for quiz title in print
+        'quiz_info_result' => null,
         'review_questions' => [],
         'page_title' => "কুইজের ফলাফল"
     ];
@@ -88,7 +86,7 @@ function prepare_results_data($conn, $current_attempt_id, $current_quiz_id, $cur
         $stmt_quiz_info->close();
 
         if ($quiz_info_res) {
-            $display_data['quiz_info_result'] = $quiz_info_res; // Store quiz_info
+            $display_data['quiz_info_result'] = $quiz_info_res;
             $display_data['page_title'] = "ফলাফল: " . htmlspecialchars($quiz_info_res['title']);
             $display_data['total_questions_in_quiz'] = $quiz_info_res['total_questions'];
         } else {
@@ -158,10 +156,12 @@ function prepare_results_data($conn, $current_attempt_id, $current_quiz_id, $cur
 }
 
 
-if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['quiz_id']) && isset($_POST['attempt_id'])) { // পরিবর্তিত শর্ত
+// Handles quiz submission (manual or auto by timer)
+if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['quiz_id']) && isset($_POST['attempt_id'])) {
     $quiz_id = intval($_POST['quiz_id']);
     $attempt_id = intval($_POST['attempt_id']);
     $submitted_answers = isset($_POST['answers']) ? $_POST['answers'] : [];
+    // $user_id is already set from session at the top
 
     if ($quiz_id <= 0 || $attempt_id <= 0) {
         $_SESSION['flash_message'] = "ফলাফল দেখাতে সমস্যা হয়েছে। (অবৈধ IDs)";
@@ -170,17 +170,13 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['quiz_id']) && isset($_
         exit;
     }
 
-    // ব্যবহারকারীর লগইন স্টেটাস এবং আইডি এখানে আবার যাচাই করা যেতে পারে যদি প্রয়োজন হয়
-    // $user_id = $_SESSION['user_id'];
-
     $end_time_dt = new DateTime();
     $end_time = $end_time_dt->format('Y-m-d H:i:s');
     $time_taken_seconds = null;
 
     $sql_get_start_time = "SELECT start_time FROM quiz_attempts WHERE id = ? AND user_id = ?";
     $stmt_get_start_time = $conn->prepare($sql_get_start_time);
-    // $user_id এখানে $_SESSION['user_id'] থেকে আসবে
-    $stmt_get_start_time->bind_param("ii", $attempt_id, $_SESSION['user_id']); 
+    $stmt_get_start_time->bind_param("ii", $attempt_id, $user_id);
     $stmt_get_start_time->execute();
     $result_start_time = $stmt_get_start_time->get_result();
     if ($result_start_time->num_rows > 0) {
@@ -214,49 +210,46 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['quiz_id']) && isset($_
         $correct_options_map = []; 
         $all_questions_map = []; 
         while($qo_row = $qo_results->fetch_assoc()){
-            $all_questions_map[$qo_row['question_id']] = true;
+            $all_questions_map[$qo_row['question_id']] = true; // Populate map of all question IDs in the quiz
             if($qo_row['is_correct'] == 1){
                 $correct_options_map[$qo_row['question_id']] = $qo_row['option_id'];
             }
         }
         $stmt_qo->close();
 
+        // Iterate over all questions that BELONG to the quiz
         foreach ($all_questions_map as $question_id_loop => $val) {
             $selected_option_id = isset($submitted_answers[$question_id_loop]) ? intval($submitted_answers[$question_id_loop]) : null;
             $is_correct_answer = 0;
 
-            if ($selected_option_id !== null) {
+            if ($selected_option_id !== null) { // If an answer was submitted for this question
                 if (isset($correct_options_map[$question_id_loop]) && $correct_options_map[$question_id_loop] == $selected_option_id) {
                     $is_correct_answer = 1;
                     $questions_answered_correctly++;
                 }
             }
             
-            // user_answers টেবিলে উত্তর সংরক্ষণ (যদি AJAX সেভ না করা হয়ে থাকে, তবে এটিই প্রথম সেভ হবে)
-            // যদি AJAX সেভ ব্যবহার করা হয়, তবে এখানে ON DUPLICATE KEY UPDATE ব্যবহার করা উচিত।
-            // যেহেতু quiz_page.php তে AJAX সেভের কোড নেই, সরাসরি INSERT ব্যবহার করা যেতে পারে।
+            // Save the answer (or lack thereof) to user_answers
+            // This uses INSERT. If save_answer_ajax.php is used, this should be an UPSERT.
+            // Based on current quiz_page.php, AJAX save is not implemented, so INSERT is fine.
             if ($selected_option_id === null) {
                  $stmt_insert_answer_final = $conn->prepare("INSERT INTO user_answers (attempt_id, question_id, selected_option_id, is_correct) VALUES (?, ?, NULL, ?)");
                  if(!$stmt_insert_answer_final) throw new Exception("ব্যবহারকারীর উত্তর সংরক্ষণ स्टेटमेंट প্রস্তুত করতে সমস্যা হয়েছে (NULL): " . $conn->error);
                  $stmt_insert_answer_final->bind_param("iii", $attempt_id, $question_id_loop, $is_correct_answer);
-                 if (!$stmt_insert_answer_final->execute()) throw new Exception("ব্যবহারকারীর উত্তর সংরক্ষণ করতে সমস্যা হয়েছে (প্রশ্ন ID: $question_id_loop): " . $stmt_insert_answer_final->error);
-                 $stmt_insert_answer_final->close();
             } else {
-                 $sql_insert_answer = "INSERT INTO user_answers (attempt_id, question_id, selected_option_id, is_correct) VALUES (?, ?, ?, ?)";
-                 $stmt_insert_answer = $conn->prepare($sql_insert_answer);
-                 if(!$stmt_insert_answer) throw new Exception("ব্যবহারকারীর উত্তর সংরক্ষণ स्टेटमेंट প্রস্তুত করতে সমস্যা হয়েছে: " . $conn->error);
-                 $stmt_insert_answer->bind_param("iiii", $attempt_id, $question_id_loop, $selected_option_id, $is_correct_answer);
-                 if (!$stmt_insert_answer->execute()) throw new Exception("ব্যবহারকারীর উত্তর সংরক্ষণ করতে সমস্যা হয়েছে (প্রশ্ন ID: $question_id_loop): " . $stmt_insert_answer->error);
-                 $stmt_insert_answer->close();
+                 $stmt_insert_answer_final = $conn->prepare("INSERT INTO user_answers (attempt_id, question_id, selected_option_id, is_correct) VALUES (?, ?, ?, ?)");
+                 if(!$stmt_insert_answer_final) throw new Exception("ব্যবহারকারীর উত্তর সংরক্ষণ स्टेटमेंट প্রস্তুত করতে সমস্যা হয়েছে: " . $conn->error);
+                 $stmt_insert_answer_final->bind_param("iiii", $attempt_id, $question_id_loop, $selected_option_id, $is_correct_answer);
             }
+            if (!$stmt_insert_answer_final->execute()) throw new Exception("ব্যবহারকারীর উত্তর সংরক্ষণ করতে সমস্যা হয়েছে (প্রশ্ন ID: $question_id_loop): " . $stmt_insert_answer_final->error);
+            $stmt_insert_answer_final->close();
         }
 
         $total_score = $questions_answered_correctly;
 
         $sql_update_attempt = "UPDATE quiz_attempts SET score = ?, end_time = ?, time_taken_seconds = ?, submitted_at = NOW() WHERE id = ? AND user_id = ?";
         $stmt_update_attempt = $conn->prepare($sql_update_attempt);
-        // $user_id এখানে $_SESSION['user_id'] থেকে আসবে
-        $stmt_update_attempt->bind_param("isiii", $total_score, $end_time, $time_taken_seconds, $attempt_id, $_SESSION['user_id']); 
+        $stmt_update_attempt->bind_param("isiii", $total_score, $end_time, $time_taken_seconds, $attempt_id, $user_id);
         if (!$stmt_update_attempt->execute()) {
              throw new Exception("কুইজের চেষ্টা আপডেট করতে সমস্যা হয়েছে: " . $stmt_update_attempt->error);
         }
@@ -264,12 +257,13 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['quiz_id']) && isset($_
 
         $conn->commit();
         
-        // ফলাফল দেখানোর জন্য ডেটা প্রস্তুত করা
-        $results_display_data = prepare_results_data($conn, $attempt_id, $quiz_id, $_SESSION['user_id']);
+        // After successful commit, prepare data for display
+        $results_display_data = prepare_results_data($conn, $attempt_id, $quiz_id, $user_id);
         if ($results_display_data['success']) {
             extract($results_display_data); 
         } else {
-            // যদি prepare_results_data ব্যর্থ হয়, তাহলে quizzes.php তে রিডাইরেক্ট করুন
+            // If data preparation fails, redirect to quizzes page with a generic message
+            // The specific error from prepare_results_data would have set a flash message
             header("Location: quizzes.php");
             exit;
         }
@@ -286,6 +280,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['quiz_id']) && isset($_
 } elseif ($_SERVER["REQUEST_METHOD"] == "GET" && isset($_GET['attempt_id']) && isset($_GET['quiz_id'])) {
     $attempt_id = intval($_GET['attempt_id']);
     $quiz_id = intval($_GET['quiz_id']);
+    // $user_id is already set from session
 
     if ($quiz_id <= 0 || $attempt_id <= 0) {
         $_SESSION['flash_message'] = "অবৈধ আইডি প্রদান করা হয়েছে।";
@@ -294,17 +289,15 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['quiz_id']) && isset($_
         exit;
     }
     
-    if (isset($_SESSION['flash_message']) && isset($_SESSION['flash_message_type'])) {
-        // Flash message will be displayed by display_flash_message() in header
-    }
-
+    // Flash messages from previous actions (e.g., login redirect) will be handled by display_flash_message in header
+    
     $results_display_data = prepare_results_data($conn, $attempt_id, $quiz_id, $user_id);
 
     if ($results_display_data['success']) {
         extract($results_display_data); 
     } else {
-        // যদি prepare_results_data ব্যর্থ হয়, তাহলে quizzes.php তে রিডাইরেক্ট করুন
-        // অথবা যেখানে উপযুক্ত মনে হয়
+        // If data preparation fails (e.g. attempt not found, not authorized),
+        // prepare_results_data would have set a flash message. Redirect to quizzes.
         header("Location: quizzes.php");
         exit;
     }
@@ -316,19 +309,14 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['quiz_id']) && isset($_
     exit;
 }
 
-// $page_title এখন $results_display_data থেকে সেট হবে (extract() এর মাধ্যমে) অথবা ডিফল্ট থাকবে
-// require_once 'includes/header.php'; এর আগে page_title সেট করা নিশ্চিত করতে হবে।
-// যেহেতু $page_title prepare_results_data এর মধ্যে সেট হচ্ছে, তাই header.php include করার আগে 
-// $results_display_data থেকে extract করাটা গুরুত্বপূর্ণ।
-
-// header.php এখানে include করা হচ্ছে
+// $page_title should now be set from extract($results_display_data)
 require_once 'includes/header.php';
 ?>
 
 <style>
 @media print {
     @page {
-        margin: none!important;
+        margin: 0!important; /* Changed from none to 0 for better compatibility */
         size: A4;
     }
     body * {
@@ -344,73 +332,89 @@ require_once 'includes/header.php';
         width: 100%;
     }
     .card-header, .card-body {
-        border: none !important; /* Remove borders for cleaner print */
+        border: none !important;
         box-shadow: none !important;
     }
     .list-group-item {
-        border: 1px solid #eee !important; /* Add light border for options in print */
+        border: 1px solid #eee !important;
     }
-    .badge { /* Make badges more prominent in print */
+    .badge { 
         border: 1px solid #ccc;
         padding: 0.3em 0.5em;
+        background-color: #fff !important; /* Ensure visibility on print */
+        color: #000 !important; /* Ensure visibility on print */
     }
+     .badge.bg-success-subtle, .badge.bg-danger-subtle, .badge.bg-warning-subtle {
+        border: 1px solid #ccc !important; /* Ensure border for all badges */
+    }
+    .text-success-emphasis { color: #0f5132 !important; }
+    .text-danger-emphasis { color: #58151c !important; }
+    .text-warning-emphasis { color: #664d03 !important; }
+
     .btn, .alert:not(.print-header-message), .timer-progress-bar, footer, header, .navbar, .footer, 
-    .feedback-message, .text-center.mb-4, .text-center.mt-4, hr,
+    .feedback-message, .text-center.mb-4:has(h3), .text-center.mb-4:has(a.btn-info), /* Hide score/time and ranking button block more specifically */
+    hr,
     .card.shadow-sm > .card-header.bg-light, /* Hide main card header */
-    .card.shadow-sm > .card-body.p-4 > .text-center.mb-4, /* Hide score/time/ranking button block */
-    .card.shadow-sm > .card-body.p-4 > hr, /* Hide the hr above "উত্তর পর্যালোচনা" */
+    /* .card.shadow-sm > .card-body.p-4 > .text-center.mb-4, // Already targeted more specifically above */
+    .card.shadow-sm > .card-body.p-4 > hr, 
     .card.shadow-sm > .card-body.p-4 > .text-center.mt-4 /* Hide bottom navigation buttons */
      {
         display: none !important;
     }
 
-    .print-header { /* কুইজের নামের জন্য */
+    .print-header { 
         visibility: visible;
         text-align: center;
         margin-bottom: 20px;
         font-size: 1.4rem; 
         font-weight: bold;
-        width: 100%; /* কলাম বিভাজনের আগে পুরো প্রস্থ নেবে */
+        width: 100%;
+    }
+    .print-header-message { /* Any alert that needs to be visible in print */
+        visibility: visible;
+        display: block !important; /* Override display none */
     }
 
     .answer-review {
-        column-count: 2; /* কন্টেন্টকে দুটি কলামে ভাগ করবে */
-        column-gap: 20px; /* কলামগুলোর মধ্যে ফাঁকা স্থান */
-        font-size: 10pt; /* প্রিন্টের জন্য ফন্ট সাইজ কমানো হয়েছে */
+        column-count: 2;
+        column-gap: 20px;
+        font-size: 10pt;
     }
 
     .answer-review .card {
-        page-break-inside: avoid; /* একটি প্রশ্ন যেন পেইজের মধ্যে না ভাঙ্গে */
-        break-inside: avoid-column; /* একটি প্রশ্ন যেন কলামের মধ্যে না ভাঙ্গে */
-        width: 100%; /* প্রতিটি প্রশ্ন যেন তার কলামের সম্পূর্ণ প্রস্থ নেয় */
+        page-break-inside: avoid;
+        break-inside: avoid-column;
+        width: 100%; 
         margin-bottom: 15px !important; 
-        font-size: inherit; /* প্যারেন্ট .answer-review থেকে ফন্ট সাইজ পাবে */
+        font-size: inherit; 
+        border: 1px solid #ddd !important; /* Add border to question cards for print */
     }
     .answer-review .card-header, .answer-review .card-body {
-        padding: 0.5rem !important; /* প্রিন্টের জন্য প্যাডিং কমানো হলো */
+        padding: 0.5rem !important;
         font-size: inherit;
+        border: none !important; /* Remove internal borders of card-header/body for print */
     }
     .answer-review .list-group-item {
         padding: 0.3rem 0.5rem !important;
-        font-size: 0.9em; /* অপশনগুলো মূল টেক্সট থেকে একটু ছোট */
+        font-size: 0.9em; 
+        border: 1px solid #eee !important; /* Ensure borders for options */
     }
     .answer-review .card-header strong {
-        font-size: 1.1em; /* প্রশ্ন নম্বর */
+        font-size: 1.1em; 
     }
-    .answer-review .mt-3.p-2.bg-light.border.rounded { /* ব্যাখ্যার বক্স */
+    .answer-review .mt-3.p-2.bg-light.border.rounded { 
         padding: 0.3rem !important;
         font-size: 0.9em;
         margin-top: 0.5rem !important;
+        background-color: #f8f9fa !important; /* Ensure bg color for explanation */
+        border: 1px solid #ddd !important;
     }
-    /* "উত্তর পর্যালোচনা" হেডিংটি প্রিন্টে হাইড করা হয়েছে, কারণ কুইজের নাম হেডিং হিসেবে ব্যবহৃত হচ্ছে */
-    #printableArea > h3.mt-4.mb-3 {
+    #printableArea > h3.mt-4.mb-3 { /* "উত্তর পর্যালোচনা" heading */
         display: none !important;
     }
-    /* প্রিন্ট বাটনটিকেও হাইড করা হয়েছে */
-    .container.mt-5 > .card.shadow-sm > .card-body.p-4 > .text-center.my-3 {
+    .container.mt-5 > .card.shadow-sm > .card-body.p-4 > .text-center.my-3:has(button) { /* Print button div */
         display: none !important;
     }
-}
 }
 </style>
 
@@ -431,7 +435,6 @@ require_once 'includes/header.php';
 
             <div class="text-center mb-4">
                 <?php
-                // ... (র‍্যাংকিং বাটন লজিক অপরিবর্তিত) ...
                 $show_ranking_now = true;
                 $ranking_button_text = "আপনার র‍্যাংকিং দেখুন";
                 if ($quiz_info_result && $quiz_info_result['status'] == 'live') {
@@ -443,10 +446,10 @@ require_once 'includes/header.php';
                                 $show_ranking_now = false; 
                             }
                         } catch (Exception $e) {
-                            // Invalid date format
+                            // Invalid date format, assume ranking can be shown
                         }
                     } else {
-                        $show_ranking_now = true;
+                         $show_ranking_now = true; // Live quiz, no end date, show ranking
                     }
                 }
                 
@@ -475,13 +478,12 @@ require_once 'includes/header.php';
                             <div class="card-body">
                                 <ul class="list-group list-group-flush">
                                     <?php 
-                                    // ... (অপশন দেখানোর লজিক অপরিবর্তিত) ...
                                     $user_correct_for_this_q = false;
                                     $correct_option_id_for_this_q = null;
                                     foreach ($question['options_list'] as $option) {
                                         if ($option['is_correct'] == 1) $correct_option_id_for_this_q = $option['id'];
                                     }
-                                    if ($question['user_selected_option_id'] == $correct_option_id_for_this_q && $question['user_selected_option_id'] !== null) {
+                                    if ($question['user_selected_option_id'] !== null && $question['user_selected_option_id'] == $correct_option_id_for_this_q) {
                                         $user_correct_for_this_q = true;
                                     }
                                     ?>
@@ -511,7 +513,7 @@ require_once 'includes/header.php';
                                     <?php endforeach; ?>
                                 </ul>
                                 <?php if ($question['user_selected_option_id'] === null && !$user_correct_for_this_q) : ?>
-                                     <p class="mt-2 mb-0 text-warning">আপনি এই প্রশ্নের উত্তর দেননি।</p>
+                                     <p class="mt-2 mb-0 text-warning print-header-message">আপনি এই প্রশ্নের উত্তর দেননি।</p>
                                 <?php endif; ?>
 
                                 <?php if (!empty($question['explanation'])): ?>
@@ -523,10 +525,11 @@ require_once 'includes/header.php';
                         </div>
                         <?php endforeach; ?>
                     <?php else: ?>
-                        <p class="alert alert-info">এই ফলাফলের জন্য উত্তর পর্যালোচনা উপলব্ধ নয় অথবা কোনো প্রশ্ন পাওয়া যায়নি।</p>
+                        <p class="alert alert-info print-header-message">এই ফলাফলের জন্য উত্তর পর্যালোচনা উপলব্ধ নয় অথবা কোনো প্রশ্ন পাওয়া যায়নি।</p>
                     <?php endif; ?>
                 </div>
-            </div> <div class="text-center mt-4">
+            </div> 
+             <div class="text-center mt-4">
                 <button onclick="printAnswerSheet()" class="btn btn-outline-primary">উত্তরপত্র প্রিন্ট করুন</button>
                 <a href="quizzes.php" class="btn btn-secondary">সকল কুইজে ফিরে যান</a>
                  <a href="profile.php" class="btn btn-outline-primary">আমার প্রোফাইল</a>
