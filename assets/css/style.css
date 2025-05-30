@@ -1,0 +1,181 @@
+/* assets/css/style.css */
+@font-face {
+  font-family: 'SolaimanLipi';
+  src: url('https://cdn.jsdelivr.net/gh/iameffat/font@master/solaimanv2.woff2') format('truetype');
+  font-weight: normal;
+  font-style: normal;
+  font-display: swap;
+}
+
+body {
+    font-family: 'SolaimanLipi', sans-serif; /* বাংলা ফন্টের জন্য */
+    display: flex;
+    flex-direction: column;
+    min-height: 100vh;
+}
+
+main {
+    flex: 1;
+}
+
+.footer {
+    background-color: #f8f9fa;
+    padding: 20px 0;
+    text-align: center;
+    margin-top: auto;
+}
+
+/* Add more custom styles as needed */
+.auth-form {
+    max-width: 400px;
+    margin: 50px auto;
+    padding: 20px;
+    border: 1px solid #ddd;
+    border-radius: 5px;
+    background-color: #f9f9f9;
+}
+.upcoming-quiz-section {
+    background-color: #e9f5ff;
+    padding: 20px;
+    border-radius: 8px;
+    margin-bottom: 20px;
+}
+.quiz-rules {
+    background-color: #fff9e6;
+    padding: 15px;
+    border-radius: 8px;
+    border: 1px solid #ffecb3;
+}
+.quiz-card {
+    margin-bottom: 20px;
+}
+
+/* Quiz Page Specific */
+.timer-progress-bar {
+    position: sticky;
+    top: 0;
+    z-index: 1000;
+    background-color: #ffffff;
+    padding: 10px 0;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+.timer.critical {
+    color: red;
+    font-weight: bold;
+}
+.question-option {
+    cursor: pointer;
+    padding: 10px;
+    border: 1px solid #eee;
+    margin-bottom: 5px;
+    border-radius: 4px;
+}
+.question-option.selected {
+    background-color: #e0e0e0; /* হালকা অ্যাশ */
+    pointer-events: none; /* একবার সিলেক্ট করলে আর ক্লিক করা যাবে না */
+}
+.question-option:hover:not(.selected) {
+    background-color: #f5f5f5;
+}
+
+/* Results Page Specific */
+.answer-review .correct-user-answer {
+    background-color: #d4edda; /* হালকা সবুজ */
+    border-color: #c3e6cb;
+}
+.answer-review .incorrect-user-answer {
+    background-color: #f8d7da; /* হালকা লাল */
+    border-color: #f5c6cb;
+}
+.answer-review .actual-correct-answer {
+    background-color: #fff3cd; /* হালকা হলুদ */
+    border-color: #ffeeba;
+    font-weight: bold;
+}
+.feedback-message {
+    padding: 15px;
+    border-radius: 5px;
+    margin-bottom: 20px;
+}
+.feedback-message.very-good { background-color: #cce5ff; color: #004085; }
+.feedback-message.good { background-color: #d4edda; color: #155724; }
+.feedback-message.average { background-color: #fff3cd; color: #856404; }
+.feedback-message.improve { background-color: #f8d7da; color: #721c24; }
+
+.quiz-card .card-title {
+    font-size: 1.1rem;
+    font-weight: bold;
+}
+
+.quiz-card .card-text {
+    font-size: 0.9rem;
+    flex-grow: 1; /* Makes description take available space */
+}
+
+.quiz-card ul {
+    font-size: 0.9rem;
+    margin-bottom: 0.5rem; /* Adjust as needed */
+}
+
+/* Quiz Page Specific */
+.timer-progress-bar {
+    position: sticky;
+    top: 0; /* Adjust if you have a fixed navbar above it from header.php */
+    z-index: 1030; /* Ensure it's above other content */
+    background-color: #f8f9fa; /* Light background */
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+.timer.critical {
+    color: red !important;
+    font-weight: bold;
+}
+.question-card .card-header {
+    background-color: #f8f9fa;
+}
+.question-option-wrapper .form-check-label {
+    cursor: pointer;
+    transition: background-color 0.2s ease-in-out, border-color 0.2s ease-in-out;
+}
+.question-option-wrapper .form-check-label:hover {
+    background-color: #f0f0f0;
+}
+
+/* Style for when an option is selected - managed by JS adding classes */
+.question-option-wrapper label.selected-option-display {
+    background-color: #cfe2ff !important; /* Bootstrap's primary-bg-subtle like color */
+    border-color: #9ec5fe !important;
+    font-weight: bold;
+}
+.feedback-message {
+    padding: 10px 15px;
+    border-radius: 5px;
+    margin-bottom: 15px;
+    font-size: 1.1rem;
+    font-weight: bold;
+}
+.feedback-message.very-good { background-color: #d1e7dd; color: #0f5132; border: 1px solid #badbcc;} /* Bootstrap success-bg-subtle like */
+.feedback-message.good { background-color: #cff4fc; color: #055160; border: 1px solid #b6effb;} /* Bootstrap info-bg-subtle like */
+.feedback-message.average { background-color: #fff3cd; color: #664d03; border: 1px solid #ffecb5;} /* Bootstrap warning-bg-subtle like */
+.feedback-message.improve { background-color: #f8d7da; color: #58151c; border: 1px solid #f1aeb5;} /* Bootstrap danger-bg-subtle like */
+
+.answer-review .list-group-item {
+    padding: 0.75rem 1.25rem;
+}
+.answer-review .correct-user-answer {
+    background-color: #d1e7dd; /* Green */
+    color: #0f5132;
+    border-left: 5px solid #198754;
+}
+.answer-review .incorrect-user-answer {
+    background-color: #f8d7da; /* Red */
+    color: #58151c;
+    border-left: 5px solid #dc3545;
+}
+.answer-review .actual-correct-answer {
+    background-color: #fff3cd; /* Yellow */
+    color: #664d03;
+    border-left: 5px solid #ffc107;
+}
+.answer-review .list-group-item .fw-bold { /* For the (আপনার সঠিক উত্তর) text */
+    font-size: 0.9em;
+}

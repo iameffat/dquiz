@@ -1,0 +1,179 @@
+<?php
+$page_title = "সকল কুইজ";
+$base_url = ''; // Root directory
+require_once 'includes/db_connect.php';
+require_once 'includes/functions.php'; 
+require_once 'includes/header.php';
+
+$user_id_for_check = isset($_SESSION['user_id']) ? $_SESSION['user_id'] : null;
+
+/**
+ * Checks if a user has any attempt (completed or not) for a given quiz.
+ *
+ * @param mysqli $conn Database connection object.
+ * @param int|null $user_id The ID of the user.
+ * @param int $quiz_id The ID of the quiz.
+ * @return array [bool $has_attempted, int|null $attempt_id]
+ */
+function hasUserAttemptedQuiz($conn, $user_id, $quiz_id) {
+    if ($user_id === null || !$conn) {
+        return [false, null];
+    }
+    // Checks for any attempt, regardless of completion status (score IS NOT NULL is removed)
+    $sql_check = "SELECT id FROM quiz_attempts WHERE user_id = ? AND quiz_id = ? LIMIT 1";
+    $stmt_check = $conn->prepare($sql_check);
+    if (!$stmt_check) {
+        error_log("Prepare failed for hasUserAttemptedQuiz: (" . $conn->errno . ") " . $conn->error);
+        return [false, null]; 
+    }
+    $stmt_check->bind_param("ii", $user_id, $quiz_id);
+    if (!$stmt_check->execute()) {
+        error_log("Execute failed for hasUserAttemptedQuiz: (" . $stmt_check->errno . ") " . $stmt_check->error);
+        $stmt_check->close();
+        return [false, null]; 
+    }
+    $result_check = $stmt_check->get_result();
+    $attempt_info = $result_check->fetch_assoc();
+    $stmt_check->close();
+    return [$result_check->num_rows > 0, $attempt_info ? $attempt_info['id'] : null];
+}
+
+
+// Fetch Live Quizzes
+$live_quizzes = [];
+$sql_live = "SELECT q.id, q.title, q.description, q.duration_minutes, q.live_start_datetime, q.live_end_datetime,
+             (SELECT COUNT(qs.id) FROM questions qs WHERE qs.quiz_id = q.id) as question_count
+             FROM quizzes q 
+             WHERE q.status = 'live' 
+             AND (q.live_start_datetime IS NULL OR q.live_start_datetime <= NOW()) 
+             AND (q.live_end_datetime IS NULL OR q.live_end_datetime >= NOW())
+             ORDER BY q.live_start_datetime DESC, q.id DESC";
+$result_live = $conn->query($sql_live);
+if ($result_live && $result_live->num_rows > 0) {
+    while ($row = $result_live->fetch_assoc()) {
+        $live_quizzes[] = $row;
+    }
+}
+
+
+// Fetch Archived Quizzes
+$archived_quizzes = [];
+$sql_archived = "SELECT q.id, q.title, q.description, q.duration_minutes, q.live_start_datetime, q.live_end_datetime,
+                (SELECT COUNT(qs.id) FROM questions qs WHERE qs.quiz_id = q.id) as question_count
+                FROM quizzes q 
+                WHERE q.status = 'archived'
+                OR (q.status = 'live' AND q.live_end_datetime IS NOT NULL AND q.live_end_datetime < NOW())
+                ORDER BY q.created_at DESC, q.id DESC";
+$result_archived = $conn->query($sql_archived);
+if ($result_archived && $result_archived->num_rows > 0) {
+    while ($row = $result_archived->fetch_assoc()) {
+        // Ensure it's not already listed in live_quizzes if it just expired
+        $is_already_live = false;
+        foreach ($live_quizzes as $live_quiz) {
+            if ($live_quiz['id'] == $row['id']) {
+                $is_already_live = true;
+                break;
+            }
+        }
+        if (!$is_already_live) {
+            $archived_quizzes[] = $row;
+        }
+    }
+}
+?>
+
+<div class="container mt-4">
+    <?php display_flash_message('flash_message', 'flash_message_type'); ?>
+    <h1 class="mb-4 text-center">কুইজসমূহ</h1>
+
+    <section id="live-quizzes" class="mb-5">
+        <h2 class="mb-3 text-success border-bottom pb-2">লাইভ কুইজ</h2>
+        <?php if (!empty($live_quizzes)): ?>
+            <div class="row row-cols-1 row-cols-md-2 row-cols-lg-3 g-4">
+                <?php foreach ($live_quizzes as $quiz): ?>
+                <?php 
+                    list($attempted_live, $attempt_id_live) = hasUserAttemptedQuiz($conn, $user_id_for_check, $quiz['id']);
+                ?>
+                <div class="col">
+                    <div class="card h-100 shadow-sm quiz-card">
+                        <div class="card-body d-flex flex-column">
+                            <h5 class="card-title"><?php echo escape_html($quiz['title']); ?></h5>
+                            <p class="card-text text-muted small">
+                                <?php echo escape_html(substr($quiz['description'] ?? '', 0, 100)) . (strlen($quiz['description'] ?? '') > 100 ? '...' : ''); ?>
+                            </p>
+                            <ul class="list-unstyled mt-auto pt-2">
+                                <li><strong>সময়:</strong> <?php echo $quiz['duration_minutes']; ?> মিনিট</li>
+                                <li><strong>প্রশ্ন সংখ্যা:</strong> <?php echo $quiz['question_count']; ?> টি</li>
+                                <?php if ($quiz['live_start_datetime']): ?>
+                                    <li><small>শুরু: <?php echo format_datetime($quiz['live_start_datetime']); ?></small></li>
+                                <?php endif; ?>
+                                <?php if ($quiz['live_end_datetime']): ?>
+                                    <li><small>শেষ: <?php echo format_datetime($quiz['live_end_datetime']); ?></small></li>
+                                <?php endif; ?>
+                            </ul>
+                            <?php if (isset($_SESSION["loggedin"]) && $_SESSION["loggedin"] === true): ?>
+                                <?php if ($attempted_live): ?>
+                                    <a href="results.php?attempt_id=<?php echo $attempt_id_live; ?>&quiz_id=<?php echo $quiz['id']; ?>" class="btn btn-outline-info mt-2">ফলাফল দেখুন</a>
+                                    <p class="small text-primary mt-1 mb-0">আপনি এই কুইজে অংশগ্রহণ করেছেন।</p>
+                                <?php else: ?>
+                                    <a href="quiz_page.php?id=<?php echo $quiz['id']; ?>" class="btn btn-success mt-2">অংশগ্রহণ করুন</a>
+                                <?php endif; ?>
+                            <?php else: ?>
+                                <a href="login.php?redirect=<?php echo urlencode('quiz_page.php?id=' . $quiz['id']); ?>" class="btn btn-outline-success mt-2">অংশগ্রহণের জন্য লগইন করুন</a>
+                            <?php endif; ?>
+                        </div>
+                    </div>
+                </div>
+                <?php endforeach; ?>
+            </div>
+        <?php else: ?>
+            <p class="text-center alert alert-light">বর্তমানে কোনো লাইভ কুইজ নেই। অনুগ্রহ করে পরে আবার দেখুন।</p>
+        <?php endif; ?>
+    </section>
+
+    <section id="archived-quizzes">
+        <h2 class="mb-3 text-secondary border-bottom pb-2">পূর্ববর্তী কুইজ (আর্কাইভ)</h2>
+        <?php if (!empty($archived_quizzes)): ?>
+            <div class="row row-cols-1 row-cols-md-2 row-cols-lg-3 g-4">
+                <?php foreach ($archived_quizzes as $quiz): ?>
+                <?php 
+                    list($attempted_archived, $attempt_id_archived) = hasUserAttemptedQuiz($conn, $user_id_for_check, $quiz['id']);
+                ?>
+                <div class="col">
+                    <div class="card h-100 shadow-sm quiz-card">
+                        <div class="card-body d-flex flex-column">
+                            <h5 class="card-title"><?php echo escape_html($quiz['title']); ?></h5>
+                            <p class="card-text text-muted small">
+                                <?php echo escape_html(substr($quiz['description'] ?? '', 0, 100)) . (strlen($quiz['description'] ?? '') > 100 ? '...' : ''); ?>
+                            </p>
+                             <ul class="list-unstyled mt-auto pt-2">
+                                <li><strong>সময়:</strong> <?php echo $quiz['duration_minutes']; ?> মিনিট</li>
+                                <li><strong>প্রশ্ন সংখ্যা:</strong> <?php echo $quiz['question_count']; ?> টি</li>
+                            </ul>
+                            <?php if (isset($_SESSION["loggedin"]) && $_SESSION["loggedin"] === true): ?>
+                                <?php if ($attempted_archived): ?>
+                                    <a href="results.php?attempt_id=<?php echo $attempt_id_archived; ?>&quiz_id=<?php echo $quiz['id']; ?>" class="btn btn-outline-info mt-2">ফলাফল দেখুন</a>
+                                     <p class="small text-primary mt-1 mb-0">আপনি এই কুইজে অংশগ্রহণ করেছেন।</p>
+                                <?php else: ?>
+                                    <a href="quiz_page.php?id=<?php echo $quiz['id']; ?>" class="btn btn-secondary mt-2">অংশগ্রহণ করুন (অনুশীলন)</a>
+                                <?php endif; ?>
+                            <?php else: ?>
+                                 <a href="login.php?redirect=<?php echo urlencode('quiz_page.php?id=' . $quiz['id']); ?>" class="btn btn-outline-secondary mt-2">অংশগ্রহণের জন্য লগইন করুন</a>
+                            <?php endif; ?>
+                        </div>
+                    </div>
+                </div>
+                <?php endforeach; ?>
+            </div>
+        <?php else: ?>
+            <p class="text-center alert alert-light">এখনও কোনো কুইজ আর্কাইভ করা হয়নি।</p>
+        <?php endif; ?>
+    </section>
+</div>
+
+<?php
+if ($conn) {
+    $conn->close();
+}
+require_once 'includes/footer.php';
+?>
