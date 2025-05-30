@@ -26,87 +26,107 @@ if ($quiz_id <= 0) {
 }
 
 $user_id = $_SESSION['user_id'];
+$user_role = isset($_SESSION['role']) ? $_SESSION['role'] : 'user'; // Get user role
 
-// --- Check if user has ANY existing attempt (completed or incomplete) for this quiz ---
-$sql_check_existing_attempt = "SELECT id, score, end_time FROM quiz_attempts WHERE user_id = ? AND quiz_id = ? LIMIT 1";
-$stmt_check_existing_attempt = $conn->prepare($sql_check_existing_attempt);
+// --- MODIFICATION START: Conditional check for non-admin users ---
+if ($user_role !== 'admin') {
+    // --- Check if user has ANY existing attempt (completed or incomplete) for this quiz ---
+    $sql_check_existing_attempt = "SELECT id, score, end_time FROM quiz_attempts WHERE user_id = ? AND quiz_id = ? LIMIT 1";
+    $stmt_check_existing_attempt = $conn->prepare($sql_check_existing_attempt);
 
-if (!$stmt_check_existing_attempt) {
-    error_log("Prepare failed for checking existing attempt: (" . $conn->errno . ") " . $conn->error);
-    $_SESSION['flash_message'] = "একটি অপ্রত্যাশিত সমস্যা হয়েছে। অনুগ্রহ করে আবার চেষ্টা করুন। (চেক অ্যাটেম্পট)";
-    $_SESSION['flash_message_type'] = "danger";
-    header("Location: quizzes.php");
-    exit;
-}
-
-$stmt_check_existing_attempt->bind_param("ii", $user_id, $quiz_id);
-
-if (!$stmt_check_existing_attempt->execute()) {
-    error_log("Execute failed for checking existing attempt: (" . $stmt_check_existing_attempt->errno . ") " . $stmt_check_existing_attempt->error);
-    $stmt_check_existing_attempt->close();
-    $_SESSION['flash_message'] = "একটি অপ্রত্যাশিত সমস্যা হয়েছে। অনুগ্রহ করে আবার চেষ্টা করুন। (এক্সিকিউট অ্যাটেম্পট)";
-    $_SESSION['flash_message_type'] = "danger";
-    header("Location: quizzes.php");
-    exit;
-}
-
-$result_existing_attempt = $stmt_check_existing_attempt->get_result();
-$existing_attempt_data = $result_existing_attempt->fetch_assoc();
-$stmt_check_existing_attempt->close();
-
-if ($existing_attempt_data) {
-    if ($existing_attempt_data['score'] === null && $existing_attempt_data['end_time'] === null) {
-        $_SESSION['flash_message'] = "আপনি ইতিমধ্যে এই কুইজে একবার প্রবেশ করেছিলেন কিন্তু সাবমিট করেননি। আপনার অসমাপ্ত চেষ্টার ফলাফল দেখানো হচ্ছে।";
-        $_SESSION['flash_message_type'] = "warning";
-        header("Location: results.php?attempt_id=" . $existing_attempt_data['id'] . "&quiz_id=" . $quiz_id);
+    if (!$stmt_check_existing_attempt) {
+        error_log("Prepare failed for checking existing attempt: (" . $conn->errno . ") " . $conn->error);
+        $_SESSION['flash_message'] = "একটি অপ্রত্যাশিত সমস্যা হয়েছে। অনুগ্রহ করে আবার চেষ্টা করুন। (চেক অ্যাটেম্পট)";
+        $_SESSION['flash_message_type'] = "danger";
+        header("Location: quizzes.php");
         exit;
-    } elseif ($existing_attempt_data['score'] !== null) { 
-        $_SESSION['flash_message'] = "আপনি ইতিমধ্যে এই কুইজটি সম্পন্ন করেছেন। নিচে আপনার আগের ফলাফল দেখানো হলো।";
-        $_SESSION['flash_message_type'] = "info";
+    }
+
+    $stmt_check_existing_attempt->bind_param("ii", $user_id, $quiz_id);
+
+    if (!$stmt_check_existing_attempt->execute()) {
+        error_log("Execute failed for checking existing attempt: (" . $stmt_check_existing_attempt->errno . ") " . $stmt_check_existing_attempt->error);
+        $stmt_check_existing_attempt->close();
+        $_SESSION['flash_message'] = "একটি অপ্রত্যাশিত সমস্যা হয়েছে। অনুগ্রহ করে আবার চেষ্টা করুন। (এক্সিকিউট অ্যাটেম্পট)";
+        $_SESSION['flash_message_type'] = "danger";
+        header("Location: quizzes.php");
+        exit;
+    }
+
+    $result_existing_attempt = $stmt_check_existing_attempt->get_result();
+    $existing_attempt_data = $result_existing_attempt->fetch_assoc();
+    $stmt_check_existing_attempt->close();
+
+    if ($existing_attempt_data) {
+        if ($existing_attempt_data['score'] === null && $existing_attempt_data['end_time'] === null) {
+            $_SESSION['flash_message'] = "আপনি ইতিমধ্যে এই কুইজে একবার প্রবেশ করেছিলেন কিন্তু সাবমিট করেননি। আপনার অসমাপ্ত চেষ্টার ফলাফল দেখানো হচ্ছে।";
+            $_SESSION['flash_message_type'] = "warning";
+            header("Location: results.php?attempt_id=" . $existing_attempt_data['id'] . "&quiz_id=" . $quiz_id);
+            exit;
+        } elseif ($existing_attempt_data['score'] !== null) { 
+            $_SESSION['flash_message'] = "আপনি ইতিমধ্যে এই কুইজটি সম্পন্ন করেছেন। নিচে আপনার আগের ফলাফল দেখানো হলো।";
+            $_SESSION['flash_message_type'] = "info";
+            header("Location: results.php?attempt_id=" . $existing_attempt_data['id'] . "&quiz_id=" . $quiz_id);
+            exit;
+        }
+        // Fallback redirect if neither score is null nor score is not null (should ideally not happen with current logic)
         header("Location: results.php?attempt_id=" . $existing_attempt_data['id'] . "&quiz_id=" . $quiz_id);
         exit;
     }
-    header("Location: results.php?attempt_id=" . $existing_attempt_data['id'] . "&quiz_id=" . $quiz_id);
-    exit;
+    // --- End check for existing attempt for non-admin users ---
 }
-// --- End check for existing attempt ---
+// --- MODIFICATION END ---
 
 $quiz = null;
-$sql_quiz = "SELECT id, title, duration_minutes, status, live_start_datetime, live_end_datetime FROM quizzes WHERE id = ? AND (status = 'live' OR status = 'archived')";
+// Fetch quiz details (title, duration, status, live times)
+$sql_quiz = "SELECT id, title, duration_minutes, status, live_start_datetime, live_end_datetime FROM quizzes WHERE id = ?";
+// Admins can access quizzes regardless of 'live' or 'archived' status for testing, 
+// but we still need to check if the quiz exists.
+// Normal users will be restricted by status checks further down if they somehow bypass the initial check (though unlikely).
+if ($user_role !== 'admin') {
+    $sql_quiz .= " AND (status = 'live' OR status = 'archived')";
+}
+
 $stmt_quiz = $conn->prepare($sql_quiz);
 $stmt_quiz->bind_param("i", $quiz_id);
 $stmt_quiz->execute();
 $result_quiz = $stmt_quiz->get_result();
+
 if ($result_quiz->num_rows === 1) {
     $quiz = $result_quiz->fetch_assoc();
     $page_title = escape_html($quiz['title']) . " - কুইজ পরীক্ষা"; 
 
-    $current_datetime = new DateTime();
-    
-    if ($quiz['status'] == 'live') {
-        if ($quiz['live_start_datetime'] !== null) {
-            $live_start_dt = new DateTime($quiz['live_start_datetime']);
-            if ($current_datetime < $live_start_dt) {
-                $_SESSION['flash_message'] = "এই কুইজটি এখনও শুরু হয়নি। শুরু হওয়ার সময়: " . format_datetime($quiz['live_start_datetime']);
-                $_SESSION['flash_message_type'] = "warning";
-                header("Location: quizzes.php");
-                exit;
+    // Status and time checks for NON-ADMIN users
+    if ($user_role !== 'admin') {
+        $current_datetime = new DateTime();
+        
+        if ($quiz['status'] == 'live') {
+            if ($quiz['live_start_datetime'] !== null) {
+                $live_start_dt = new DateTime($quiz['live_start_datetime']);
+                if ($current_datetime < $live_start_dt) {
+                    $_SESSION['flash_message'] = "এই কুইজটি এখনও শুরু হয়নি। শুরু হওয়ার সময়: " . format_datetime($quiz['live_start_datetime']);
+                    $_SESSION['flash_message_type'] = "warning";
+                    header("Location: quizzes.php");
+                    exit;
+                }
             }
-        }
-        if ($quiz['live_end_datetime'] !== null) {
-            $live_end_dt = new DateTime($quiz['live_end_datetime']);
-            if ($current_datetime > $live_end_dt) {
-                $_SESSION['flash_message'] = "এই কুইজটি শেষ হয়ে গিয়েছে।";
-                $_SESSION['flash_message_type'] = "info";
-                header("Location: quizzes.php");
-                exit;
+            if ($quiz['live_end_datetime'] !== null) {
+                $live_end_dt = new DateTime($quiz['live_end_datetime']);
+                if ($current_datetime > $live_end_dt) {
+                    $_SESSION['flash_message'] = "এই কুইজটি শেষ হয়ে গিয়েছে।";
+                    $_SESSION['flash_message_type'] = "info";
+                    header("Location: quizzes.php");
+                    exit;
+                }
             }
+        } elseif ($quiz['status'] == 'draft') {
+             $_SESSION['flash_message'] = "এই কুইজটি এখন অংশগ্রহণের জন্য উপলব্ধ নয় (ড্রাফট)।";
+             $_SESSION['flash_message_type'] = "warning";
+             header("Location: quizzes.php");
+             exit;
         }
-    } elseif ($quiz['status'] == 'draft') {
-         $_SESSION['flash_message'] = "এই কুইজটি এখন অংশগ্রহণের জন্য উপলব্ধ নয় (ড্রাফট)।";
-         $_SESSION['flash_message_type'] = "warning";
-         header("Location: quizzes.php");
-         exit;
+        // Note: 'archived' quizzes are allowed for non-admins if they haven't attempted, they just can't re-attempt.
+        // If an admin is accessing an archived quiz, they can proceed.
     }
 
 } else {
@@ -118,6 +138,7 @@ if ($result_quiz->num_rows === 1) {
 }
 $stmt_quiz->close();
 
+// Fetch questions and options
 $questions = [];
 $sql_questions = "SELECT id, question_text FROM questions WHERE quiz_id = ? ORDER BY order_number ASC";
 $stmt_questions = $conn->prepare($sql_questions);
@@ -144,10 +165,12 @@ $stmt_questions->close();
 $total_questions = count($questions);
 $quiz_duration_seconds = $quiz['duration_minutes'] * 60;
 
+// Start a new quiz attempt (this will happen for admins on each visit, and for users on their first valid visit)
 $attempt_id = null;
 $start_time = date('Y-m-d H:i:s');
 $sql_start_attempt = "INSERT INTO quiz_attempts (user_id, quiz_id, start_time) VALUES (?, ?, ?)";
 $stmt_start_attempt = $conn->prepare($sql_start_attempt);
+
 if (!$stmt_start_attempt) {
     error_log("Prepare failed for starting attempt: (" . $conn->errno . ") " . $conn->error);
     $_SESSION['flash_message'] = "কুইজ শুরু করতে একটি অপ্রত্যাশিত সমস্যা হয়েছে।";
@@ -155,7 +178,9 @@ if (!$stmt_start_attempt) {
     header("Location: quizzes.php");
     exit;
 }
+
 $stmt_start_attempt->bind_param("iis", $user_id, $quiz_id, $start_time);
+
 if ($stmt_start_attempt->execute()) {
     $attempt_id = $stmt_start_attempt->insert_id;
 } else {
@@ -168,6 +193,7 @@ if ($stmt_start_attempt->execute()) {
 }
 $stmt_start_attempt->close();
 
+// Include HTML header
 require_once 'includes/header.php';
 ?>
 
@@ -318,6 +344,7 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     });
 
+    // Prevent form resubmission on page refresh/back
     if (window.history.replaceState) {
         window.history.replaceState(null, null, window.location.href);
     }
