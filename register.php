@@ -4,6 +4,18 @@ $base_url = ''; // Root directory
 require_once 'includes/db_connect.php';
 require_once 'includes/functions.php';
 
+// বাংলাদেশের ৬৪ জেলার তালিকা
+$districts = [
+    "বাগেরহাট", "বান্দরবান", "বরগুনা", "বরিশাল", "ভোলা", "বগুড়া", "ব্রাহ্মণবাড়িয়া", "চাঁদপুর", "চাঁপাইনবাবগঞ্জ",
+    "চট্টগ্রাম", "চুয়াডাঙ্গা", "কুমিল্লা", "কক্সবাজার", "ঢাকা", "দিনাজপুর", "ফরিদপুর", "ফেনী", "গাইবান্ধা",
+    "গাজীপুর", "গোপালগঞ্জ", "হবিগঞ্জ", "জামালপুর", "যশোর", "ঝালকাঠি", "ঝিনাইদহ", "জয়পুরহাট", "খাগড়াছড়ি",
+    "খুলনা", "কিশোরগঞ্জ", "কুড়িগ্রাম", "কুষ্টিয়া", "লক্ষ্মীপুর", "লালমনিরহাট", "মাদারীপুর", "মাগুরা", "মানিকগঞ্জ",
+    "মেহেরপুর", "মৌলভীবাজার", "মুন্সিগঞ্জ", "ময়মনসিংহ", "নওগাঁ", "নড়াইল", "নারায়ণগঞ্জ", "নরসিংদী", "নাটোর",
+    "নেত্রকোনা", "নীলফামারী", "নোয়াখালী", "পঞ্চগড়", "পটুয়াখালী", "পিরোজপুর", "রাজবাড়ী", "রাজশাহী", "রাঙ্গামাটি",
+    "রংপুর", "সাতক্ষীরা", "শরীয়তপুর", "শেরপুর", "সিরাজগঞ্জ", "সুনামগঞ্জ", "সিলেট", "টাঙ্গাইল", "ঠাকুরগাঁও"
+];
+sort($districts); // জেলার নামগুলো বর্ণানুক্রমিকভাবে সাজানো হলো
+
 $name = $mobile_number = $email = $district_name = $password = $confirm_password = "";
 $errors = [];
 $success_message = "";
@@ -13,7 +25,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
     $name = trim($_POST["name"]);
     $mobile_number = trim($_POST["mobile_number"]);
     $email = trim($_POST["email"]);
-    $district_name = trim($_POST["district_name"]); // Changed from address
+    $district_name = trim($_POST["district_name"]);
     $password = $_POST["password"];
     $confirm_password = $_POST["confirm_password"];
 
@@ -68,10 +80,13 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
         }
     }
     
-    // District Name validation (formerly Address)
+    // District Name validation
     if (empty($district_name)) {
-        $errors['district_name'] = "আপনার জেলার নাম লিখুন।";
+        $errors['district_name'] = "আপনার জেলার নাম নির্বাচন করুন।";
+    } elseif (!in_array($district_name, $districts)) {
+        $errors['district_name'] = "একটি বৈধ জেলা নির্বাচন করুন।";
     }
+
 
     // Password validation
     if (empty($password)) {
@@ -91,23 +106,20 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
     if (empty($errors)) {
         $hashed_password = password_hash($password, PASSWORD_DEFAULT); // Hash the password
 
-        // Gender column removed from SQL query and bind_param
         $sql_insert_user = "INSERT INTO users (name, mobile_number, email, address, password) VALUES (?, ?, ?, ?, ?)";
         
         if ($stmt_insert = $conn->prepare($sql_insert_user)) {
-            // sssss instead of ssssss, $param_gender removed
             $stmt_insert->bind_param("sssss", $param_name, $param_mobile, $param_email, $param_district_name, $param_password);
             
             $param_name = $name;
             $param_mobile = $mobile_number;
             $param_email = $email;
-            $param_district_name = $district_name; // Use district name for address column
+            $param_district_name = $district_name; 
             $param_password = $hashed_password;
             
             if ($stmt_insert->execute()) {
                 $success_message = "রেজিস্ট্রেশন সফল হয়েছে! আপনি এখন <a href='login.php'>লগইন</a> করতে পারেন।";
-                // Clear form fields after successful registration
-                $name = $mobile_number = $email = $district_name = ""; // Gender removed
+                $name = $mobile_number = $email = $district_name = ""; 
             } else {
                 $errors['db'] = "দুঃখিত! কিছু একটা সমস্যা হয়েছে। অনুগ্রহ করে আবার চেষ্টা করুন।";
             }
@@ -117,7 +129,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
         }
     }
 }
-$conn->close(); // Close connection
+$conn->close(); 
 require_once 'includes/header.php';
 ?>
 
@@ -153,7 +165,15 @@ require_once 'includes/header.php';
         
         <div class="mb-3">
             <label for="district_name" class="form-label">জেলার নাম <span class="text-danger">*</span></label>
-            <input type="text" name="district_name" id="district_name" class="form-control <?php echo (!empty($errors['district_name'])) ? 'is-invalid' : ''; ?>" value="<?php echo htmlspecialchars($district_name); ?>" required>
+            <select name="district_name" id="district_name" class="form-select <?php echo (!empty($errors['district_name'])) ? 'is-invalid' : ''; ?>" required>
+                <option value="">জেলা নির্বাচন করুন</option>
+                <?php
+                foreach ($districts as $district) {
+                    $selected = ($district_name == $district) ? 'selected' : '';
+                    echo "<option value=\"".htmlspecialchars($district)."\" ".$selected.">".htmlspecialchars($district)."</option>";
+                }
+                ?>
+            </select>
             <?php if (!empty($errors['district_name'])): ?><div class="invalid-feedback"><?php echo $errors['district_name']; ?></div><?php endif; ?>
         </div>
 
