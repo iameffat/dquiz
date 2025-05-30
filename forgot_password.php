@@ -1,6 +1,6 @@
 <?php
 $page_title = "পাসওয়ার্ড পুনরুদ্ধার";
-$base_url = ''; // Root directory
+$base_url = ''; // Root directory - ensure this is correct for your setup
 require_once 'includes/db_connect.php'; // Session is started here
 require_once 'includes/functions.php'; // For escape_html, display_flash_message
 
@@ -17,8 +17,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
         $message = "অনুগ্রহ করে একটি সঠিক ইমেইল এড্রেস দিন।";
         $message_type = "danger";
     } else {
-        // Check if email exists in the users table
-        $sql_user = "SELECT id FROM users WHERE email = ?";
+        $sql_user = "SELECT id, name FROM users WHERE email = ?"; // Fetch name for email personalization
         if ($stmt_user = $conn->prepare($sql_user)) {
             $stmt_user->bind_param("s", $email);
             $stmt_user->execute();
@@ -26,16 +25,12 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
 
             if ($user_data = $result_user->fetch_assoc()) {
                 $user_id = $user_data['id'];
+                $user_name = $user_data['name']; // Get user's name
 
-                // Generate a unique token
-                $token = bin2hex(random_bytes(32)); // Plain token for the URL
-                $hashed_token = password_hash($token, PASSWORD_DEFAULT); // Hashed token for DB
-                $expires_at = date('Y-m-d H:i:s', strtotime('+1 hour')); // Token expires in 1 hour
+                $token = bin2hex(random_bytes(32));
+                $hashed_token = password_hash($token, PASSWORD_DEFAULT);
+                $expires_at = date('Y-m-d H:i:s', strtotime('+1 hour'));
 
-                // Database operations:
-                // 1. Delete any existing old tokens for this user
-                // 2. Insert the new token
-                // IMPORTANT: Ensure you have a 'password_resets' table as described above.
                 $conn->begin_transaction();
                 try {
                     $sql_delete_old_tokens = "DELETE FROM password_resets WHERE user_id = ?";
@@ -47,6 +42,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
                         throw new Exception("ডাটাবেস সমস্যা (পুরাতন টোকেন মুছতে): " . $conn->error);
                     }
 
+                    // IMPORTANT: Ensure 'password_resets' table exists with user_id, token (hashed), expires_at
                     $sql_insert_token = "INSERT INTO password_resets (user_id, token, expires_at) VALUES (?, ?, ?)";
                     if ($stmt_insert = $conn->prepare($sql_insert_token)) {
                         $stmt_insert->bind_param("iss", $user_id, $hashed_token, $expires_at);
@@ -60,21 +56,26 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
                     
                     $conn->commit();
 
-                    // Send email
-                    // !!! গুরুত্বপূর্ণ: "yourdomain.com" পরিবর্তন করে আপনার আসল ডোমেইন দিন !!!
-                    // !!! এবং $from_email আপনার ডোমেইনের ভেরিফাইড ইমেইল এড্রেস হতে হবে !!!
-                    $reset_link = $base_url . "reset_password.php?token=" . urlencode($token);
-                    // Ensure $base_url is correctly configured or construct full URL:
-                    // $protocol = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off' || $_SERVER['SERVER_PORT'] == 443) ? "https://" : "http://";
-                    // $domainName = $_SERVER['HTTP_HOST'];
-                    // $reset_link = $protocol . $domainName . $base_url . "reset_password.php?token=" . urlencode($token);
+                    // Construct full reset link
+                    $protocol = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off' || $_SERVER['SERVER_PORT'] == 443) ? "https://" : "http://";
+                    $domainName = $_SERVER['HTTP_HOST']; // e.g., yourdomain.com
+                    
+                    // Adjust if reset_password.php is not in the root
+                    // If $base_url is for a subdirectory like '/quiz/', then:
+                    // $reset_link_path = rtrim($base_url, '/') . "/reset_password.php?token=" . urlencode($token);
+                    // If reset_password.php is in the root and $base_url is also '', then:
+                    $reset_link_path = "/reset_password.php?token=" . urlencode($token);
+                    if (!empty($base_url) && $base_url !== '/') {
+                        $reset_link_path = "/" . trim($base_url, '/') . "/reset_password.php?token=" . urlencode($token);
+                    }
+                    $reset_link = $protocol . $domainName . $reset_link_path;
 
 
                     $to = $email;
-                    $email_subject = "আপনার পাসওয়ার্ড পুনরুদ্ধার করুন - দ্বীনিলাইফ কুইজ";
+                    $email_subject = "আপনার পাসওয়ার্ড পুনরুদ্ধার করুন - দ্বীনিলাইফ কুইজ";
                     
-                    $email_body = "<html><body>";
-                    $email_body .= "<p>আসসালামু আলাইকুম,</p>";
+                    $email_body = "<html><head><meta charset='UTF-8'></head><body>"; // Added meta charset
+                    $email_body .= "<p>আসসালামু আলাইকুম, " . htmlspecialchars($user_name) . ",</p>";
                     $email_body .= "<p>আপনি আপনার দ্বীনিলাইফ কুইজ একাউন্টের পাসওয়ার্ড পুনরুদ্ধারের জন্য অনুরোধ করেছেন।</p>";
                     $email_body .= "<p>আপনার পাসওয়ার্ড পুনরুদ্ধার করতে, অনুগ্রহ করে নিচের লিঙ্কে ক্লিক করুন:</p>";
                     $email_body .= "<p><a href=\"{$reset_link}\">{$reset_link}</a></p>";
@@ -83,61 +84,71 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
                     $email_body .= "<p>শুভেচ্ছান্তে,<br>দ্বীনিলাইফ কুইজ টিম</p>";
                     $email_body .= "</body></html>";
 
-                    $from_email = "admin@deenelife.com"; // আপনার ওয়েবসাইটের অ্যাডমিন ইমেইল দিন
+                    // !!! Ensure this email is valid and authorized to send from your server !!!
+                    $from_email = "admin@deenelife.com"; 
                     $from_name = "দ্বীনিলাইফ কুইজ";
 
                     $headers = "MIME-Version: 1.0" . "\r\n";
                     $headers .= "Content-type:text/html;charset=UTF-8" . "\r\n";
                     $headers .= "From: =?UTF-8?B?".base64_encode($from_name)."?= <" . $from_email . ">" . "\r\n";
                     $headers .= "Reply-To: " . $from_email . "\r\n";
+                    // It's often good to set a Return-Path
+                    // $headers .= "Return-Path: " . $from_email . "\r\n";
                     
                     $email_subject_encoded = "=?UTF-8?B?".base64_encode($email_subject)."?=";
 
+                    // --- Debugging Mail Parameters ---
+                    // error_log("Attempting to send email to: " . $to);
+                    // error_log("Subject: " . $email_subject_encoded);
+                    // error_log("Headers: " . $headers);
+                    // error_log("Body: " . $email_body);
+                    // error_log("Reset Link: " . $reset_link);
+                    // ---------------------------------
+
                     if (mail($to, $email_subject_encoded, $email_body, $headers)) {
-                        $message = "যদি আপনার প্রদত্ত ইমেইলটি আমাদের সিস্টেমে রেজিস্টার্ড থাকে, তবে পাসওয়ার্ড পুনরুদ্ধারের জন্য একটি লিঙ্ক আপনার ইমেইলে পাঠানো হয়েছে। লিঙ্কটি ১ ঘণ্টা পর্যন্ত সক্রিয় থাকবে।";
+                        $message = "যদি আপনার প্রদত্ত ইমেইলটি আমাদের সিস্টেমে রেজিস্টার্ড থাকে, তবে পাসওয়ার্ড পুনরুদ্ধারের জন্য একটি লিঙ্ক আপনার ইমেইলে পাঠানো হয়েছে। লিঙ্কটি ১ ঘণ্টা পর্যন্ত সক্রিয় থাকবে। অনুগ্রহ করে আপনার ইনবক্স এবং স্প্যাম/জাঙ্ক ফোল্ডার চেক করুন।";
                         $message_type = "success";
                     } else {
-                        error_log("Mail failed to send to: {$to}");
-                        $message = "ইমেইল পাঠাতে সমস্যা হয়েছে। অনুগ্রহ করে পরে আবার চেষ্টা করুন অথবা এডমিনের সাথে যোগাযোগ করুন।";
+                        error_log("PHP mail() function failed for: {$to}. Check mail server logs and PHP configuration.");
+                        $message = "ইমেইল পাঠাতে একটি টেকনিক্যাল সমস্যা হয়েছে। অনুগ্রহ করে কিছুক্ষণ পর আবার চেষ্টা করুন অথবা সাইট এডমিনের সাথে যোগাযোগ করুন।";
                         $message_type = "danger";
                     }
 
                 } catch (Exception $e) {
                     $conn->rollback();
-                    error_log("Password Reset Error: " . $e->getMessage());
-                    // Show generic message to user even on DB error for security
-                    $message = "একটি সমস্যা হয়েছে। অনুগ্রহ করে কিছুক্ষণ পর আবার চেষ্টা করুন।";
+                    error_log("Password Reset DB Error: " . $e->getMessage());
+                    $message = "একটি ডাটাবেস সমস্যা হয়েছে। অনুগ্রহ করে কিছুক্ষণ পর আবার চেষ্টা করুন।";
                     $message_type = "danger";
                 }
 
             } else {
-                // Email not found in DB - show generic message to prevent email enumeration
-                 $message = "যদি আপনার প্রদত্ত ইমেইলটি আমাদের সিস্টেমে রেজিস্টার্ড থাকে, তবে পাসওয়ার্ড পুনরুদ্ধারের জন্য একটি লিঙ্ক আপনার ইমেইলে পাঠানো হয়েছে। লিঙ্কটি ১ ঘণ্টা পর্যন্ত সক্রিয় থাকবে।";
-                $message_type = "info"; // Or 'success' to be consistent
+                $message = "যদি আপনার প্রদত্ত ইমেইলটি আমাদের সিস্টেমে রেজিস্টার্ড থাকে, তবে পাসওয়ার্ড পুনরুদ্ধারের জন্য একটি লিঙ্ক আপনার ইমেইলে পাঠানো হয়েছে। লিঙ্কটি ১ ঘণ্টা পর্যন্ত সক্রিয় থাকবে। অনুগ্রহ করে আপনার ইনবক্স এবং স্প্যাম/জাঙ্ক ফোল্ডার চেক করুন।";
+                $message_type = "info"; 
             }
             $stmt_user->close();
         } else {
-            // DB error during user check
-            $message = "ডাটাবেস সমস্যা হয়েছে। অনুগ্রহ করে পরে আবার চেষ্টা করুন।";
+            $message = "ডাটাবেস ইউজার চেক করতে সমস্যা হয়েছে। অনুগ্রহ করে পরে আবার চেষ্টা করুন।";
             $message_type = "danger";
         }
     }
 }
-require_once 'includes/header.php'; // Header include
+require_once 'includes/header.php'; 
 ?>
 
 <div class="auth-form">
-    <h2 class="text-center mb-4">পাসওয়ার্ড পুনরুদ্ধার করুন</h2>
+    <h2 class="text-center mb-4">পাসওয়ার্ড পুনরুদ্ধার করুন</h2>
     <?php if (!empty($message)): ?>
         <div class="alert alert-<?php echo htmlspecialchars($message_type); ?>"><?php echo $message; ?></div>
     <?php endif; ?>
+    <?php display_flash_message(); ?>
+
     <form action="<?php echo htmlspecialchars($_SERVER["PHP_SELF"]); ?>" method="post" novalidate>
         <div class="mb-3">
             <label for="email" class="form-label">আপনার রেজিস্টার্ড ইমেইল <span class="text-danger">*</span></label>
             <input type="email" name="email" id="email" class="form-control" required value="<?php echo isset($_POST['email']) ? htmlspecialchars($_POST['email']) : ''; ?>">
         </div>
         <div class="d-grid">
-            <button type="submit" class="btn btn-primary">রিকোয়েস্ট পাঠান</button>
+            <button type="submit" class="btn btn-primary">রিকোয়েস্ট পাঠান</button>
         </div>
         <p class="mt-3 text-center"><a href="login.php">লগইন পেইজে ফিরে যান</a></p>
     </form>
