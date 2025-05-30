@@ -158,10 +158,9 @@ function prepare_results_data($conn, $current_attempt_id, $current_quiz_id, $cur
 }
 
 
-if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['submit_quiz'])) {
-    // ... (POST রিকোয়েস্ট হ্যান্ডেলিং কোড অপরিবর্তিত) ...
-    $quiz_id = isset($_POST['quiz_id']) ? intval($_POST['quiz_id']) : 0;
-    $attempt_id = isset($_POST['attempt_id']) ? intval($_POST['attempt_id']) : 0;
+if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['quiz_id']) && isset($_POST['attempt_id'])) { // পরিবর্তিত শর্ত
+    $quiz_id = intval($_POST['quiz_id']);
+    $attempt_id = intval($_POST['attempt_id']);
     $submitted_answers = isset($_POST['answers']) ? $_POST['answers'] : [];
 
     if ($quiz_id <= 0 || $attempt_id <= 0) {
@@ -171,17 +170,21 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['submit_quiz'])) {
         exit;
     }
 
+    // ব্যবহারকারীর লগইন স্টেটাস এবং আইডি এখানে আবার যাচাই করা যেতে পারে যদি প্রয়োজন হয়
+    // $user_id = $_SESSION['user_id'];
+
     $end_time_dt = new DateTime();
     $end_time = $end_time_dt->format('Y-m-d H:i:s');
     $time_taken_seconds = null;
 
     $sql_get_start_time = "SELECT start_time FROM quiz_attempts WHERE id = ? AND user_id = ?";
     $stmt_get_start_time = $conn->prepare($sql_get_start_time);
-    $stmt_get_start_time->bind_param("ii", $attempt_id, $user_id);
+    // $user_id এখানে $_SESSION['user_id'] থেকে আসবে
+    $stmt_get_start_time->bind_param("ii", $attempt_id, $_SESSION['user_id']); 
     $stmt_get_start_time->execute();
     $result_start_time = $stmt_get_start_time->get_result();
     if ($result_start_time->num_rows > 0) {
-        $attempt_details_start = $result_start_time->fetch_assoc(); // Renamed variable
+        $attempt_details_start = $result_start_time->fetch_assoc();
         $start_timestamp_db = new DateTime($attempt_details_start['start_time']);
         $time_taken_seconds = $end_time_dt->getTimestamp() - $start_timestamp_db->getTimestamp();
     }
@@ -193,9 +196,9 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['submit_quiz'])) {
     $stmt_all_q_count = $conn->prepare($sql_all_q_count);
     $stmt_all_q_count->bind_param("i", $quiz_id);
     $stmt_all_q_count->execute();
-    $total_questions_in_quiz_from_db = $stmt_all_q_count->get_result()->fetch_assoc()['total_q']; // Renamed
+    $total_questions_in_quiz_from_db = $stmt_all_q_count->get_result()->fetch_assoc()['total_q'];
     $stmt_all_q_count->close();
-    $total_questions_in_quiz = $total_questions_in_quiz_from_db; // Assign to the main variable
+    $total_questions_in_quiz = $total_questions_in_quiz_from_db;
 
 
     $conn->begin_transaction();
@@ -218,7 +221,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['submit_quiz'])) {
         }
         $stmt_qo->close();
 
-        foreach ($all_questions_map as $question_id_loop => $val) { // Renamed $question_id to $question_id_loop
+        foreach ($all_questions_map as $question_id_loop => $val) {
             $selected_option_id = isset($submitted_answers[$question_id_loop]) ? intval($submitted_answers[$question_id_loop]) : null;
             $is_correct_answer = 0;
 
@@ -229,6 +232,9 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['submit_quiz'])) {
                 }
             }
             
+            // user_answers টেবিলে উত্তর সংরক্ষণ (যদি AJAX সেভ না করা হয়ে থাকে, তবে এটিই প্রথম সেভ হবে)
+            // যদি AJAX সেভ ব্যবহার করা হয়, তবে এখানে ON DUPLICATE KEY UPDATE ব্যবহার করা উচিত।
+            // যেহেতু quiz_page.php তে AJAX সেভের কোড নেই, সরাসরি INSERT ব্যবহার করা যেতে পারে।
             if ($selected_option_id === null) {
                  $stmt_insert_answer_final = $conn->prepare("INSERT INTO user_answers (attempt_id, question_id, selected_option_id, is_correct) VALUES (?, ?, NULL, ?)");
                  if(!$stmt_insert_answer_final) throw new Exception("ব্যবহারকারীর উত্তর সংরক্ষণ स्टेटमेंट প্রস্তুত করতে সমস্যা হয়েছে (NULL): " . $conn->error);
@@ -247,9 +253,10 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['submit_quiz'])) {
 
         $total_score = $questions_answered_correctly;
 
-        $sql_update_attempt = "UPDATE quiz_attempts SET score = ?, end_time = ?, time_taken_seconds = ?, submitted_at = NOW() WHERE id = ? AND user_id = ?"; // Added submitted_at = NOW()
+        $sql_update_attempt = "UPDATE quiz_attempts SET score = ?, end_time = ?, time_taken_seconds = ?, submitted_at = NOW() WHERE id = ? AND user_id = ?";
         $stmt_update_attempt = $conn->prepare($sql_update_attempt);
-        $stmt_update_attempt->bind_param("isiii", $total_score, $end_time, $time_taken_seconds, $attempt_id, $user_id);
+        // $user_id এখানে $_SESSION['user_id'] থেকে আসবে
+        $stmt_update_attempt->bind_param("isiii", $total_score, $end_time, $time_taken_seconds, $attempt_id, $_SESSION['user_id']); 
         if (!$stmt_update_attempt->execute()) {
              throw new Exception("কুইজের চেষ্টা আপডেট করতে সমস্যা হয়েছে: " . $stmt_update_attempt->error);
         }
@@ -257,10 +264,12 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['submit_quiz'])) {
 
         $conn->commit();
         
-        $results_display_data = prepare_results_data($conn, $attempt_id, $quiz_id, $user_id);
+        // ফলাফল দেখানোর জন্য ডেটা প্রস্তুত করা
+        $results_display_data = prepare_results_data($conn, $attempt_id, $quiz_id, $_SESSION['user_id']);
         if ($results_display_data['success']) {
             extract($results_display_data); 
         } else {
+            // যদি prepare_results_data ব্যর্থ হয়, তাহলে quizzes.php তে রিডাইরেক্ট করুন
             header("Location: quizzes.php");
             exit;
         }
@@ -275,7 +284,6 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['submit_quiz'])) {
     }
 
 } elseif ($_SERVER["REQUEST_METHOD"] == "GET" && isset($_GET['attempt_id']) && isset($_GET['quiz_id'])) {
-    // ... (GET রিকোয়েস্ট হ্যান্ডেলিং কোড অপরিবর্তিত) ...
     $attempt_id = intval($_GET['attempt_id']);
     $quiz_id = intval($_GET['quiz_id']);
 
@@ -287,7 +295,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['submit_quiz'])) {
     }
     
     if (isset($_SESSION['flash_message']) && isset($_SESSION['flash_message_type'])) {
-        // Flash message will be displayed by display_flash_message()
+        // Flash message will be displayed by display_flash_message() in header
     }
 
     $results_display_data = prepare_results_data($conn, $attempt_id, $quiz_id, $user_id);
@@ -295,6 +303,8 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['submit_quiz'])) {
     if ($results_display_data['success']) {
         extract($results_display_data); 
     } else {
+        // যদি prepare_results_data ব্যর্থ হয়, তাহলে quizzes.php তে রিডাইরেক্ট করুন
+        // অথবা যেখানে উপযুক্ত মনে হয়
         header("Location: quizzes.php");
         exit;
     }
@@ -306,7 +316,12 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['submit_quiz'])) {
     exit;
 }
 
-// page_title এখন $results_display_data থেকে সেট হবে (extract() এর মাধ্যমে)
+// $page_title এখন $results_display_data থেকে সেট হবে (extract() এর মাধ্যমে) অথবা ডিফল্ট থাকবে
+// require_once 'includes/header.php'; এর আগে page_title সেট করা নিশ্চিত করতে হবে।
+// যেহেতু $page_title prepare_results_data এর মধ্যে সেট হচ্ছে, তাই header.php include করার আগে 
+// $results_display_data থেকে extract করাটা গুরুত্বপূর্ণ।
+
+// header.php এখানে include করা হচ্ছে
 require_once 'includes/header.php';
 ?>
 

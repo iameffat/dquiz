@@ -255,7 +255,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
     let timeLeft = <?php echo $quiz_duration_seconds; ?>;
 
-    function updateTimerDisplay() {
+     function updateTimerDisplay() {
         const minutes = Math.floor(timeLeft / 60);
         const seconds = timeLeft % 60;
         timerDisplay.textContent = `সময়: ${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
@@ -264,9 +264,9 @@ document.addEventListener('DOMContentLoaded', function() {
         } else if (timeLeft <= 0) {
             timerDisplay.classList.remove('critical'); 
             timerDisplay.textContent = "সময় শেষ!";
-            if (quizForm && !quizForm.dataset.submitted) {
-                quizForm.dataset.submitted = 'true'; 
-                quizForm.submit();
+            if (quizForm && !quizForm.dataset.submitted) { // Check if already submitted
+                quizForm.dataset.submitted = 'true'; // Set flag before submitting
+                quizForm.submit(); // এটি results.php তে POST করবে
             }
             clearInterval(timerInterval);
         }
