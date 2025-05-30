@@ -2,12 +2,13 @@
 $page_title = "পাসওয়ার্ড পুনরুদ্ধার";
 $base_url = ''; // Root directory - ensure this is correct for your setup
 require_once 'includes/db_connect.php'; // Session is started here
-require_once 'includes/functions.php'; // For escape_html, display_flash_message
+require_once 'includes/functions.php'; 
 
 $message = "";
-$message_type = "info"; // Default message type
+$message_type = "info";
 
 if ($_SERVER["REQUEST_METHOD"] == "POST") {
+    error_log("Forgot Password POST request received."); // Debug: Start of POST
     $email = trim($_POST['email']);
 
     if (empty($email)) {
@@ -17,7 +18,8 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
         $message = "অনুগ্রহ করে একটি সঠিক ইমেইল এড্রেস দিন।";
         $message_type = "danger";
     } else {
-        $sql_user = "SELECT id, name FROM users WHERE email = ?"; // Fetch name for email personalization
+        error_log("Email validation passed for: " . $email); // Debug: Email validated
+        $sql_user = "SELECT id, name FROM users WHERE email = ?";
         if ($stmt_user = $conn->prepare($sql_user)) {
             $stmt_user->bind_param("s", $email);
             $stmt_user->execute();
@@ -25,7 +27,8 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
 
             if ($user_data = $result_user->fetch_assoc()) {
                 $user_id = $user_data['id'];
-                $user_name = $user_data['name']; // Get user's name
+                $user_name = $user_data['name'];
+                error_log("User found: ID " . $user_id . ", Name: " . $user_name); // Debug: User found
 
                 $token = bin2hex(random_bytes(32));
                 $hashed_token = password_hash($token, PASSWORD_DEFAULT);
@@ -33,48 +36,55 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
 
                 $conn->begin_transaction();
                 try {
+                    error_log("Starting database transaction for user_id: " . $user_id); // Debug
                     $sql_delete_old_tokens = "DELETE FROM password_resets WHERE user_id = ?";
                     if ($stmt_delete = $conn->prepare($sql_delete_old_tokens)) {
                         $stmt_delete->bind_param("i", $user_id);
                         $stmt_delete->execute();
+                        error_log("Old tokens deleted for user_id: " . $user_id . ". Affected rows: " . $stmt_delete->affected_rows); // Debug
                         $stmt_delete->close();
                     } else {
                         throw new Exception("ডাটাবেস সমস্যা (পুরাতন টোকেন মুছতে): " . $conn->error);
                     }
 
-                    // IMPORTANT: Ensure 'password_resets' table exists with user_id, token (hashed), expires_at
                     $sql_insert_token = "INSERT INTO password_resets (user_id, token, expires_at) VALUES (?, ?, ?)";
                     if ($stmt_insert = $conn->prepare($sql_insert_token)) {
                         $stmt_insert->bind_param("iss", $user_id, $hashed_token, $expires_at);
                         if (!$stmt_insert->execute()) {
                             throw new Exception("ডাটাবেস সমস্যা (নতুন টোকেন সংরক্ষণ করতে): " . $stmt_insert->error);
                         }
+                        error_log("New token inserted for user_id: " . $user_id); // Debug
                         $stmt_insert->close();
                     } else {
                         throw new Exception("ডাটাবেস সমস্যা (নতুন টোকেন প্রস্তুত করতে): " . $conn->error);
                     }
                     
                     $conn->commit();
+                    error_log("Database transaction committed for user_id: " . $user_id); // Debug
 
                     // Construct full reset link
                     $protocol = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off' || $_SERVER['SERVER_PORT'] == 443) ? "https://" : "http://";
-                    $domainName = $_SERVER['HTTP_HOST']; // e.g., yourdomain.com
+                    $domainName = $_SERVER['HTTP_HOST'];
                     
-                    // Adjust if reset_password.php is not in the root
-                    // If $base_url is for a subdirectory like '/quiz/', then:
-                    // $reset_link_path = rtrim($base_url, '/') . "/reset_password.php?token=" . urlencode($token);
-                    // If reset_password.php is in the root and $base_url is also '', then:
-                    $reset_link_path = "/reset_password.php?token=" . urlencode($token);
-                    if (!empty($base_url) && $base_url !== '/') {
-                        $reset_link_path = "/" . trim($base_url, '/') . "/reset_password.php?token=" . urlencode($token);
+                    // Assuming reset_password.php is in the same directory as forgot_password.php
+                    // If $base_url is empty or '/', this should work for root.
+                    // If files are in a subdirectory, $base_url should reflect that, e.g., '/quizapp/'
+                    $path_to_reset_script = "reset_password.php"; 
+                    if (!empty($base_url) && $base_url !== '/' && $base_url !== './') {
+                         $path_to_reset_script = rtrim($base_url, '/') . "/" . $path_to_reset_script;
                     }
-                    $reset_link = $protocol . $domainName . $reset_link_path;
+                     // Ensure leading slash if not present from base_url
+                    if (strpos($path_to_reset_script, '/') !== 0 && !empty($path_to_reset_script)) {
+                        $path_to_reset_script = '/' . $path_to_reset_script;
+                    }
 
+                    $reset_link = $protocol . $domainName . $path_to_reset_script . "?token=" . urlencode($token);
+                    error_log("Generated reset link: " . $reset_link); // Debug: Log the generated link
 
                     $to = $email;
                     $email_subject = "আপনার পাসওয়ার্ড পুনরুদ্ধার করুন - দ্বীনিলাইফ কুইজ";
                     
-                    $email_body = "<html><head><meta charset='UTF-8'></head><body>"; // Added meta charset
+                    $email_body = "<html><head><meta charset='UTF-8'></head><body>";
                     $email_body .= "<p>আসসালামু আলাইকুম, " . htmlspecialchars($user_name) . ",</p>";
                     $email_body .= "<p>আপনি আপনার দ্বীনিলাইফ কুইজ একাউন্টের পাসওয়ার্ড পুনরুদ্ধারের জন্য অনুরোধ করেছেন।</p>";
                     $email_body .= "<p>আপনার পাসওয়ার্ড পুনরুদ্ধার করতে, অনুগ্রহ করে নিচের লিঙ্কে ক্লিক করুন:</p>";
@@ -84,49 +94,50 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
                     $email_body .= "<p>শুভেচ্ছান্তে,<br>দ্বীনিলাইফ কুইজ টিম</p>";
                     $email_body .= "</body></html>";
 
-                    // !!! Ensure this email is valid and authorized to send from your server !!!
                     $from_email = "admin@deenelife.com"; 
-                    $from_name = "দ্বীনিলাইফ কুইজ";
+                    $from_name = "দ্বীনিলাইফ কুইজ"; // admin/send_email.php তে "দ্বীনিলাইফ কুইজ এডমিন" ছিল
 
                     $headers = "MIME-Version: 1.0" . "\r\n";
                     $headers .= "Content-type:text/html;charset=UTF-8" . "\r\n";
                     $headers .= "From: =?UTF-8?B?".base64_encode($from_name)."?= <" . $from_email . ">" . "\r\n";
                     $headers .= "Reply-To: " . $from_email . "\r\n";
-                    // It's often good to set a Return-Path
-                    // $headers .= "Return-Path: " . $from_email . "\r\n";
+                    // $headers .= "Return-Path: " . $from_email . "\r\n"; // Consider adding this
                     
                     $email_subject_encoded = "=?UTF-8?B?".base64_encode($email_subject)."?=";
 
-                   error_log("--- Forgot Password Email Attempt ---");
-error_log("To: " . $to);
-error_log("Subject Encoded: " . $email_subject_encoded);
-// error_log("Body: " . $email_body); // Body can be long, log selectively if needed
-error_log("Headers: " . $headers);
-error_log("Reset Link Generated: " . $reset_link);
+                    error_log("--- Forgot Password Email Attempt ---");
+                    error_log("To: " . $to);
+                    error_log("Subject Encoded: " . $email_subject_encoded);
+                    // error_log("Headers: " . $headers); // Headers might be too verbose for general log
+                    // error_log("Body: " . $email_body); // Body can be long
 
-if (mail($to, $email_subject_encoded, $email_body, $headers)) {
-    // ... success logic ...
-} else {
-    $mail_error = error_get_last(); // Get the last error if mail() fails
-    error_log("PHP mail() function FAILED for: {$to}. Last error: " . print_r($mail_error, true));
-    $message = "ইমেইল পাঠাতে একটি টেকনিক্যাল সমস্যা হয়েছে। অনুগ্রহ করে কিছুক্ষণ পর আবার চেষ্টা করুন অথবা সাইট এডমিনের সাথে যোগাযোগ করুন। (Error Ref: FPMAIL)";
-    $message_type = "danger";
-}
+                    if (mail($to, $email_subject_encoded, $email_body, $headers)) {
+                        error_log("Mail sent successfully to: {$to} via forgot_password.php"); // Debug: Success
+                        $message = "যদি আপনার প্রদত্ত ইমেইলটি আমাদের সিস্টেমে রেজিস্টার্ড থাকে, তবে পাসওয়ার্ড পুনরুদ্ধারের জন্য একটি লিঙ্ক আপনার ইমেইলে পাঠানো হয়েছে। লিঙ্কটি ১ ঘণ্টা পর্যন্ত সক্রিয় থাকবে। অনুগ্রহ করে আপনার ইনবক্স এবং স্প্যাম/জাঙ্ক ফোল্ডার চেক করুন।";
+                        $message_type = "success";
+                    } else {
+                        $mail_error = error_get_last();
+                        error_log("PHP mail() function FAILED for: {$to} in forgot_password.php. Last error: " . print_r($mail_error, true)); // Debug: Failure
+                        $message = "ইমেইল পাঠাতে একটি টেকনিক্যাল সমস্যা হয়েছে। অনুগ্রহ করে কিছুক্ষণ পর আবার চেষ্টা করুন অথবা সাইট এডমিনের সাথে যোগাযোগ করুন। (Error Ref: FPMAILFAIL)";
+                        $message_type = "danger";
+                    }
 
                 } catch (Exception $e) {
                     $conn->rollback();
-                    error_log("Password Reset DB Error: " . $e->getMessage());
-                    $message = "একটি ডাটাবেস সমস্যা হয়েছে। অনুগ্রহ করে কিছুক্ষণ পর আবার চেষ্টা করুন।";
+                    error_log("Password Reset DB/General Error in forgot_password.php: " . $e->getMessage()); // Debug
+                    $message = "একটি ডাটাবেস বা সাধারণ সমস্যা হয়েছে। অনুগ্রহ করে কিছুক্ষণ পর আবার চেষ্টা করুন। (Error Ref: FPDBERR)";
                     $message_type = "danger";
                 }
 
             } else {
+                error_log("Email not found in database: " . $email); // Debug: Email not found
                 $message = "যদি আপনার প্রদত্ত ইমেইলটি আমাদের সিস্টেমে রেজিস্টার্ড থাকে, তবে পাসওয়ার্ড পুনরুদ্ধারের জন্য একটি লিঙ্ক আপনার ইমেইলে পাঠানো হয়েছে। লিঙ্কটি ১ ঘণ্টা পর্যন্ত সক্রিয় থাকবে। অনুগ্রহ করে আপনার ইনবক্স এবং স্প্যাম/জাঙ্ক ফোল্ডার চেক করুন।";
                 $message_type = "info"; 
             }
             $stmt_user->close();
         } else {
-            $message = "ডাটাবেস ইউজার চেক করতে সমস্যা হয়েছে। অনুগ্রহ করে পরে আবার চেষ্টা করুন।";
+            error_log("DB prepare statement failed for user check: " . $conn->error); // Debug
+            $message = "ডাটাবেস ইউজার চেক করতে সমস্যা হয়েছে। অনুগ্রহ করে পরে আবার চেষ্টা করুন। (Error Ref: FPDBPREP)";
             $message_type = "danger";
         }
     }
