@@ -4,19 +4,7 @@ $base_url = ''; // Root directory
 require_once 'includes/db_connect.php';
 require_once 'includes/functions.php';
 
-// বাংলাদেশের ৬৪ জেলার তালিকা
-$districts = [
-    "বাগেরহাট", "বান্দরবান", "বরগুনা", "বরিশাল", "ভোলা", "বগুড়া", "ব্রাহ্মণবাড়িয়া", "চাঁদপুর", "চাঁপাইনবাবগঞ্জ",
-    "চট্টগ্রাম", "চুয়াডাঙ্গা", "কুমিল্লা", "কক্সবাজার", "ঢাকা", "দিনাজপুর", "ফরিদপুর", "ফেনী", "গাইবান্ধা",
-    "গাজীপুর", "গোপালগঞ্জ", "হবিগঞ্জ", "জামালপুর", "যশোর", "ঝালকাঠি", "ঝিনাইদহ", "জয়পুরহাট", "খাগড়াছড়ি",
-    "খুলনা", "কিশোরগঞ্জ", "কুড়িগ্রাম", "কুষ্টিয়া", "লক্ষ্মীপুর", "লালমনিরহাট", "মাদারীপুর", "মাগুরা", "মানিকগঞ্জ",
-    "মেহেরপুর", "মৌলভীবাজার", "মুন্সিগঞ্জ", "ময়মনসিংহ", "নওগাঁ", "নড়াইল", "নারায়ণগঞ্জ", "নরসিংদী", "নাটোর",
-    "নেত্রকোনা", "নীলফামারী", "নোয়াখালী", "পঞ্চগড়", "পটুয়াখালী", "পিরোজপুর", "রাজবাড়ী", "রাজশাহী", "রাঙ্গামাটি",
-    "রংপুর", "সাতক্ষীরা", "শরীয়তপুর", "শেরপুর", "সিরাজগঞ্জ", "সুনামগঞ্জ", "সিলেট", "টাঙ্গাইল", "ঠাকুরগাঁও"
-];
-sort($districts); // জেলার নামগুলো বর্ণানুক্রমিকভাবে সাজানো হলো
-
-$name = $mobile_number = $email = $district_name = $password = $confirm_password = "";
+$name = $mobile_number = $email = $gender = $address = $password = $confirm_password = "";
 $errors = [];
 $success_message = "";
 
@@ -25,7 +13,8 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
     $name = trim($_POST["name"]);
     $mobile_number = trim($_POST["mobile_number"]);
     $email = trim($_POST["email"]);
-    $district_name = trim($_POST["district_name"]);
+    $gender = isset($_POST["gender"]) ? trim($_POST["gender"]) : "";
+    $address = trim($_POST["address"]);
     $password = $_POST["password"];
     $confirm_password = $_POST["confirm_password"];
 
@@ -80,13 +69,15 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
         }
     }
     
-    // District Name validation
-    if (empty($district_name)) {
-        $errors['district_name'] = "আপনার জেলার নাম নির্বাচন করুন।";
-    } elseif (!in_array($district_name, $districts)) {
-        $errors['district_name'] = "একটি বৈধ জেলা নির্বাচন করুন।";
+    // Gender validation
+    if (empty($gender)) {
+        $errors['gender'] = "আপনার লিঙ্গ নির্বাচন করুন।";
     }
 
+    // Address validation (optional)
+    if (empty($address)) {
+        $errors['address'] = "আপনার ঠিকানা লিখুন।";
+    }
 
     // Password validation
     if (empty($password)) {
@@ -106,20 +97,22 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
     if (empty($errors)) {
         $hashed_password = password_hash($password, PASSWORD_DEFAULT); // Hash the password
 
-        $sql_insert_user = "INSERT INTO users (name, mobile_number, email, address, password) VALUES (?, ?, ?, ?, ?)";
+        $sql_insert_user = "INSERT INTO users (name, mobile_number, email, gender, address, password) VALUES (?, ?, ?, ?, ?, ?)";
         
         if ($stmt_insert = $conn->prepare($sql_insert_user)) {
-            $stmt_insert->bind_param("sssss", $param_name, $param_mobile, $param_email, $param_district_name, $param_password);
+            $stmt_insert->bind_param("ssssss", $param_name, $param_mobile, $param_email, $param_gender, $param_address, $param_password);
             
             $param_name = $name;
             $param_mobile = $mobile_number;
             $param_email = $email;
-            $param_district_name = $district_name; 
+            $param_gender = $gender;
+            $param_address = $address;
             $param_password = $hashed_password;
             
             if ($stmt_insert->execute()) {
                 $success_message = "রেজিস্ট্রেশন সফল হয়েছে! আপনি এখন <a href='login.php'>লগইন</a> করতে পারেন।";
-                $name = $mobile_number = $email = $district_name = ""; 
+                // Clear form fields after successful registration
+                $name = $mobile_number = $email = $gender = $address = "";
             } else {
                 $errors['db'] = "দুঃখিত! কিছু একটা সমস্যা হয়েছে। অনুগ্রহ করে আবার চেষ্টা করুন।";
             }
@@ -129,7 +122,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
         }
     }
 }
-$conn->close(); 
+$conn->close(); // Close connection
 require_once 'includes/header.php';
 ?>
 
@@ -164,17 +157,28 @@ require_once 'includes/header.php';
         </div>
         
         <div class="mb-3">
-            <label for="district_name" class="form-label">জেলার নাম <span class="text-danger">*</span></label>
-            <select name="district_name" id="district_name" class="form-select <?php echo (!empty($errors['district_name'])) ? 'is-invalid' : ''; ?>" required>
-                <option value="">জেলা নির্বাচন করুন</option>
-                <?php
-                foreach ($districts as $district) {
-                    $selected = ($district_name == $district) ? 'selected' : '';
-                    echo "<option value=\"".htmlspecialchars($district)."\" ".$selected.">".htmlspecialchars($district)."</option>";
-                }
-                ?>
-            </select>
-            <?php if (!empty($errors['district_name'])): ?><div class="invalid-feedback"><?php echo $errors['district_name']; ?></div><?php endif; ?>
+            <label class="form-label">লিঙ্গ <span class="text-danger">*</span></label>
+            <div>
+                <div class="form-check form-check-inline">
+                    <input class="form-check-input <?php echo (!empty($errors['gender'])) ? 'is-invalid' : ''; ?>" type="radio" name="gender" id="male" value="পুরুষ" <?php if ($gender == "পুরুষ") echo "checked"; ?> required>
+                    <label class="form-check-label" for="male">পুরুষ</label>
+                </div>
+                <div class="form-check form-check-inline">
+                    <input class="form-check-input <?php echo (!empty($errors['gender'])) ? 'is-invalid' : ''; ?>" type="radio" name="gender" id="female" value="মহিলা" <?php if ($gender == "মহিলা") echo "checked"; ?> required>
+                    <label class="form-check-label" for="female">মহিলা</label>
+                </div>
+                <div class="form-check form-check-inline">
+                    <input class="form-check-input <?php echo (!empty($errors['gender'])) ? 'is-invalid' : ''; ?>" type="radio" name="gender" id="other" value="অন্যান্য" <?php if ($gender == "অন্যান্য") echo "checked"; ?> required>
+                    <label class="form-check-label" for="other">অন্যান্য</label>
+                </div>
+            </div>
+            <?php if (!empty($errors['gender'])): ?><div class="text-danger small"><?php echo $errors['gender']; ?></div><?php endif; ?>
+        </div>
+
+        <div class="mb-3">
+            <label for="address" class="form-label">ঠিকানা <span class="text-danger">*</span></label>
+            <textarea name="address" id="address" class="form-control <?php echo (!empty($errors['address'])) ? 'is-invalid' : ''; ?>" rows="3" required><?php echo htmlspecialchars($address); ?></textarea>
+            <?php if (!empty($errors['address'])): ?><div class="invalid-feedback"><?php echo $errors['address']; ?></div><?php endif; ?>
         </div>
 
         <div class="mb-3">
