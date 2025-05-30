@@ -43,8 +43,8 @@ $og_image_to_display = isset($page_og_image) ? htmlspecialchars($page_og_image) 
     
     <title><?php echo $page_title_to_display; ?></title>
 
-    <link rel="icon" href="<?php echo $base_url; ?>favicon.ico" type="image/x-icon">
-    <link rel="shortcut icon" href="<?php echo $base_url; ?>favicon.ico" type="image/x-icon">
+    <link rel="icon" href="<?php echo $base_url; ?>assets/images/icons/favicon.ico" type="image/x-icon">
+    <link rel="shortcut icon" href="<?php echo $base_url; ?>assets/images/icons/favicon.ico" type="image/x-icon">
     <link rel="apple-touch-icon" sizes="180x180" href="<?php echo $base_url; ?>assets/images/icons/apple-touch-icon.png">
     <link rel="icon" type="image/png" sizes="32x32" href="<?php echo $base_url; ?>assets/images/icons/favicon-32x32.png">
     <link rel="icon" type="image/png" sizes="16x16" href="<?php echo $base_url; ?>assets/images/icons/favicon-16x16.png">
