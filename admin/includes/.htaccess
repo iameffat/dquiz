@@ -2,8 +2,9 @@
     RewriteEngine On
     RewriteBase /
 
-    # URL q/{numeric_id} কে quiz_page.php?id={numeric_id} তে পাঠাবে
+    # নিশ্চিত করুন যে এটি কোনো বিদ্যমান ফাইল বা ফোল্ডার নয়
     RewriteCond %{REQUEST_FILENAME} !-f
     RewriteCond %{REQUEST_FILENAME} !-d
+    # URL q/{numeric_id} কে quiz_page.php?id={numeric_id} তে পাঠাবে
     RewriteRule ^q/([0-9]+)/?$ quiz_page.php?id=$1 [L,QSA]
 </IfModule>
