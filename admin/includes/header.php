@@ -11,7 +11,23 @@ $current_admin_base_url = isset($admin_base_url) ? $admin_base_url : '';
     <title><?php echo isset($page_title) ? $page_title . ' - এডমিন প্যানেল' : 'এডমিন প্যানেল - দ্বীনিলাইফ কুইজ'; ?></title>
     <link href="<?php echo $current_admin_base_url; ?>../assets/css/bootstrap.min.css" rel="stylesheet">
     <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+Bengali:wght@400;700&display=swap" rel="stylesheet">
-    <link href="<?php echo $current_admin_base_url; ?>../assets/css/style.css" rel="stylesheet"> <style>
+    <link href="<?php echo $current_admin_base_url; ?>../assets/css/style.css" rel="stylesheet"> 
+    <link href="<?php echo isset($base_url) ? $base_url : ''; ?>assets/css/style.css" rel="stylesheet">
+    <link rel="icon" type="image/png" href="<?php echo isset($base_url) ? $base_url : ''; ?>assets/images/icons/favicon-96x96.png" sizes="96x96" />
+    <link rel="icon" type="image/svg+xml" href="<?php echo isset($base_url) ? $base_url : ''; ?>assets/images/icons/favicon.svg" />
+    <link rel="shortcut icon" href="<?php echo isset($base_url) ? $base_url : ''; ?>assets/images/icons/favicon.ico" />
+    <link rel="apple-touch-icon" sizes="180x180" href="<?php echo isset($base_url) ? $base_url : ''; ?>assets/images/icons/apple-touch-icon.png" />
+    <meta name="apple-mobile-web-app-title" content="Quiz DeeneLife" />
+    <link rel="manifest" href="<?php echo isset($base_url) ? $base_url : ''; ?>assets/images/icons/site.webmanifest" />
+    <script async src="https://www.googletagmanager.com/gtag/js?id=G-RMVK2X0HZJ"></script>
+<script>
+  window.dataLayer = window.dataLayer || [];
+  function gtag(){dataLayer.push(arguments);}
+  gtag('js', new Date());
+
+  gtag('config', 'G-RMVK2X0HZJ');
+</script>
+    <style>
         body { display: flex; min-height: 100vh; flex-direction: column; }
         .admin-sidebar { width: 280px; background-color: #343a40; color: #fff; min-height: 100vh; position:fixed; top:0; left:0; bottom:0; padding-top:15px; }
         .admin-sidebar a { color: #adb5bd; text-decoration: none; display: block; padding: 10px 15px; }

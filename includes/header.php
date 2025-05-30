@@ -25,6 +25,20 @@ if (!isset($conn)) {
     <link href="<?php echo isset($base_url) ? $base_url : ''; ?>assets/css/bootstrap.min.css" rel="stylesheet">
     <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+Bengali:wght@400;700&display=swap" rel="stylesheet">
     <link href="<?php echo isset($base_url) ? $base_url : ''; ?>assets/css/style.css" rel="stylesheet">
+    <link rel="icon" type="image/png" href="<?php echo isset($base_url) ? $base_url : ''; ?>assets/images/icons/favicon-96x96.png" sizes="96x96" />
+    <link rel="icon" type="image/svg+xml" href="<?php echo isset($base_url) ? $base_url : ''; ?>assets/images/icons/favicon.svg" />
+    <link rel="shortcut icon" href="<?php echo isset($base_url) ? $base_url : ''; ?>assets/images/icons/favicon.ico" />
+    <link rel="apple-touch-icon" sizes="180x180" href="<?php echo isset($base_url) ? $base_url : ''; ?>assets/images/icons/apple-touch-icon.png" />
+    <meta name="apple-mobile-web-app-title" content="Quiz DeeneLife" />
+    <link rel="manifest" href="<?php echo isset($base_url) ? $base_url : ''; ?>assets/images/icons/site.webmanifest" />
+    <script async src="https://www.googletagmanager.com/gtag/js?id=G-RMVK2X0HZJ"></script>
+<script>
+  window.dataLayer = window.dataLayer || [];
+  function gtag(){dataLayer.push(arguments);}
+  gtag('js', new Date());
+
+  gtag('config', 'G-RMVK2X0HZJ');
+</script>
      <?php
     // Page-specific styles injected here
     if (isset($page_specific_styles) && !empty($page_specific_styles)) {
