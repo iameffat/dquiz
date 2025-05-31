@@ -111,7 +111,7 @@ if (!isset($_SESSION["loggedin"]) || $_SESSION["loggedin"] !== true) {
                 <div class="d-grid gap-2 d-md-flex justify-content-md-center">
                     <a href="login.php?redirect=<?php echo urlencode('quiz_page.php?id=' . $quiz_id); ?>" class="btn btn-primary btn-lg px-4">লগইন করুন</a>
                 </div><br>
-                <p class="lead text-center">রেজিস্টার করা না থাকলে, উপরের লগিন বাটনে ক্লিক করে রেজিস্টেশন করুন!</p>
+                <p class="lead text-center">রেজিস্টার করা না থাকলে, উপরের <b>লগইন বাটনে</b> ক্লিক করে রেজিস্টেশন করুন!</p>
                  <p class="text-center mt-3"><a href="<?php echo $base_url; ?>quizzes.php" class="btn btn-outline-secondary btn-sm">সকল কুইজ দেখুন</a></p>
             </div>
         </div>
