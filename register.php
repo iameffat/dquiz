@@ -7,7 +7,8 @@ require_once 'includes/functions.php';
 // If a redirect GET parameter is present, store it in a temporary session variable
 // This is useful if the user was trying to access a specific page before being sent to register
 if (isset($_GET['redirect'])) {
-    $_SESSION['redirect_url_user_after_reg'] = urldecode($_GET['redirect']);
+    // Store the original redirect target that came with the link to register page
+    $_SESSION['redirect_url_on_register_init'] = urldecode($_GET['redirect']);
 }
 
 
@@ -112,20 +113,19 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
             $param_password = $hashed_password;
             
             if ($stmt_insert->execute()) {
-                // $success_message = "রেজিস্ট্রেশন সফল হয়েছে! আপনি এখন <a href='login.php'>লগইন</a> করতে পারেন।";
-                // Clear form fields after successful registration
-                // $name = $mobile_number = $email = $district_name = ""; // Gender removed
-
                 // Set flash message for login page
                 $_SESSION['flash_message'] = "রেজিস্ট্রেশন সফল হয়েছে! অনুগ্রহ করে লগইন করুন।";
                 $_SESSION['flash_message_type'] = "success";
 
                 // Prepare redirect to login page, preserving the original intended redirect if any
                 $login_redirect_param = '';
-                if (isset($_SESSION['redirect_url_user_after_reg'])) {
+                // Check if a redirect URL was stored when register.php was initially loaded
+                if (isset($_SESSION['redirect_url_on_register_init'])) {
                     // Pass this redirect to the login page
-                    $login_redirect_param = '?redirect=' . urlencode($_SESSION['redirect_url_user_after_reg']);
-                    unset($_SESSION['redirect_url_user_after_reg']); // Clear it as it's now for login page
+                    $login_redirect_param = '?redirect=' . urlencode($_SESSION['redirect_url_on_register_init']);
+                    // Important: Set this to the main session redirect variable that login.php uses
+                    $_SESSION['redirect_url_user'] = $_SESSION['redirect_url_on_register_init'];
+                    unset($_SESSION['redirect_url_on_register_init']); // Clear the temporary one
                 }
                 header("Location: login.php" . $login_redirect_param);
                 exit;
@@ -139,16 +139,14 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
         }
     }
 }
-// $conn->close(); // Close connection: Moved to footer or after all processing
+// $conn->close(); // Connection will be closed in footer.php
 require_once 'includes/header.php';
 ?>
 
 <div class="auth-form">
     <h2 class="text-center mb-4">নতুন একাউন্ট তৈরি করুন</h2>
 
-    <?php // if (!empty($success_message)): // Removed as we redirect on success ?>
-        <?php // endif; ?>
-    <?php display_flash_message(); // This will display messages set before redirect (e.g. from login if already logged in) ?>
+    <?php display_flash_message(); // This will display messages set before redirect (e.g. if user is already logged in and tries to access register.php) ?>
 
 
     <?php if (!empty($errors['db'])): ?>
@@ -196,15 +194,12 @@ require_once 'includes/header.php';
             <button type="submit" class="btn btn-primary">রেজিস্টার করুন</button>
         </div>
         <p class="mt-3 text-center">ইতিমধ্যে একাউন্ট আছে? <a href="login.php<?php
-            $redirect_param_for_login_link_reg = '';
-            // If a redirect target was passed to register.php, carry it over to the login link
-            if (isset($_SESSION['redirect_url_user_after_reg'])) {
-                $redirect_param_for_login_link_reg = '?redirect=' . urlencode($_SESSION['redirect_url_user_after_reg']);
-            } elseif (isset($_SESSION['redirect_url_user'])) { 
-                // Fallback to any general redirect URL already in session (e.g. if user navigated away and came back)
-                 $redirect_param_for_login_link_reg = '?redirect=' . urlencode($_SESSION['redirect_url_user']);
+            $login_link_redirect_param = '';
+            // If a redirect target was stored when register.php was loaded, pass it to the login link
+            if (isset($_SESSION['redirect_url_on_register_init'])) {
+                $login_link_redirect_param = '?redirect=' . urlencode($_SESSION['redirect_url_on_register_init']);
             }
-            echo $redirect_param_for_login_link_reg;
+            echo $login_link_redirect_param;
         ?>">লগইন করুন</a></p>
     </form>
 </div>
