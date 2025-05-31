@@ -418,7 +418,7 @@ require_once 'includes/header.php'; // HTML হেডার অংশ
             <?php
                 // Determine card class and button properties based on quiz status
                 $card_class_home = 'quiz-card-sm';
-                $button_text_home = 'অংশগ্রহণ করুন';
+                $button_text_home = 'অংশগ্রহণের জন্য লগইন';
                 $button_class_home = 'btn-outline-primary';
                 $link_href_home = 'quiz_page.php?id=' . $quiz['id'];
                 $additional_info_home = '';
