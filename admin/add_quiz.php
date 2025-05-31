@@ -301,7 +301,7 @@ require_once 'includes/header.php';
                                 <input class="form-check-input mt-0" type="radio" name="questions[0][correct_option]" value="<?php echo $i; ?>" aria-label="সঠিক উত্তর <?php echo $i + 1; ?>" required <?php if($i==0) echo 'checked';?>>
                             </div>
                              <div class="form-control-wrapper flex-grow-1">
-                                <input type="text" class="form-control option-input-suggest" name="questions[0][options][<?php echo $i; ?>]" placeholder="অপশন <?php echo $i + 1; ?>" id="option_text_0_<?php echo $i; ?>" required>
+                                <input type="text" class="form-control option-input-suggest" name="questions[0][options][<?php echo $i; ?>]" placeholder="অপশন <?php echo $i + 1; ?>" id="option_text_0_<?php echo $i; ?>">
                                 <div class="suggestions-container" id="suggestions_q_0_opt_<?php echo $i; ?>"></div> </div>
                         </div>
                         <?php endfor; ?>
