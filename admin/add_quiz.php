@@ -247,8 +247,9 @@ require_once 'includes/header.php';
                     <input type="text" class="form-control" id="quiz_title" name="quiz_title" value="<?php echo isset($_POST['quiz_title']) ? htmlspecialchars($_POST['quiz_title']) : ''; ?>" required>
                 </div>
                 <div class="mb-3">
-                    <label for="quiz_description" class="form-label">সংক্ষিপ্ত বর্ণনা (ঐচ্ছিক)</label>
-                    <textarea class="form-control" id="quiz_description" name="quiz_description" rows="3"><?php echo isset($_POST['quiz_description']) ? htmlspecialchars($_POST['quiz_description']) : ''; ?></textarea>
+                    <label for="quiz_description_editor" class="form-label">সংক্ষিপ্ত বর্ণনা (ঐচ্ছিক)</label>
+                    <div id="quiz_description_editor"><?php echo isset($_POST['quiz_description']) ? $_POST['quiz_description'] : ''; ?></div>
+                    <input type="hidden" name="quiz_description" id="quiz_description_hidden">
                 </div>
                 <div class="row">
                     <div class="col-md-6 mb-3">
@@ -403,6 +404,40 @@ document.addEventListener('DOMContentLoaded', function () {
             }
         }
 
+         // Initialize Quill editor for quiz description
+    if (document.getElementById('quiz_description_editor')) {
+        const quillDescription = new Quill('#quiz_description_editor', {
+            theme: 'snow',
+            modules: {
+                toolbar: [
+                    [{ 'header': [1, 2, 3, false] }],
+                    ['bold', 'italic', 'underline', 'strike'],
+                    [{ 'list': 'ordered'}, { 'list': 'bullet' }],
+                    [{ 'align': [] }],
+                    ['link', 'image'], // 'image' can be added if you want image uploads within description
+                    ['clean']
+                ]
+            }
+        });
+
+        // On form submission, update the hidden input with Quill's HTML content
+        const addQuizForm = document.getElementById('addQuizForm');
+        if (addQuizForm) {
+            addQuizForm.addEventListener('submit', function() {
+                const descriptionHiddenInput = document.getElementById('quiz_description_hidden');
+                if (descriptionHiddenInput) {
+                    descriptionHiddenInput.value = quillDescription.root.innerHTML;
+                }
+            });
+        }
+        
+        // Preserve content if form reloads with an error (Quill initializes with the div's content)
+        <?php if (isset($_POST['quiz_description'])): ?>
+        // The content is already set in the div's HTML by PHP.
+        // If the content was complex HTML, you might need:
+        // quillDescription.root.innerHTML = <?php echo json_encode($_POST['quiz_description']); ?>;
+        <?php endif; ?>
+    }
         // For option inputs
         const optionInputs = questionBlock.querySelectorAll('.option-input-suggest');
         optionInputs.forEach((optInput, optIndex) => {

@@ -20,6 +20,9 @@ $current_admin_base_url = isset($admin_base_url) ? $admin_base_url : '';
     <link rel="apple-touch-icon" sizes="180x180" href="<?php echo isset($base_url) ? $base_url : ''; ?>assets/images/icons/apple-touch-icon.png" />
     <meta name="apple-mobile-web-app-title" content="Quiz DeeneLife" />
     <link rel="manifest" href="<?php echo isset($base_url) ? $base_url : ''; ?>assets/images/icons/site.webmanifest" />
+
+    <link href="https://cdn.jsdelivr.net/npm/quill@2.0.3/dist/quill.snow.css" rel="stylesheet" />
+
     <script async src="https://www.googletagmanager.com/gtag/js?id=G-RMVK2X0HZJ"></script>
 <script>
   window.dataLayer = window.dataLayer || [];
@@ -46,6 +49,10 @@ $current_admin_base_url = isset($admin_base_url) ? $admin_base_url : '';
             border-radius: 4px;
             margin-bottom: 10px; /* Adds some space below the image */
             display: block; /* Can help with layout consistency */
+        }
+        /* Quill editor height */
+        .ql-container {
+            min-height: 150px;
         }
     </style>
 </head>
@@ -92,3 +99,4 @@ $current_admin_base_url = isset($admin_base_url) ? $admin_base_url : '';
 </div>
 
 <main class="admin-main-content">
+<script src="https://cdn.jsdelivr.net/npm/quill@2.0.3/dist/quill.js"></script>

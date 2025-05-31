@@ -310,9 +310,12 @@ require_once 'includes/header.php'; // HTML হেডার অংশ
                 <div class="card h-100 quiz-card-sm">
                     <div class="card-body d-flex flex-column">
                         <h5 class="card-title"><?php echo htmlspecialchars($quiz['title']); ?></h5>
-                        <p class="card-text text-muted small">
-                            <?php echo htmlspecialchars(substr($quiz['description'] ?? '', 0, 80)) . (strlen($quiz['description'] ?? '') > 80 ? '...' : ''); ?>
-                        </p>
+                       <p class="card-text text-muted small">
+    <?php 
+        $plain_description = strip_tags($quiz['description'] ?? ''); // Remove HTML tags
+        echo htmlspecialchars(mb_substr($plain_description, 0, 80)) . (mb_strlen($plain_description) > 80 ? '...' : ''); // Use mb_substr for multi-byte strings
+    ?>
+</p>
                         <ul class="list-unstyled small mt-auto pt-2 mb-2">
                             <li><strong>সময়:</strong> <?php echo $quiz['duration_minutes']; ?> মিনিট</li>
                             <li><strong>প্রশ্ন:</strong> <?php echo $quiz['question_count']; ?> টি</li>
