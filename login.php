@@ -6,16 +6,21 @@ $base_url = ''; // Root directory
 require_once 'includes/db_connect.php'; // Ensure session is started here
 require_once 'includes/functions.php';
 
-// If user is already logged in, redirect to profile page
+// If a redirect GET parameter is present, store it. This takes precedence.
+// This ensures that if a user clicks a login link with a redirect, it's captured.
+if (isset($_GET['redirect'])) {
+    $_SESSION['redirect_url_user'] = urldecode($_GET['redirect']);
+}
+
+// If user is already logged in, redirect them
 if (isset($_SESSION["loggedin"]) && $_SESSION["loggedin"] === true) {
-    // Check for a redirect URL first
     if (isset($_SESSION['redirect_url_user'])) {
         $redirect_url = $_SESSION['redirect_url_user'];
         unset($_SESSION['redirect_url_user']); // Clear the stored URL
         header("location: " . $redirect_url);
         exit;
     }
-    header("location: profile.php"); // Default redirect if already logged in and no specific redirect
+    header("location: profile.php"); // Default redirect if already logged in
     exit;
 }
 
@@ -100,6 +105,8 @@ require_once 'includes/header.php';
 <div class="auth-form">
     <h2 class="text-center mb-4">লগইন করুন</h2>
 
+    <?php display_flash_message(); // For flash messages from redirects, e.g., from registration ?>
+
     <?php if (!empty($errors['login'])): ?>
         <div class="alert alert-danger"><?php echo $errors['login']; ?></div>
     <?php endif; ?>
@@ -121,7 +128,19 @@ require_once 'includes/header.php';
         <div class="d-grid">
             <button type="submit" class="btn btn-primary">লগইন</button>
         </div>
-        <p class="mt-3 text-center">একাউন্ট নেই? <a href="register.php">রেজিস্টার করুন</a></p>
+        <p class="mt-3 text-center">একাউন্ট নেই? <a href="register.php<?php
+    $redirect_param_for_login_link = '';
+    // if (isset($_SESSION['redirect_url_user_after_reg'])) { // if redirect was passed to register.php
+    //     $redirect_param_for_login_link = '?redirect=' . urlencode($_SESSION['redirect_url_user_after_reg']);
+    // } elseif (isset($_SESSION['redirect_url_user'])) { // Or if a general redirect is already in session
+    //      $redirect_param_for_login_link = '?redirect=' . urlencode($_SESSION['redirect_url_user']);
+    // } // This logic might be better placed in register.php's link to login. For now, direct link.
+    // Keeping it simple for now:
+    if (isset($_SESSION['redirect_url_user'])) {
+         $redirect_param_for_login_link = '?redirect=' . urlencode($_SESSION['redirect_url_user']);
+    }
+    echo $redirect_param_for_login_link;
+?>">রেজিস্টার করুন</a></p>
     </form>
 </div>
 

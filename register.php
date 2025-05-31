@@ -4,9 +4,16 @@ $base_url = ''; // Root directory
 require_once 'includes/db_connect.php';
 require_once 'includes/functions.php';
 
+// If a redirect GET parameter is present, store it in a temporary session variable
+// This is useful if the user was trying to access a specific page before being sent to register
+if (isset($_GET['redirect'])) {
+    $_SESSION['redirect_url_user_after_reg'] = urldecode($_GET['redirect']);
+}
+
+
 $name = $mobile_number = $email = $district_name = $password = $confirm_password = "";
 $errors = [];
-$success_message = "";
+// $success_message = ""; // success_message is less useful if we redirect immediately
 
 if ($_SERVER["REQUEST_METHOD"] == "POST") {
     // Sanitize and validate inputs
@@ -36,7 +43,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
             if ($stmt_check_mobile->execute()) {
                 $stmt_check_mobile->store_result();
                 if ($stmt_check_mobile->num_rows > 0) {
-                    $errors['mobile'] = "এই মোবাইল নম্বরটি 이미 ব্যবহৃত হয়েছে।";
+                    $errors['mobile'] = "এই মোবাইল নম্বরটি ইতিমধ্যে ব্যবহৃত হয়েছে।";
                 }
             } else {
                 $errors['db'] = "কিছু একটা সমস্যা হয়েছে। অনুগ্রহ করে আবার চেষ্টা করুন।";
@@ -59,7 +66,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
             if ($stmt_check_email->execute()) {
                 $stmt_check_email->store_result();
                 if ($stmt_check_email->num_rows > 0) {
-                    $errors['email'] = "এই ইমেইলটি 이미 ব্যবহৃত হয়েছে।";
+                    $errors['email'] = "এই ইমেইলটি ইতিমধ্যে ব্যবহৃত হয়েছে।";
                 }
             } else {
                 $errors['db'] = "কিছু একটা সমস্যা হয়েছে। অনুগ্রহ করে আবার চেষ্টা করুন।";
@@ -105,9 +112,24 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
             $param_password = $hashed_password;
             
             if ($stmt_insert->execute()) {
-                $success_message = "রেজিস্ট্রেশন সফল হয়েছে! আপনি এখন <a href='login.php'>লগইন</a> করতে পারেন।";
+                // $success_message = "রেজিস্ট্রেশন সফল হয়েছে! আপনি এখন <a href='login.php'>লগইন</a> করতে পারেন।";
                 // Clear form fields after successful registration
-                $name = $mobile_number = $email = $district_name = ""; // Gender removed
+                // $name = $mobile_number = $email = $district_name = ""; // Gender removed
+
+                // Set flash message for login page
+                $_SESSION['flash_message'] = "রেজিস্ট্রেশন সফল হয়েছে! অনুগ্রহ করে লগইন করুন।";
+                $_SESSION['flash_message_type'] = "success";
+
+                // Prepare redirect to login page, preserving the original intended redirect if any
+                $login_redirect_param = '';
+                if (isset($_SESSION['redirect_url_user_after_reg'])) {
+                    // Pass this redirect to the login page
+                    $login_redirect_param = '?redirect=' . urlencode($_SESSION['redirect_url_user_after_reg']);
+                    unset($_SESSION['redirect_url_user_after_reg']); // Clear it as it's now for login page
+                }
+                header("Location: login.php" . $login_redirect_param);
+                exit;
+
             } else {
                 $errors['db'] = "দুঃখিত! কিছু একটা সমস্যা হয়েছে। অনুগ্রহ করে আবার চেষ্টা করুন।";
             }
@@ -117,16 +139,17 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
         }
     }
 }
-$conn->close(); // Close connection
+// $conn->close(); // Close connection: Moved to footer or after all processing
 require_once 'includes/header.php';
 ?>
 
 <div class="auth-form">
     <h2 class="text-center mb-4">নতুন একাউন্ট তৈরি করুন</h2>
 
-    <?php if (!empty($success_message)): ?>
-        <div class="alert alert-success"><?php echo $success_message; ?></div>
-    <?php endif; ?>
+    <?php // if (!empty($success_message)): // Removed as we redirect on success ?>
+        <?php // endif; ?>
+    <?php display_flash_message(); // This will display messages set before redirect (e.g. from login if already logged in) ?>
+
 
     <?php if (!empty($errors['db'])): ?>
         <div class="alert alert-danger"><?php echo $errors['db']; ?></div>
@@ -172,8 +195,23 @@ require_once 'includes/header.php';
         <div class="d-grid">
             <button type="submit" class="btn btn-primary">রেজিস্টার করুন</button>
         </div>
-        <p class="mt-3 text-center">ইতিমধ্যে একাউন্ট আছে? <a href="login.php">লগইন করুন</a></p>
+        <p class="mt-3 text-center">ইতিমধ্যে একাউন্ট আছে? <a href="login.php<?php
+            $redirect_param_for_login_link_reg = '';
+            // If a redirect target was passed to register.php, carry it over to the login link
+            if (isset($_SESSION['redirect_url_user_after_reg'])) {
+                $redirect_param_for_login_link_reg = '?redirect=' . urlencode($_SESSION['redirect_url_user_after_reg']);
+            } elseif (isset($_SESSION['redirect_url_user'])) { 
+                // Fallback to any general redirect URL already in session (e.g. if user navigated away and came back)
+                 $redirect_param_for_login_link_reg = '?redirect=' . urlencode($_SESSION['redirect_url_user']);
+            }
+            echo $redirect_param_for_login_link_reg;
+        ?>">লগইন করুন</a></p>
     </form>
 </div>
 
-<?php include 'includes/footer.php'; ?>
+<?php 
+if ($conn && $conn->ping()) {
+    $conn->close(); 
+}
+include 'includes/footer.php'; 
+?>
