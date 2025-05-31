@@ -20,7 +20,6 @@ if ($quiz_id <= 0) {
     exit;
 }
 
-// Delete Question Action
 if (isset($_GET['action']) && $_GET['action'] == 'delete_question' && isset($_GET['question_id'])) {
     $question_id_to_delete = intval($_GET['question_id']);
     
@@ -34,7 +33,7 @@ if (isset($_GET['action']) && $_GET['action'] == 'delete_question' && isset($_GE
         $image_row = $image_result->fetch_assoc();
         $stmt_get_image->close();
 
-        if (!$image_row && $image_result->num_rows === 0) { 
+        if (!$image_row && $image_result->num_rows === 0) { // Check if the question exists and belongs to the quiz
             throw new Exception("প্রশ্নটি এই কুইজের নয় অথবা খুঁজে পাওয়া যায়নি।");
         }
 
@@ -51,6 +50,7 @@ if (isset($_GET['action']) && $_GET['action'] == 'delete_question' && isset($_GE
         $stmt_delete_q->close();
         
         if ($image_row && !empty($image_row['image_url'])) {
+            // Construct the full path from the script's location
             $image_file_path = QUESTION_IMAGE_UPLOAD_DIR_EDIT . basename($image_row['image_url']);
             if (file_exists($image_file_path)) {
                 unlink($image_file_path);
@@ -70,7 +70,6 @@ if (isset($_GET['action']) && $_GET['action'] == 'delete_question' && isset($_GE
     exit;
 }
 
-// Load quiz details
 $sql_quiz = "SELECT * FROM quizzes WHERE id = ?";
 if ($stmt_quiz_load = $conn->prepare($sql_quiz)) {
     $stmt_quiz_load->bind_param("i", $quiz_id);
@@ -88,30 +87,22 @@ if ($stmt_quiz_load = $conn->prepare($sql_quiz)) {
     $stmt_quiz_load->close();
 }
 
-// Handle Full Quiz Update
 if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['update_full_quiz'])) {
     $conn->begin_transaction();
     try {
         $quiz_title = trim($_POST['quiz_title']);
         $quiz_description = trim($_POST['quiz_description']);
         $quiz_duration = intval($_POST['quiz_duration']);
-        $quiz_status = trim($_POST['quiz_status']); // [MODIFIED]
+        $quiz_status = trim($_POST['quiz_status']);
         $quiz_live_start = !empty($_POST['quiz_live_start']) ? trim($_POST['quiz_live_start']) : NULL;
         $quiz_live_end = !empty($_POST['quiz_live_end']) ? trim($_POST['quiz_live_end']) : NULL;
 
         if (empty($quiz_title)) $errors[] = "কুইজের শিরোনাম আবশ্যক।";
         if ($quiz_duration <= 0) $errors[] = "কুইজের সময় অবশ্যই ০ মিনিটের বেশি হতে হবে।";
-        // [MODIFIED] Add 'upcoming' to valid statuses
-        if (!in_array($quiz_status, ['draft', 'live', 'archived', 'upcoming'])) $errors[] = "অবৈধ কুইজ স্ট্যাটাস।"; // [MODIFIED]
-
-        // If status is 'upcoming' or 'live', live_start_datetime is recommended/required
-        if (($quiz_status === 'live' || $quiz_status === 'upcoming') && empty($quiz_live_start)) {
-            $errors[] = "লাইভ বা আপকামিং কুইজের জন্য 'লাইভ শুরু' তারিখ ও সময় আবশ্যক।";
-        }
+        if (!in_array($quiz_status, ['draft', 'live', 'archived'])) $errors[] = "অবৈধ কুইজ স্ট্যাটাস।";
         if ($quiz_live_start && $quiz_live_end && strtotime($quiz_live_start) >= strtotime($quiz_live_end)) {
             $errors[] = "লাইভ শেষের সময় অবশ্যই শুরুর সময়ের পরে হতে হবে।";
         }
-        
 
         if (empty($errors)) {
             $sql_update_meta = "UPDATE quizzes SET title = ?, description = ?, duration_minutes = ?, status = ?, live_start_datetime = ?, live_end_datetime = ? WHERE id = ?";
@@ -121,7 +112,6 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['update_full_quiz'])) {
             $stmt_update_meta->close();
         }
 
-        // Update existing questions
         if (isset($_POST['existing_questions'])) {
             foreach ($_POST['existing_questions'] as $q_id => $q_data) {
                 $q_text = trim($q_data['text']);
@@ -214,7 +204,6 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['update_full_quiz'])) {
             }
         }
         
-        // Add new questions
         if (isset($_POST['new_questions'])) {
             foreach ($_POST['new_questions'] as $nq_idx => $nq_data) {
                 $nq_text = trim($nq_data['text']);
@@ -313,7 +302,6 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['update_full_quiz'])) {
     } catch (Exception $e) {
         $conn->rollback();
         $errors[] = "একটি গুরুতর ত্রুটি ঘটেছে: " . $e->getMessage();
-        // Preserve form data on error
         $quiz['title'] = $_POST['quiz_title'] ?? $quiz['title'];
         $quiz['description'] = $_POST['quiz_description'] ?? $quiz['description'];
         $quiz['duration_minutes'] = $_POST['quiz_duration'] ?? $quiz['duration_minutes'];
@@ -324,7 +312,6 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['update_full_quiz'])) {
 }
 
 
-// Reload questions after potential updates or for initial load
 $questions_data = [];
 $sql_questions_load = "SELECT id, question_text, image_url, explanation, order_number FROM questions WHERE quiz_id = ? ORDER BY order_number ASC, id ASC";
 if ($stmt_q_load = $conn->prepare($sql_questions_load)) {
@@ -375,8 +362,8 @@ require_once 'includes/header.php';
                     <input type="text" class="form-control" id="quiz_title" name="quiz_title" value="<?php echo htmlspecialchars($quiz['title']); ?>" required>
                 </div>
                 <div class="mb-3">
-                    <label for="quiz_description_editor_edit" class="form-label">সংক্ষিপ্ত বর্ণনা</label>
-                    <div id="quiz_description_editor_edit"><?php echo $quiz['description']; ?></div>
+                    <label for="quiz_description_editor" class="form-label">সংক্ষিপ্ত বর্ণনা</label>
+                    <div id="quiz_description_editor_edit"><?php echo $quiz['description']; // Output raw HTML here ?></div>
                     <input type="hidden" name="quiz_description" id="quiz_description_hidden_edit">
                 </div>
                 <div class="row">
@@ -388,19 +375,20 @@ require_once 'includes/header.php';
                         <label for="quiz_status" class="form-label">স্ট্যাটাস <span class="text-danger">*</span></label>
                         <select class="form-select" id="quiz_status" name="quiz_status" required>
                             <option value="draft" <?php echo ($quiz['status'] == 'draft') ? 'selected' : ''; ?>>ড্রাফট</option>
-                            <option value="upcoming" <?php echo ($quiz['status'] == 'upcoming') ? 'selected' : ''; ?>>আপকামিং</option> <option value="live" <?php echo ($quiz['status'] == 'live') ? 'selected' : ''; ?>>লাইভ</option>
+                            <option value="live" <?php echo ($quiz['status'] == 'live') ? 'selected' : ''; ?>>লাইভ</option>
                             <option value="archived" <?php echo ($quiz['status'] == 'archived') ? 'selected' : ''; ?>>আর্কাইভড</option>
                         </select>
                     </div>
                      <div class="col-md-4 mb-3">
-                        <label for="quiz_live_start" class="form-label">লাইভ/আপকামিং শুরু (ঐচ্ছিক যদি ড্রাফট বা আর্কাইভড হয়)</label> <input type="datetime-local" class="form-control" id="quiz_live_start" name="quiz_live_start" value="<?php echo !empty($quiz['live_start_datetime']) ? date('Y-m-d\TH:i', strtotime($quiz['live_start_datetime'])) : ''; ?>">
-                         <small class="form-text text-muted">কুইজটি কখন থেকে লাইভ বা আপকামিং হিসেবে দেখানো শুরু হবে।</small> </div>
+                        <label for="quiz_live_start" class="form-label">লাইভ শুরু (ঐচ্ছিক)</label>
+                        <input type="datetime-local" class="form-control" id="quiz_live_start" name="quiz_live_start" value="<?php echo !empty($quiz['live_start_datetime']) ? date('Y-m-d\TH:i', strtotime($quiz['live_start_datetime'])) : ''; ?>">
+                    </div>
                 </div>
                  <div class="row">
                     <div class="col-md-4 mb-3">
                         <label for="quiz_live_end" class="form-label">লাইভ শেষ (ঐচ্ছিক)</label>
                         <input type="datetime-local" class="form-control" id="quiz_live_end" name="quiz_live_end" value="<?php echo !empty($quiz['live_end_datetime']) ? date('Y-m-d\TH:i', strtotime($quiz['live_end_datetime'])) : ''; ?>">
-                        <small class="form-text text-muted">কুইজটি কখন স্বয়ংক্রিয়ভাবে আর্কাইভ হয়ে যাবে।</small> </div>
+                    </div>
                 </div>
             </div>
         </div>
@@ -530,58 +518,14 @@ require_once 'includes/header.php';
 document.addEventListener('DOMContentLoaded', function () {
     const newQuestionsContainer = document.getElementById('new_questions_container');
     const addNewQuestionBtn = document.getElementById('add_new_question_btn');
-    const quizStatusSelect = document.getElementById('quiz_status'); // For edit page
-    const liveStartInput = document.getElementById('quiz_live_start'); // For edit page
     
     const templateNewQuestionBlock = document.querySelector('.new-question-block[data-new-question-index="0"]');
     if (!templateNewQuestionBlock) {
         console.error("Template for new question block not found!");
-        // return; // Don't return, other functionalities might still work
+        return;
     }
     
     let newQuestionGlobalIndex = 0; 
-
-    function updateQuizStatusRequirements() { // For edit page
-        if (!quizStatusSelect || !liveStartInput) return; // Ensure elements exist
-        const selectedStatus = quizStatusSelect.value;
-        if (selectedStatus === 'live' || selectedStatus === 'upcoming') {
-            liveStartInput.required = true;
-        } else {
-            liveStartInput.required = false;
-        }
-    }
-
-    if(quizStatusSelect && liveStartInput) {
-        quizStatusSelect.addEventListener('change', updateQuizStatusRequirements);
-        updateQuizStatusRequirements(); // Initial check
-    }
-
-    if (document.getElementById('quiz_description_editor_edit')) {
-        const quillEditDescription = new Quill('#quiz_description_editor_edit', {
-            theme: 'snow',
-            modules: {
-                toolbar: [
-                    [{ 'header': [1, 2, 3, false] }],
-                    ['bold', 'italic', 'underline', 'strike'],
-                    [{ 'list': 'ordered'}, { 'list': 'bullet' }],
-                    [{ 'align': [] }],
-                    ['link', 'image'],
-                    ['clean']
-                ]
-            }
-        });
-        
-        const editQuizForm = document.getElementById('editQuizForm');
-        if (editQuizForm) {
-            editQuizForm.addEventListener('submit', function() {
-                const descriptionHiddenInputEdit = document.getElementById('quiz_description_hidden_edit');
-                if (descriptionHiddenInputEdit) {
-                    descriptionHiddenInputEdit.value = quillEditDescription.root.innerHTML;
-                }
-            });
-        }
-    }
-
 
     function updateNewQuestionBlockAttributes(block, uniqueIdx) {
         block.querySelector('.new-question-number').textContent = newQuestionsContainer.querySelectorAll('.new-question-block:not([style*="display:none"])').length; 
@@ -606,46 +550,80 @@ document.addEventListener('DOMContentLoaded', function () {
             radio.setAttribute('name', radioGroupName);
             radio.required = true;
             if(firstRadioInBlock) {
-                radio.checked = true; 
+                radio.checked = true; // Default check first radio for new question block
                 firstRadioInBlock = false;
             }
         });
     }
 
-    if(addNewQuestionBtn && templateNewQuestionBlock){ // Check if elements exist
-        addNewQuestionBtn.addEventListener('click', function () {
-            const newClonedBlock = templateNewQuestionBlock.cloneNode(true);
-            newClonedBlock.style.display = 'block'; 
-            
-            updateNewQuestionBlockAttributes(newClonedBlock, newQuestionGlobalIndex);
-            newQuestionGlobalIndex++; 
-            
-            newClonedBlock.querySelectorAll('textarea, input[type="text"], input[type="file"]').forEach(input => input.value = '');
-            newClonedBlock.querySelectorAll('input[type="radio"]').forEach(radio => radio.checked = false);
-            
-            const firstRadioInClone = newClonedBlock.querySelector('input[type="radio"][value="0"]');
-            if(firstRadioInClone) firstRadioInClone.checked = true;
+    addNewQuestionBtn.addEventListener('click', function () {
+        const newClonedBlock = templateNewQuestionBlock.cloneNode(true);
+        newClonedBlock.style.display = 'block'; 
+        
+        updateNewQuestionBlockAttributes(newClonedBlock, newQuestionGlobalIndex);
+        newQuestionGlobalIndex++; // Increment global unique index for next block
+        
+        newClonedBlock.querySelectorAll('textarea, input[type="text"], input[type="file"]').forEach(input => input.value = '');
+        newClonedBlock.querySelectorAll('input[type="radio"]').forEach(radio => radio.checked = false);
+        
+        // Explicitly check the first radio again after cloning and clearing
+        const firstRadioInClone = newClonedBlock.querySelector('input[type="radio"][value="0"]');
+        if(firstRadioInClone) firstRadioInClone.checked = true;
 
 
-            newClonedBlock.querySelector('.remove-new-question').addEventListener('click', function () {
-                newClonedBlock.remove();
-                let displayIdx = 1;
-                newQuestionsContainer.querySelectorAll('.new-question-block:not([style*="display:none"])').forEach(visibleBlock => {
-                     visibleBlock.querySelector('.new-question-number').textContent = displayIdx++;
-                });
+        newClonedBlock.querySelector('.remove-new-question').addEventListener('click', function () {
+            newClonedBlock.remove();
+            // Re-number displayed indices of new questions after removal
+            let displayIdx = 1;
+            newQuestionsContainer.querySelectorAll('.new-question-block:not([style*="display:none"])').forEach(visibleBlock => {
+                 visibleBlock.querySelector('.new-question-number').textContent = displayIdx++;
             });
-            
-            newQuestionsContainer.appendChild(newClonedBlock);
-            const currentVisibleBlocks = newQuestionsContainer.querySelectorAll('.new-question-block:not([style*="display:none"])');
-            newClonedBlock.querySelector('.new-question-number').textContent = currentVisibleBlocks.length;
+        });
+        
+        newQuestionsContainer.appendChild(newClonedBlock);
+        // Update display number for the newly added block
+        const currentVisibleBlocks = newQuestionsContainer.querySelectorAll('.new-question-block:not([style*="display:none"])');
+        newClonedBlock.querySelector('.new-question-number').textContent = currentVisibleBlocks.length;
 
-            const noExistingMsg = document.getElementById('no_existing_questions_message');
-            if (noExistingMsg) {
-                 noExistingMsg.style.display = 'none';
+        if (document.getElementById('no_existing_questions_message')) {
+             document.getElementById('no_existing_questions_message').style.display = 'none';
+        }
+    });
+
+    // Initialize Quill editor for quiz description on edit page
+    if (document.getElementById('quiz_description_editor_edit')) {
+        const quillEditDescription = new Quill('#quiz_description_editor_edit', {
+            theme: 'snow',
+            modules: {
+                toolbar: [
+                    [{ 'header': [1, 2, 3, false] }],
+                    ['bold', 'italic', 'underline', 'strike'],
+                    [{ 'list': 'ordered'}, { 'list': 'bullet' }],
+                    [{ 'align': [] }],
+                    ['link', 'image'],
+                    ['clean']
+                ]
             }
         });
+        
+        // Set initial content from PHP (already rendered in the div)
+        // quillEditDescription.root.innerHTML = <?php echo json_encode($quiz['description']); ?>;
+        // The above line is usually needed if the div was empty, but since PHP echoes into it,
+        // Quill should pick it up. If not, uncomment and adapt.
+
+        // On form submission, update the hidden input
+        const editQuizForm = document.getElementById('editQuizForm');
+        if (editQuizForm) {
+            editQuizForm.addEventListener('submit', function() {
+                const descriptionHiddenInputEdit = document.getElementById('quiz_description_hidden_edit');
+                if (descriptionHiddenInputEdit) {
+                    descriptionHiddenInputEdit.value = quillEditDescription.root.innerHTML;
+                }
+            });
+        }
     }
-    
+
+    // To ensure numbering is correct if existing questions are present
     let displayIdx = 1;
     newQuestionsContainer.querySelectorAll('.new-question-block:not([style*="display:none"])').forEach(visibleBlock => {
          visibleBlock.querySelector('.new-question-number').textContent = displayIdx++;
