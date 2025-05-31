@@ -107,11 +107,11 @@ if (!isset($_SESSION["loggedin"]) || $_SESSION["loggedin"] !== true) {
                     <li class="list-group-item"><strong>স্ট্যাটাস:</strong> <span class="<?php echo $status_text_class; ?>"><?php echo $status_display_text; ?></span></li>
                 </ul>
                 <hr>
-                <p class="lead text-center">এই কুইজে অংশগ্রহণ করতে অনুগ্রহ করে লগইন অথবা রেজিস্টার করুন।</p>
+                <p class="lead text-center">এই কুইজে অংশগ্রহণ করতে অনুগ্রহ করে লগইন করুন।</p>
                 <div class="d-grid gap-2 d-md-flex justify-content-md-center">
                     <a href="login.php?redirect=<?php echo urlencode('quiz_page.php?id=' . $quiz_id); ?>" class="btn btn-primary btn-lg px-4">লগইন করুন</a>
-                    <a href="register.php?redirect=<?php echo urlencode('quiz_page.php?id=' . $quiz_id); ?>" class="btn btn-success btn-lg px-4">রেজিস্টার করুন</a>
                 </div>
+                <p class="lead text-center">রেজিস্টার করা না থাকলে, উপরের লগিন বাটনে ক্লিক করে রেজিস্টেশন করুন!</p>
                  <p class="text-center mt-3"><a href="<?php echo $base_url; ?>quizzes.php" class="btn btn-outline-secondary btn-sm">সকল কুইজ দেখুন</a></p>
             </div>
         </div>
