@@ -362,8 +362,9 @@ require_once 'includes/header.php';
                     <input type="text" class="form-control" id="quiz_title" name="quiz_title" value="<?php echo htmlspecialchars($quiz['title']); ?>" required>
                 </div>
                 <div class="mb-3">
-                    <label for="quiz_description" class="form-label">সংক্ষিপ্ত বর্ণনা</label>
-                    <textarea class="form-control" id="quiz_description" name="quiz_description" rows="3"><?php echo htmlspecialchars($quiz['description']); ?></textarea>
+                    <label for="quiz_description_editor" class="form-label">সংক্ষিপ্ত বর্ণনা</label>
+                    <div id="quiz_description_editor_edit"><?php echo $quiz['description']; // Output raw HTML here ?></div>
+                    <input type="hidden" name="quiz_description" id="quiz_description_hidden_edit">
                 </div>
                 <div class="row">
                     <div class="col-md-4 mb-3">
@@ -588,6 +589,39 @@ document.addEventListener('DOMContentLoaded', function () {
              document.getElementById('no_existing_questions_message').style.display = 'none';
         }
     });
+
+    // Initialize Quill editor for quiz description on edit page
+    if (document.getElementById('quiz_description_editor_edit')) {
+        const quillEditDescription = new Quill('#quiz_description_editor_edit', {
+            theme: 'snow',
+            modules: {
+                toolbar: [
+                    [{ 'header': [1, 2, 3, false] }],
+                    ['bold', 'italic', 'underline', 'strike'],
+                    [{ 'list': 'ordered'}, { 'list': 'bullet' }],
+                    [{ 'align': [] }],
+                    ['link', 'image'],
+                    ['clean']
+                ]
+            }
+        });
+        
+        // Set initial content from PHP (already rendered in the div)
+        // quillEditDescription.root.innerHTML = <?php echo json_encode($quiz['description']); ?>;
+        // The above line is usually needed if the div was empty, but since PHP echoes into it,
+        // Quill should pick it up. If not, uncomment and adapt.
+
+        // On form submission, update the hidden input
+        const editQuizForm = document.getElementById('editQuizForm');
+        if (editQuizForm) {
+            editQuizForm.addEventListener('submit', function() {
+                const descriptionHiddenInputEdit = document.getElementById('quiz_description_hidden_edit');
+                if (descriptionHiddenInputEdit) {
+                    descriptionHiddenInputEdit.value = quillEditDescription.root.innerHTML;
+                }
+            });
+        }
+    }
 
     // To ensure numbering is correct if existing questions are present
     let displayIdx = 1;
