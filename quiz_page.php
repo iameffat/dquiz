@@ -51,7 +51,7 @@ if (!isset($_SESSION["loggedin"]) || $_SESSION["loggedin"] !== true) {
     <div class="container mt-5">
         <div class="card shadow-sm">
             <div class="card-header bg-primary text-white">
-                <h2 class="mb-0"><?php echo escape_html($quiz_info_for_display['title']); ?></h2>
+                <center><h2 class="mb-0"><?php echo escape_html($quiz_info_for_display['title']); ?></h2> </center>
             </div>
             <div class="card-body">
                 <h5 class="card-subtitle mb-2 text-muted">কুইজের বিবরণ</h5>
