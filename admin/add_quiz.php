@@ -41,7 +41,6 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
             if (empty(trim($question_data['text']))) {
                 $errors[] = "প্রশ্ন #" . ($q_idx + 1) . ": প্রশ্নের লেখা খালি রাখা যাবে না।";
             }
-            // question_data['info_text'] is optional, so no specific validation needed unless required
             
             if (isset($_FILES['questions']['name'][$q_idx]['image_url']) && $_FILES['questions']['error'][$q_idx]['image_url'] == UPLOAD_ERR_OK) {
                 $file_name_check = $_FILES['questions']['name'][$q_idx]['image_url'];
@@ -91,7 +90,6 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
 
             foreach ($_POST['questions'] as $q_idx => $question_data) {
                 $q_text = trim($question_data['text']);
-                $q_info_text = isset($question_data['info_text']) ? trim($question_data['info_text']) : NULL; // Get info_text
                 $q_explanation = isset($question_data['explanation']) ? trim($question_data['explanation']) : NULL;
                 $q_image_url = NULL;
 
@@ -144,11 +142,10 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
                     }
                 }
 
-                // Modified SQL and bind_param
-                $sql_question = "INSERT INTO questions (quiz_id, question_text, question_info_text, image_url, explanation, order_number) VALUES (?, ?, ?, ?, ?, ?)";
+                $sql_question = "INSERT INTO questions (quiz_id, question_text, image_url, explanation, order_number) VALUES (?, ?, ?, ?, ?)";
                 $stmt_question = $conn->prepare($sql_question);
                 $order_num = $q_idx + 1;
-                $stmt_question->bind_param("issssi", $quiz_id, $q_text, $q_info_text, $q_image_url, $q_explanation, $order_num);
+                $stmt_question->bind_param("isssi", $quiz_id, $q_text, $q_image_url, $q_explanation, $order_num);
                 
                 if (!$stmt_question->execute()) {
                     throw new Exception("প্রশ্ন সংরক্ষণ করতে সমস্যা হয়েছে: " . $stmt_question->error);
@@ -289,10 +286,6 @@ require_once 'includes/header.php';
                     <button type="button" class="btn btn-sm btn-danger remove-question" style="display:none;">প্রশ্ন সরান</button>
                 </div>
                 <div class="card-body">
-                    <div class="mb-3">
-                        <label for="question_info_text_0" class="form-label">প্রশ্নের পূর্বে/মাঝে তথ্য (ঐচ্ছিক)</label>
-                        <textarea class="form-control" id="question_info_text_0" name="questions[0][info_text]" rows="2"></textarea>
-                    </div>
                     <div class="mb-3 form-control-wrapper"> <label for="question_text_0" class="form-label">প্রশ্নের লেখা <span class="text-danger">*</span></label>
                         <textarea class="form-control question-input-suggest" id="question_text_0" name="questions[0][text]" rows="2" required></textarea>
                         <div class="suggestions-container" id="suggestions_q_0"></div> </div>
@@ -414,35 +407,39 @@ document.addEventListener('DOMContentLoaded', function () {
         }
 
          // Initialize Quill editor for quiz description
-        if (document.getElementById('quiz_description_editor')) {
-            const quillDescription = new Quill('#quiz_description_editor', {
-                theme: 'snow',
-                modules: {
-                    toolbar: [
-                        [{ 'header': [1, 2, 3, false] }],
-                        ['bold', 'italic', 'underline', 'strike'],
-                        [{ 'list': 'ordered'}, { 'list': 'bullet' }],
-                        [{ 'align': [] }],
-                        ['link', 'image'], 
-                        ['clean']
-                    ]
+    if (document.getElementById('quiz_description_editor')) {
+        const quillDescription = new Quill('#quiz_description_editor', {
+            theme: 'snow',
+            modules: {
+                toolbar: [
+                    [{ 'header': [1, 2, 3, false] }],
+                    ['bold', 'italic', 'underline', 'strike'],
+                    [{ 'list': 'ordered'}, { 'list': 'bullet' }],
+                    [{ 'align': [] }],
+                    ['link', 'image'], // 'image' can be added if you want image uploads within description
+                    ['clean']
+                ]
+            }
+        });
+
+        // On form submission, update the hidden input with Quill's HTML content
+        const addQuizForm = document.getElementById('addQuizForm');
+        if (addQuizForm) {
+            addQuizForm.addEventListener('submit', function() {
+                const descriptionHiddenInput = document.getElementById('quiz_description_hidden');
+                if (descriptionHiddenInput) {
+                    descriptionHiddenInput.value = quillDescription.root.innerHTML;
                 }
             });
-
-            const addQuizForm = document.getElementById('addQuizForm');
-            if (addQuizForm) {
-                addQuizForm.addEventListener('submit', function() {
-                    const descriptionHiddenInput = document.getElementById('quiz_description_hidden');
-                    if (descriptionHiddenInput) {
-                        descriptionHiddenInput.value = quillDescription.root.innerHTML;
-                    }
-                });
-            }
-            
-            <?php if (isset($_POST['quiz_description'])): ?>
-            // Content is set by PHP
-            <?php endif; ?>
         }
+        
+        // Preserve content if form reloads with an error (Quill initializes with the div's content)
+        <?php if (isset($_POST['quiz_description'])): ?>
+        // The content is already set in the div's HTML by PHP.
+        // If the content was complex HTML, you might need:
+        // quillDescription.root.innerHTML = <?php echo json_encode($_POST['quiz_description']); ?>;
+        <?php endif; ?>
+    }
         // For option inputs
         const optionInputs = questionBlock.querySelectorAll('.option-input-suggest');
         optionInputs.forEach((optInput, optIndex) => {
@@ -468,18 +465,11 @@ document.addEventListener('DOMContentLoaded', function () {
     function updateQuestionBlocks() {
         const questionBlocks = document.querySelectorAll('.question-block');
         questionBlocks.forEach((block, index) => {
-            block.dataset.questionIndex = index; 
+            block.dataset.questionIndex = index; // Set/Update the question index on the block itself
             block.querySelector('.question-number').textContent = index + 1;
 
-            // Update IDs and names for question text, info_text, image, explanation
-            const qInfoTextarea = block.querySelector('textarea[name$="[info_text]"]');
-            if(qInfoTextarea) {
-                qInfoTextarea.name = `questions[${index}][info_text]`;
-                qInfoTextarea.id = `question_info_text_${index}`;
-                block.querySelector(`label[for^="question_info_text_"]`).setAttribute('for', `question_info_text_${index}`);
-            }
-
-            const qTextarea = block.querySelector('textarea[name$="[text]"]');
+            // Update IDs and names for question text, image, explanation
+            const qTextarea = block.querySelector('textarea[name^="questions["][name$="[text]"]');
             if(qTextarea) {
                 qTextarea.name = `questions[${index}][text]`;
                 qTextarea.id = `question_text_${index}`;
@@ -488,20 +478,21 @@ document.addEventListener('DOMContentLoaded', function () {
                  if (suggestionsContainerQ) suggestionsContainerQ.id = `suggestions_q_${index}`;
             }
             
-            const qImage = block.querySelector('input[type="file"][name$="[image_url]"]');
+            const qImage = block.querySelector('input[type="file"][name^="questions["][name$="[image_url]"]');
              if(qImage) {
                 qImage.name = `questions[${index}][image_url]`;
                 qImage.id = `question_image_${index}`;
                 block.querySelector(`label[for^="question_image_"]`).setAttribute('for', `question_image_${index}`);
             }
 
-            const qExplanation = block.querySelector('textarea[name$="[explanation]"]');
+            const qExplanation = block.querySelector('textarea[name^="questions["][name$="[explanation]"]');
             if(qExplanation){
                 qExplanation.name = `questions[${index}][explanation]`;
                 qExplanation.id = `question_explanation_${index}`;
                 block.querySelector(`label[for^="question_explanation_"]`).setAttribute('for', `question_explanation_${index}`);
             }
             
+            // Update options
             const optionGroups = block.querySelectorAll('.options-container .input-group');
             optionGroups.forEach((optGroup, optIdx) => {
                 const radio = optGroup.querySelector('input[type="radio"]');
@@ -510,7 +501,8 @@ document.addEventListener('DOMContentLoaded', function () {
                 const textInput = optGroup.querySelector('input[type="text"].option-input-suggest');
                 if(textInput) {
                     textInput.name = `questions[${index}][options][${optIdx}]`;
-                    textInput.id = `option_text_${index}_${optIdx}`;
+                    textInput.id = `option_text_${index}_${optIdx}`; // Unique ID for option text input
+                    // Update suggestion container ID for this option
                     const optSuggestionContainer = optGroup.querySelector('.suggestions-container[id^="suggestions_q_"]');
                     if(optSuggestionContainer) optSuggestionContainer.id = `suggestions_q_${index}_opt_${optIdx}`;
                 }
@@ -520,26 +512,30 @@ document.addEventListener('DOMContentLoaded', function () {
             if (removeBtn) {
                 removeBtn.style.display = questionBlocks.length > 1 ? 'inline-block' : 'none';
             }
+            // After re-indexing, ensure suggestion listeners are correctly set up for this block
             setupSuggestionListenersForBlock(block);
         });
     }
     
     addQuestionBtn.addEventListener('click', function () {
         const currentBlocks = document.querySelectorAll('.question-block');
-        const nextIndex = currentBlocks.length;
+        const nextIndex = currentBlocks.length; // This will be the index for the new block
 
         const firstQuestionBlock = document.querySelector('.question-block');
-        if (!firstQuestionBlock) return;
+        if (!firstQuestionBlock) return; // Should not happen
         const newQuestionBlock = firstQuestionBlock.cloneNode(true);
 
+        // Set the data-question-index immediately for the new block
         newQuestionBlock.dataset.questionIndex = nextIndex; 
 
+        // Clear input values and checks
         newQuestionBlock.querySelectorAll('textarea, input[type="text"], input[type="file"]').forEach(input => input.value = '');
         newQuestionBlock.querySelectorAll('input[type="radio"]').forEach(radio => radio.checked = false);
         
         const firstRadioInNew = newQuestionBlock.querySelector('input[type="radio"][value="0"]');
         if (firstRadioInNew) firstRadioInNew.checked = true;
 
+        // Clear any cloned suggestion items from the template
         newQuestionBlock.querySelectorAll('.suggestions-container').forEach(sc => {
             sc.innerHTML = '';
             sc.style.display = 'none';
@@ -556,6 +552,7 @@ document.addEventListener('DOMContentLoaded', function () {
         }
     });
 
+    // Initial setup for the first block
     updateQuestionBlocks(); 
 });
 </script>

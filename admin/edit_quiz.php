@@ -20,7 +20,7 @@ if ($quiz_id <= 0) {
     exit;
 }
 
-// Delete question action
+// Delete question action (existing code, no changes needed here for upcoming status)
 if (isset($_GET['action']) && $_GET['action'] == 'delete_question' && isset($_GET['question_id'])) {
     $question_id_to_delete = intval($_GET['question_id']);
     
@@ -99,6 +99,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['update_full_quiz'])) {
 
         if (empty($quiz_title)) $errors[] = "কুইজের শিরোনাম আবশ্যক।";
         if ($quiz_duration <= 0) $errors[] = "কুইজের সময় অবশ্যই ০ মিনিটের বেশি হতে হবে।";
+        // Updated status validation
         if (!in_array($quiz_status, ['draft', 'live', 'archived', 'upcoming'])) $errors[] = "অবৈধ কুইজ স্ট্যাটাস।";
         
         if ($quiz_live_start && $quiz_live_end && strtotime($quiz_live_start) >= strtotime($quiz_live_end)) {
@@ -113,10 +114,10 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['update_full_quiz'])) {
             $stmt_update_meta->close();
         }
 
+        // Handling existing questions (Code from your file, ensure $errors is checked before commit)
         if (isset($_POST['existing_questions'])) {
             foreach ($_POST['existing_questions'] as $q_id => $q_data) {
                 $q_text = trim($q_data['text']);
-                $q_info_text = isset($q_data['info_text']) ? trim($q_data['info_text']) : NULL; // Get info_text
                 $q_explanation = isset($q_data['explanation']) ? trim($q_data['explanation']) : NULL;
                 $q_order = isset($q_data['order_number']) ? intval($q_data['order_number']) : 0;
                 $current_image_url = isset($q_data['current_image_url']) ? $q_data['current_image_url'] : null;
@@ -162,6 +163,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['update_full_quiz'])) {
 
                     if (move_uploaded_file($file_tmp_name, $upload_path)) {
                         $new_image_url_for_db = 'uploads/question_images/' . $uploaded_file_name;
+                        // Compress uploaded image
                         if (strtolower($file_type) == 'image/jpeg' || strtolower($file_type) == 'image/jpg') {
                             if(function_exists('imagecreatefromjpeg') && function_exists('imagejpeg')){
                                 $source = imagecreatefromjpeg($upload_path);
@@ -182,10 +184,10 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['update_full_quiz'])) {
                         throw new Exception("প্রশ্ন (ID: $q_id): নতুন ছবি আপলোড করতে ব্যর্থ।");
                     }
                 }
-                // Modified SQL and bind_param
-                $sql_update_q = "UPDATE questions SET question_text = ?, question_info_text = ?, image_url = ?, explanation = ?, order_number = ? WHERE id = ? AND quiz_id = ?";
+                
+                $sql_update_q = "UPDATE questions SET question_text = ?, image_url = ?, explanation = ?, order_number = ? WHERE id = ? AND quiz_id = ?";
                 $stmt_update_q = $conn->prepare($sql_update_q);
-                $stmt_update_q->bind_param("ssssiii", $q_text, $q_info_text, $new_image_url_for_db, $q_explanation, $q_order, $q_id, $quiz_id);
+                $stmt_update_q->bind_param("sssiii", $q_text, $new_image_url_for_db, $q_explanation, $q_order, $q_id, $quiz_id);
                 if (!$stmt_update_q->execute()) throw new Exception("বিদ্যমান প্রশ্ন (ID: $q_id) আপডেট করতে সমস্যা: " . $stmt_update_q->error);
                 $stmt_update_q->close();
 
@@ -205,12 +207,12 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['update_full_quiz'])) {
             }
         }
         
+        // Handling new questions (Code from your file, ensure $errors is checked before commit)
          if (isset($_POST['new_questions'])) {
             foreach ($_POST['new_questions'] as $nq_idx => $nq_data) {
                 $nq_text = trim($nq_data['text']);
                 if (empty($nq_text)) continue; 
 
-                $nq_info_text = isset($nq_data['info_text']) ? trim($nq_data['info_text']) : NULL; // Get info_text for new questions
                 $nq_explanation = isset($nq_data['explanation']) ? trim($nq_data['explanation']) : NULL;
                 $nq_order = isset($nq_data['order_number']) ? intval($nq_data['order_number']) : 0;
                 $nq_image_url_for_db = NULL;
@@ -239,6 +241,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['update_full_quiz'])) {
 
                     if (move_uploaded_file($file_tmp_name, $upload_path)) {
                         $nq_image_url_for_db = 'uploads/question_images/' . $new_q_file_name;
+                        // Compress uploaded image
                          if (strtolower($file_type) == 'image/jpeg' || strtolower($file_type) == 'image/jpg') {
                             if(function_exists('imagecreatefromjpeg') && function_exists('imagejpeg')){
                                 $source = imagecreatefromjpeg($upload_path);
@@ -270,10 +273,10 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['update_full_quiz'])) {
                     $new_order_num = ($max_o_res && $max_o_res['max_o'] !== null) ? $max_o_res['max_o'] + 1 : 1;
                     $stmt_max_order->close();
                 }
-                // Modified SQL and bind_param
-                $sql_insert_nq = "INSERT INTO questions (quiz_id, question_text, question_info_text, image_url, explanation, order_number) VALUES (?, ?, ?, ?, ?, ?)";
+
+                $sql_insert_nq = "INSERT INTO questions (quiz_id, question_text, image_url, explanation, order_number) VALUES (?, ?, ?, ?, ?)";
                 $stmt_insert_nq = $conn->prepare($sql_insert_nq);
-                $stmt_insert_nq->bind_param("issssi", $quiz_id, $nq_text, $nq_info_text, $nq_image_url_for_db, $nq_explanation, $new_order_num);
+                $stmt_insert_nq->bind_param("isssi", $quiz_id, $nq_text, $nq_image_url_for_db, $nq_explanation, $new_order_num);
                 if (!$stmt_insert_nq->execute()) throw new Exception("নতুন প্রশ্ন যোগ করতে সমস্যা: " . $stmt_insert_nq->error);
                 $new_question_id = $stmt_insert_nq->insert_id;
                 $stmt_insert_nq->close();
@@ -303,6 +306,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['update_full_quiz'])) {
     } catch (Exception $e) {
         $conn->rollback();
         $errors[] = "একটি গুরুতর ত্রুটি ঘটেছে: " . $e->getMessage();
+        // Preserve form data on error
         $quiz['title'] = $_POST['quiz_title'] ?? $quiz['title'];
         $quiz['description'] = $_POST['quiz_description'] ?? $quiz['description'];
         $quiz['duration_minutes'] = $_POST['quiz_duration'] ?? $quiz['duration_minutes'];
@@ -312,9 +316,9 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['update_full_quiz'])) {
     }
 }
 
-// Fetch questions and options for the quiz, including question_info_text
+// Fetch questions and options for the quiz (Code from your file)
 $questions_data = [];
-$sql_questions_load = "SELECT id, question_text, question_info_text, image_url, explanation, order_number FROM questions WHERE quiz_id = ? ORDER BY order_number ASC, id ASC";
+$sql_questions_load = "SELECT id, question_text, image_url, explanation, order_number FROM questions WHERE quiz_id = ? ORDER BY order_number ASC, id ASC";
 if ($stmt_q_load = $conn->prepare($sql_questions_load)) {
     $stmt_q_load->bind_param("i", $quiz_id);
     $stmt_q_load->execute();
@@ -410,11 +414,6 @@ require_once 'includes/header.php';
                         <input type="hidden" name="existing_questions[<?php echo $q_item['id']; ?>][id]" value="<?php echo $q_item['id']; ?>">
                         <input type="hidden" name="existing_questions[<?php echo $q_item['id']; ?>][current_image_url]" value="<?php echo htmlspecialchars($q_item['image_url']); ?>">
 
-                        <div class="mb-3">
-                            <label class="form-label">প্রশ্নের পূর্বে/মাঝে তথ্য (ঐচ্ছিক)</label>
-                            <textarea class="form-control" name="existing_questions[<?php echo $q_item['id']; ?>][info_text]" rows="2"><?php echo htmlspecialchars($q_item['question_info_text'] ?? ''); ?></textarea>
-                        </div>
-                        
                         <div class="row">
                             <div class="col-md-9 mb-3">
                                 <label class="form-label">প্রশ্নের লেখা <span class="text-danger">*</span></label>
@@ -481,10 +480,6 @@ require_once 'includes/header.php';
                     <button type="button" class="btn btn-sm btn-danger remove-new-question">প্রশ্ন সরান</button>
                 </div>
                 <div class="card-body">
-                    <div class="mb-3">
-                        <label class="form-label">প্রশ্নের পূর্বে/মাঝে তথ্য (ঐচ্ছিক)</label>
-                        <textarea class="form-control" name="new_questions[0][info_text]" rows="2"></textarea>
-                    </div>
                      <div class="row">
                         <div class="col-md-9 mb-3">
                             <label class="form-label">প্রশ্নের লেখা <span class="text-danger">*</span></label>
@@ -542,4 +537,95 @@ document.addEventListener('DOMContentLoaded', function () {
         block.querySelector('.new-question-number').textContent = newQuestionsContainer.querySelectorAll('.new-question-block:not([style*="display:none"])').length; 
         block.dataset.newQuestionIndex = uniqueIdx;
 
-        block.querySelectorAll('[name^
+        block.querySelectorAll('[name^="new_questions["]').forEach(input => {
+            let oldName = input.getAttribute('name');
+            let newName = oldName.replace(/new_questions\[\d+\]/, `new_questions[${uniqueIdx}]`);
+            input.setAttribute('name', newName);
+            if (input.tagName.toLowerCase() === 'textarea' && newName.includes('[text]')) input.required = true;
+            else if (input.type === 'text' && newName.includes('[options]')) input.required = true;
+        });
+        
+        const fileInput = block.querySelector('input[type="file"][name^="new_questions_files["]');
+        if (fileInput) {
+            fileInput.setAttribute('name', `new_questions_files[${uniqueIdx}][image_url]`);
+        }
+
+        const radioGroupName = `new_questions[${uniqueIdx}][correct_option_new]`;
+        let firstRadioInBlock = true;
+        block.querySelectorAll('input[type="radio"]').forEach(radio => {
+            radio.setAttribute('name', radioGroupName);
+            radio.required = true;
+            if(firstRadioInBlock) {
+                radio.checked = true; // Default check first radio for new question block
+                firstRadioInBlock = false;
+            }
+        });
+    }
+
+    addNewQuestionBtn.addEventListener('click', function () {
+        const newClonedBlock = templateNewQuestionBlock.cloneNode(true);
+        newClonedBlock.style.display = 'block'; 
+        
+        updateNewQuestionBlockAttributes(newClonedBlock, newQuestionGlobalIndex);
+        newQuestionGlobalIndex++; 
+        
+        newClonedBlock.querySelectorAll('textarea, input[type="text"], input[type="file"]').forEach(input => input.value = '');
+        newClonedBlock.querySelectorAll('input[type="radio"]').forEach(radio => radio.checked = false);
+        
+        const firstRadioInClone = newClonedBlock.querySelector('input[type="radio"][value="0"]');
+        if(firstRadioInClone) firstRadioInClone.checked = true;
+
+        newClonedBlock.querySelector('.remove-new-question').addEventListener('click', function () {
+            newClonedBlock.remove();
+            let displayIdx = 1;
+            newQuestionsContainer.querySelectorAll('.new-question-block:not([style*="display:none"])').forEach(visibleBlock => {
+                 visibleBlock.querySelector('.new-question-number').textContent = displayIdx++;
+            });
+        });
+        
+        newQuestionsContainer.appendChild(newClonedBlock);
+        const currentVisibleBlocks = newQuestionsContainer.querySelectorAll('.new-question-block:not([style*="display:none"])');
+        newClonedBlock.querySelector('.new-question-number').textContent = currentVisibleBlocks.length;
+
+        if (document.getElementById('no_existing_questions_message')) {
+             document.getElementById('no_existing_questions_message').style.display = 'none';
+        }
+    });
+
+    if (document.getElementById('quiz_description_editor_edit')) {
+        const quillEditDescription = new Quill('#quiz_description_editor_edit', {
+            theme: 'snow',
+            modules: {
+                toolbar: [
+                    [{ 'header': [1, 2, 3, false] }],
+                    ['bold', 'italic', 'underline', 'strike'],
+                    [{ 'list': 'ordered'}, { 'list': 'bullet' }],
+                    [{ 'align': [] }],
+                    ['link', 'image'],
+                    ['clean']
+                ]
+            }
+        });
+        
+        const editQuizForm = document.getElementById('editQuizForm');
+        if (editQuizForm) {
+            editQuizForm.addEventListener('submit', function() {
+                const descriptionHiddenInputEdit = document.getElementById('quiz_description_hidden_edit');
+                if (descriptionHiddenInputEdit) {
+                    descriptionHiddenInputEdit.value = quillEditDescription.root.innerHTML;
+                }
+            });
+        }
+    }
+
+    let displayIdx = 1;
+    newQuestionsContainer.querySelectorAll('.new-question-block:not([style*="display:none"])').forEach(visibleBlock => {
+         visibleBlock.querySelector('.new-question-number').textContent = displayIdx++;
+    });
+});
+</script>
+
+<?php
+$conn->close();
+require_once 'includes/footer.php';
+?>
