@@ -3,24 +3,13 @@ $page_title = "সকল কুইজ";
 $base_url = ''; // Root directory
 require_once 'includes/db_connect.php';
 require_once 'includes/functions.php'; 
-// header.php এখানে include করার আগে $page_specific_styles ভ্যারিয়েবল সেট করতে হবে
-// তাই header.php এর include আপাতত নিচে সরিয়ে দিচ্ছি।
 
 $user_id_for_check = isset($_SESSION['user_id']) ? $_SESSION['user_id'] : null;
 
-/**
- * Checks if a user has any attempt (completed or not) for a given quiz.
- *
- * @param mysqli $conn Database connection object.
- * @param int|null $user_id The ID of the user.
- * @param int $quiz_id The ID of the quiz.
- * @return array [bool $has_attempted, int|null $attempt_id]
- */
 function hasUserAttemptedQuiz($conn, $user_id, $quiz_id) {
     if ($user_id === null || !$conn) {
         return [false, null];
     }
-    // Checks for any attempt, regardless of completion status (score IS NOT NULL is removed)
     $sql_check = "SELECT id FROM quiz_attempts WHERE user_id = ? AND quiz_id = ? LIMIT 1";
     $stmt_check = $conn->prepare($sql_check);
     if (!$stmt_check) {
@@ -39,6 +28,19 @@ function hasUserAttemptedQuiz($conn, $user_id, $quiz_id) {
     return [$result_check->num_rows > 0, $attempt_info ? $attempt_info['id'] : null];
 }
 
+// Fetch Upcoming Quizzes
+$upcoming_quizzes = [];
+$sql_upcoming = "SELECT q.id, q.title, q.description, q.duration_minutes, q.live_start_datetime, q.live_end_datetime,
+                 (SELECT COUNT(qs.id) FROM questions qs WHERE qs.quiz_id = q.id) as question_count
+                 FROM quizzes q
+                 WHERE q.status = 'upcoming'
+                 ORDER BY q.live_start_datetime ASC, q.created_at ASC, q.id DESC";
+$result_upcoming = $conn->query($sql_upcoming);
+if ($result_upcoming && $result_upcoming->num_rows > 0) {
+    while ($row = $result_upcoming->fetch_assoc()) {
+        $upcoming_quizzes[] = $row;
+    }
+}
 
 // Fetch Live Quizzes
 $live_quizzes = [];
@@ -56,7 +58,6 @@ if ($result_live && $result_live->num_rows > 0) {
     }
 }
 
-
 // Fetch Archived Quizzes
 $archived_quizzes = [];
 $sql_archived = "SELECT q.id, q.title, q.description, q.duration_minutes, q.live_start_datetime, q.live_end_datetime,
@@ -68,7 +69,6 @@ $sql_archived = "SELECT q.id, q.title, q.description, q.duration_minutes, q.live
 $result_archived = $conn->query($sql_archived);
 if ($result_archived && $result_archived->num_rows > 0) {
     while ($row = $result_archived->fetch_assoc()) {
-        // Ensure it's not already listed in live_quizzes if it just expired
         $is_already_live = false;
         foreach ($live_quizzes as $live_quiz) {
             if ($live_quiz['id'] == $row['id']) {
@@ -128,6 +128,24 @@ $page_specific_styles = "
         border-radius: 0.25rem; 
     }
 
+    /* Upcoming Quiz Card Specific Styling */
+    .upcoming-quiz-card {
+        background-color: #e0f7fa; /* Light Cyan */
+        border-left: 5px solid #00bcd4; /* Cyan */
+    }
+
+    .upcoming-quiz-card .card-title {
+        color: #00796b; /* Darker Cyan/Teal */
+    }
+    
+    .upcoming-quiz-card .btn-info[disabled] {
+        background-color: #4dd0e1;
+        border-color: #4dd0e1;
+        color: #fff;
+        opacity: 0.75;
+    }
+
+
     /* Live Quiz Card Specific Styling */
     .live-quiz-card {
         background-color: #e6ffed; 
@@ -158,7 +176,7 @@ $page_specific_styles = "
     }
 
     /* Archived Quiz Card Styling */
-    .archived-quiz-card { /* এই ক্লাসটি আর্কাইভ কুইজের কার্ডে যোগ করতে হবে যদি ভিন্ন স্টাইল চান */
+    .archived-quiz-card {
         background-color: #f8f9fa; 
         border-left: 5px solid #6c757d; 
     }
@@ -187,29 +205,65 @@ $page_specific_styles = "
     }
 
     /* Section Title Styling */
+    #upcoming-quizzes h2 {
+        color: #0097a7 !important; /* Cyan emphasis */
+        font-weight: 600;
+    }
     #live-quizzes h2 {
         color: #28a745 !important;
         font-weight: 600;
     }
-
     #archived-quizzes h2 {
         color: #6c757d !important;
         font-weight: 600;
     }
 
-    .alert-light { /* \"কোনো কুইজ নেই\" বার্তার জন্য */
+    .alert-light { 
         background-color: #f8f9fa;
         border-color: #e9ecef;
         color: #495057;
     }
 ";
 
-require_once 'includes/header.php'; // header.php এখন $page_specific_styles পাবে
+require_once 'includes/header.php';
 ?>
 
 <div class="container mt-4">
     <?php display_flash_message('flash_message', 'flash_message_type'); ?>
     <h1 class="mb-4 text-center">কুইজসমূহ</h1>
+
+    <section id="upcoming-quizzes" class="mb-5">
+        <h2 class="mb-3 text-info border-bottom pb-2">আপকামিং কুইজ</h2>
+        <?php if (!empty($upcoming_quizzes)): ?>
+            <div class="row row-cols-1 row-cols-md-2 row-cols-lg-3 g-4">
+                <?php foreach ($upcoming_quizzes as $quiz): ?>
+                <div class="col">
+                    <div class="card h-100 shadow-sm quiz-card upcoming-quiz-card">
+                        <div class="card-body d-flex flex-column">
+                            <h5 class="card-title"><?php echo escape_html($quiz['title']); ?></h5>
+                            <div class="card-text text-muted small quiz-description-display">
+                                <?php echo $quiz['description'] ?? ''; ?>
+                            </div>
+                            <ul class="list-unstyled mt-auto pt-2">
+                                <li><strong>সময়:</strong> <?php echo $quiz['duration_minutes']; ?> মিনিট</li>
+                                <li><strong>প্রশ্ন সংখ্যা:</strong> <?php echo $quiz['question_count']; ?> টি</li>
+                                <?php if ($quiz['live_start_datetime']): ?>
+                                    <li><small>সম্ভাব্য শুরু: <?php echo format_datetime($quiz['live_start_datetime']); ?></small></li>
+                                <?php endif; ?>
+                                 <?php if ($quiz['live_end_datetime'] && $quiz['live_start_datetime'] && strtotime($quiz['live_end_datetime']) > strtotime($quiz['live_start_datetime'])  ): // শুধু শেষ সময় দেখালে কনফিউশন হতে পারে, তাই শুরুর সময়ও থাকতে হবে ?>
+                                    <li><small>সম্ভাব্য শেষ: <?php echo format_datetime($quiz['live_end_datetime']); ?></small></li>
+                                <?php endif; ?>
+                            </ul>
+                            <button class="btn btn-info mt-2" disabled>শীঘ্রই আসছে...</button>
+                        </div>
+                    </div>
+                </div>
+                <?php endforeach; ?>
+            </div>
+        <?php else: ?>
+            <p class="text-center alert alert-light">বর্তমানে কোনো আপকামিং কুইজ নেই। অনুগ্রহ করে পরে আবার দেখুন।</p>
+        <?php endif; ?>
+    </section>
 
     <section id="live-quizzes" class="mb-5">
         <h2 class="mb-3 text-success border-bottom pb-2">লাইভ কুইজ</h2>
@@ -224,13 +278,8 @@ require_once 'includes/header.php'; // header.php এখন $page_specific_style
                         <div class="card-body d-flex flex-column">
                             <h5 class="card-title"><?php echo escape_html($quiz['title']); ?></h5>
                             <div class="card-text text-muted small quiz-description-display">
-    <?php
-        // Ensure $quiz['description'] is not null
-        $description_html = $quiz['description'] ?? '';
-        // Directly echo the HTML content.
-        echo $description_html;
-    ?>
-</div>
+                                <?php echo $quiz['description'] ?? ''; ?>
+                            </div>
                             <ul class="list-unstyled mt-auto pt-2">
                                 <li><strong>সময়:</strong> <?php echo $quiz['duration_minutes']; ?> মিনিট</li>
                                 <li><strong>প্রশ্ন সংখ্যা:</strong> <?php echo $quiz['question_count']; ?> টি</li>
@@ -274,13 +323,8 @@ require_once 'includes/header.php'; // header.php এখন $page_specific_style
                         <div class="card-body d-flex flex-column">
                             <h5 class="card-title"><?php echo escape_html($quiz['title']); ?></h5>
                      <div class="card-text text-muted small quiz-description-display">
-    <?php
-        // Ensure $quiz['description'] is not null
-        $description_html = $quiz['description'] ?? '';
-        // Directly echo the HTML content.
-        echo $description_html;
-    ?>
-</div>
+                        <?php echo $quiz['description'] ?? ''; ?>
+                    </div>
                              <ul class="list-unstyled mt-auto pt-2">
                                 <li><strong>সময়:</strong> <?php echo $quiz['duration_minutes']; ?> মিনিট</li>
                                 <li><strong>প্রশ্ন সংখ্যা:</strong> <?php echo $quiz['question_count']; ?> টি</li>

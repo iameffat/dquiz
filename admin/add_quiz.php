@@ -18,165 +18,166 @@ if (!is_dir(QUESTION_IMAGE_UPLOAD_DIR)) {
 
 
 if ($_SERVER["REQUEST_METHOD"] == "POST") {
-    // ... YOUR EXISTING PHP CODE FOR POST HANDLING ...
-    // This part remains the same as in your original file.
-    // For brevity, I'm not repeating it all here.
-    $quiz_title = trim($_POST['quiz_title']); //
-    $quiz_description = trim($_POST['quiz_description']); //
-    $quiz_duration = intval($_POST['quiz_duration']); //
-    $quiz_status = trim($_POST['quiz_status']); //
-    $quiz_live_start = !empty($_POST['quiz_live_start']) ? trim($_POST['quiz_live_start']) : NULL; //
-    $quiz_live_end = !empty($_POST['quiz_live_end']) ? trim($_POST['quiz_live_end']) : NULL; //
+    $quiz_title = trim($_POST['quiz_title']);
+    $quiz_description = trim($_POST['quiz_description']);
+    $quiz_duration = intval($_POST['quiz_duration']);
+    $quiz_status = trim($_POST['quiz_status']);
+    $quiz_live_start = !empty($_POST['quiz_live_start']) ? trim($_POST['quiz_live_start']) : NULL;
+    $quiz_live_end = !empty($_POST['quiz_live_end']) ? trim($_POST['quiz_live_end']) : NULL;
 
-    if (empty($quiz_title)) $errors[] = "কুইজের শিরোনাম আবশ্যক।"; //
-    if ($quiz_duration <= 0) $errors[] = "কুইজের সময় অবশ্যই ০ মিনিটের বেশি হতে হবে।"; //
-    if (!in_array($quiz_status, ['draft', 'live', 'archived'])) $errors[] = "অবৈধ কুইজ স্ট্যাটাস।"; //
+    if (empty($quiz_title)) $errors[] = "কুইজের শিরোনাম আবশ্যক।";
+    if ($quiz_duration <= 0) $errors[] = "কুইজের সময় অবশ্যই ০ মিনিটের বেশি হতে হবে।";
+    // Updated status validation
+    if (!in_array($quiz_status, ['draft', 'live', 'archived', 'upcoming'])) $errors[] = "অবৈধ কুইজ স্ট্যাটাস।";
 
-    if (!isset($_POST['questions']) || empty($_POST['questions'])) { //
-        $errors[] = "কুইজে কমপক্ষে একটি প্রশ্ন থাকতে হবে।"; //
+    if ($quiz_live_start && $quiz_live_end && strtotime($quiz_live_start) >= strtotime($quiz_live_end)) {
+        $errors[] = "লাইভ শেষের সময় অবশ্যই শুরুর সময়ের পরে হতে হবে।";
+    }
+
+    if (!isset($_POST['questions']) || empty($_POST['questions'])) {
+        $errors[] = "কুইজে কমপক্ষে একটি প্রশ্ন থাকতে হবে।";
     } else {
-        foreach ($_POST['questions'] as $q_idx => $question_data) { //
-            if (empty(trim($question_data['text']))) { //
-                $errors[] = "প্রশ্ন #" . ($q_idx + 1) . ": প্রশ্নের লেখা খালি রাখা যাবে না।"; //
+        foreach ($_POST['questions'] as $q_idx => $question_data) {
+            if (empty(trim($question_data['text']))) {
+                $errors[] = "প্রশ্ন #" . ($q_idx + 1) . ": প্রশ্নের লেখা খালি রাখা যাবে না।";
             }
             
-            if (isset($_FILES['questions']['name'][$q_idx]['image_url']) && $_FILES['questions']['error'][$q_idx]['image_url'] == UPLOAD_ERR_OK) { //
-                $file_name_check = $_FILES['questions']['name'][$q_idx]['image_url']; //
-                $file_size_check = $_FILES['questions']['size'][$q_idx]['image_url']; //
-                $file_type_check = $_FILES['questions']['type'][$q_idx]['image_url']; //
-                $allowed_types = ['image/jpeg', 'image/png', 'image/gif', 'image/webp']; //
-                $max_file_size = 5 * 1024 * 1024; // 5MB //
+            if (isset($_FILES['questions']['name'][$q_idx]['image_url']) && $_FILES['questions']['error'][$q_idx]['image_url'] == UPLOAD_ERR_OK) {
+                $file_name_check = $_FILES['questions']['name'][$q_idx]['image_url'];
+                $file_size_check = $_FILES['questions']['size'][$q_idx]['image_url'];
+                $file_type_check = $_FILES['questions']['type'][$q_idx]['image_url'];
+                $allowed_types = ['image/jpeg', 'image/png', 'image/gif', 'image/webp'];
+                $max_file_size = 5 * 1024 * 1024; // 5MB
 
-                if (!in_array(strtolower($file_type_check), $allowed_types)) { //
-                    $errors[] = "প্রশ্ন #" . ($q_idx + 1) . ": অনুমোদিত ছবির ধরণ JPEG, PNG, WEBP বা GIF. আপনি দিয়েছেন: " . $file_type_check; //
+                if (!in_array(strtolower($file_type_check), $allowed_types)) {
+                    $errors[] = "প্রশ্ন #" . ($q_idx + 1) . ": অনুমোদিত ছবির ধরণ JPEG, PNG, WEBP বা GIF. আপনি দিয়েছেন: " . $file_type_check;
                 }
-                if ($file_size_check > $max_file_size) { //
-                    $errors[] = "প্রশ্ন #" . ($q_idx + 1) . ": ছবির ফাইল সাইজ 5MB এর বেশি হতে পারবে না।"; //
+                if ($file_size_check > $max_file_size) {
+                    $errors[] = "প্রশ্ন #" . ($q_idx + 1) . ": ছবির ফাইল সাইজ 5MB এর বেশি হতে পারবে না।";
                 }
-            } elseif (isset($_FILES['questions']['error'][$q_idx]['image_url']) && $_FILES['questions']['error'][$q_idx]['image_url'] != UPLOAD_ERR_NO_FILE) { //
-                $errors[] = "প্রশ্ন #" . ($q_idx + 1) . ": ছবি আপলোড করতে সমস্যা হয়েছে (Error code: ".$_FILES['questions']['error'][$q_idx]['image_url'].")"; //
+            } elseif (isset($_FILES['questions']['error'][$q_idx]['image_url']) && $_FILES['questions']['error'][$q_idx]['image_url'] != UPLOAD_ERR_NO_FILE) {
+                $errors[] = "প্রশ্ন #" . ($q_idx + 1) . ": ছবি আপলোড করতে সমস্যা হয়েছে (Error code: ".$_FILES['questions']['error'][$q_idx]['image_url'].")";
             }
 
-
-            if (empty($question_data['options']) || count($question_data['options']) < 2) { //
-                 $errors[] = "প্রশ্ন #" . ($q_idx + 1) . ": কমপক্ষে দুটি অপশন থাকতে হবে।"; //
+            if (empty($question_data['options']) || count($question_data['options']) < 2) {
+                 $errors[] = "প্রশ্ন #" . ($q_idx + 1) . ": কমপক্ষে দুটি অপশন থাকতে হবে।";
             } else {
-                $empty_options = 0; //
-                foreach ($question_data['options'] as $opt_idx => $opt_text) { //
-                    if (empty(trim($opt_text))) $empty_options++; //
+                $empty_options = 0;
+                foreach ($question_data['options'] as $opt_idx => $opt_text) {
+                    if (empty(trim($opt_text))) $empty_options++;
                 }
-                if ($empty_options > 0) $errors[] = "প্রশ্ন #" . ($q_idx + 1) . ": অপশনের লেখা খালি রাখা যাবে না।"; //
+                if ($empty_options > 0) $errors[] = "প্রশ্ন #" . ($q_idx + 1) . ": অপশনের লেখা খালি রাখা যাবে না।";
             }
-            if (!isset($question_data['correct_option']) || $question_data['correct_option'] === '') { //
-                $errors[] = "প্রশ্ন #" . ($q_idx + 1) . ": সঠিক উত্তর নির্বাচন করা হয়নি।"; //
+            if (!isset($question_data['correct_option']) || $question_data['correct_option'] === '') {
+                $errors[] = "প্রশ্ন #" . ($q_idx + 1) . ": সঠিক উত্তর নির্বাচন করা হয়নি।";
             }
         }
     }
 
-    if (empty($errors)) { //
-        $conn->begin_transaction(); //
+    if (empty($errors)) {
+        $conn->begin_transaction();
         try {
-            $sql_quiz = "INSERT INTO quizzes (title, description, duration_minutes, status, live_start_datetime, live_end_datetime, created_by) VALUES (?, ?, ?, ?, ?, ?, ?)"; //
-            $stmt_quiz = $conn->prepare($sql_quiz); //
-            $created_by_user_id = $_SESSION['user_id']; //
-            $stmt_quiz->bind_param("ssisssi", $quiz_title, $quiz_description, $quiz_duration, $quiz_status, $quiz_live_start, $quiz_live_end, $created_by_user_id); //
+            $sql_quiz = "INSERT INTO quizzes (title, description, duration_minutes, status, live_start_datetime, live_end_datetime, created_by) VALUES (?, ?, ?, ?, ?, ?, ?)";
+            $stmt_quiz = $conn->prepare($sql_quiz);
+            $created_by_user_id = $_SESSION['user_id'];
+            $stmt_quiz->bind_param("ssisssi", $quiz_title, $quiz_description, $quiz_duration, $quiz_status, $quiz_live_start, $quiz_live_end, $created_by_user_id);
             
-            if (!$stmt_quiz->execute()) { //
-                throw new Exception("কুইজ সংরক্ষণ করতে সমস্যা হয়েছে: " . $stmt_quiz->error); //
+            if (!$stmt_quiz->execute()) {
+                throw new Exception("কুইজ সংরক্ষণ করতে সমস্যা হয়েছে: " . $stmt_quiz->error);
             }
-            $quiz_id = $stmt_quiz->insert_id; //
-            $stmt_quiz->close(); //
+            $quiz_id = $stmt_quiz->insert_id;
+            $stmt_quiz->close();
 
-            foreach ($_POST['questions'] as $q_idx => $question_data) { //
-                $q_text = trim($question_data['text']); //
-                $q_explanation = isset($question_data['explanation']) ? trim($question_data['explanation']) : NULL; //
-                $q_image_url = NULL; //
+            foreach ($_POST['questions'] as $q_idx => $question_data) {
+                $q_text = trim($question_data['text']);
+                $q_explanation = isset($question_data['explanation']) ? trim($question_data['explanation']) : NULL;
+                $q_image_url = NULL;
 
-                if (isset($_FILES['questions']['name'][$q_idx]['image_url']) && $_FILES['questions']['error'][$q_idx]['image_url'] == UPLOAD_ERR_OK) { //
-                    $file_tmp_name = $_FILES['questions']['tmp_name'][$q_idx]['image_url']; //
-                    $file_name = basename($_FILES['questions']['name'][$q_idx]['image_url']); //
-                    $file_type = $_FILES['questions']['type'][$q_idx]['image_url']; //
-                    $file_ext = strtolower(pathinfo($file_name, PATHINFO_EXTENSION)); //
+                if (isset($_FILES['questions']['name'][$q_idx]['image_url']) && $_FILES['questions']['error'][$q_idx]['image_url'] == UPLOAD_ERR_OK) {
+                    $file_tmp_name = $_FILES['questions']['tmp_name'][$q_idx]['image_url'];
+                    $file_name = basename($_FILES['questions']['name'][$q_idx]['image_url']);
+                    $file_type = $_FILES['questions']['type'][$q_idx]['image_url'];
+                    $file_ext = strtolower(pathinfo($file_name, PATHINFO_EXTENSION));
                     
-                    $safe_extensions = ['jpg', 'jpeg', 'png', 'gif', 'webp']; //
-                    if (!in_array($file_ext, $safe_extensions)) { //
-                        throw new Exception("প্রশ্ন #" . ($q_idx + 1) . ": অবৈধ ফাইল এক্সটেনশন।"); //
+                    $safe_extensions = ['jpg', 'jpeg', 'png', 'gif', 'webp'];
+                    if (!in_array($file_ext, $safe_extensions)) {
+                        throw new Exception("প্রশ্ন #" . ($q_idx + 1) . ": অবৈধ ফাইল এক্সটেনশন।");
                     }
 
-                    $new_file_name = "q_img_" . $quiz_id . "_" . time() . "_" . uniqid() . "." . $file_ext; //
-                    $upload_path = QUESTION_IMAGE_UPLOAD_DIR . $new_file_name; //
+                    $new_file_name = "q_img_" . $quiz_id . "_" . time() . "_" . uniqid() . "." . $file_ext;
+                    $upload_path = QUESTION_IMAGE_UPLOAD_DIR . $new_file_name;
 
-                    if (move_uploaded_file($file_tmp_name, $upload_path)) { //
-                        $q_image_url = 'uploads/question_images/' . $new_file_name; //
+                    if (move_uploaded_file($file_tmp_name, $upload_path)) {
+                        $q_image_url = 'uploads/question_images/' . $new_file_name;
 
-                        if (strtolower($file_type) == 'image/jpeg' || strtolower($file_type) == 'image/jpg') { //
-                            if (function_exists('imagecreatefromjpeg') && function_exists('imagejpeg')) { //
-                                $source_image = imagecreatefromjpeg($upload_path); //
-                                if ($source_image) { //
-                                    imagejpeg($source_image, $upload_path, 75); //
-                                    imagedestroy($source_image); //
+                        if (strtolower($file_type) == 'image/jpeg' || strtolower($file_type) == 'image/jpg') {
+                            if (function_exists('imagecreatefromjpeg') && function_exists('imagejpeg')) {
+                                $source_image = imagecreatefromjpeg($upload_path);
+                                if ($source_image) {
+                                    imagejpeg($source_image, $upload_path, 75);
+                                    imagedestroy($source_image);
                                 }
                             }
-                        } elseif (strtolower($file_type) == 'image/png') { //
-                             if (function_exists('imagecreatefrompng') && function_exists('imagepng')) { //
-                                $source_image = imagecreatefrompng($upload_path); //
-                                if ($source_image) { //
-                                    imagealphablending($source_image, false);  //
-                                    imagesavealpha($source_image, true);     //
-                                    imagepng($source_image, $upload_path, 6);  //
-                                    imagedestroy($source_image); //
+                        } elseif (strtolower($file_type) == 'image/png') {
+                             if (function_exists('imagecreatefrompng') && function_exists('imagepng')) {
+                                $source_image = imagecreatefrompng($upload_path);
+                                if ($source_image) {
+                                    imagealphablending($source_image, false); 
+                                    imagesavealpha($source_image, true);    
+                                    imagepng($source_image, $upload_path, 6); 
+                                    imagedestroy($source_image);
                                 }
                             }
-                        } elseif (strtolower($file_type) == 'image/webp') { //
-                            if (function_exists('imagecreatefromwebp') && function_exists('imagewebp')) { //
-                                $source_image = imagecreatefromwebp($upload_path); //
-                                if ($source_image) { //
-                                    imagewebp($source_image, $upload_path, 80);  //
-                                    imagedestroy($source_image); //
+                        } elseif (strtolower($file_type) == 'image/webp') {
+                            if (function_exists('imagecreatefromwebp') && function_exists('imagewebp')) {
+                                $source_image = imagecreatefromwebp($upload_path);
+                                if ($source_image) {
+                                    imagewebp($source_image, $upload_path, 80); 
+                                    imagedestroy($source_image);
                                 }
                             }
                         }
                     } else {
-                        throw new Exception("প্রশ্ন #" . ($q_idx + 1) . ": ছবি আপলোড করতে ব্যর্থ।"); //
+                        throw new Exception("প্রশ্ন #" . ($q_idx + 1) . ": ছবি আপলোড করতে ব্যর্থ।");
                     }
                 }
 
-                $sql_question = "INSERT INTO questions (quiz_id, question_text, image_url, explanation, order_number) VALUES (?, ?, ?, ?, ?)"; //
-                $stmt_question = $conn->prepare($sql_question); //
-                $order_num = $q_idx + 1; // Simple order based on form submission order //
-                $stmt_question->bind_param("isssi", $quiz_id, $q_text, $q_image_url, $q_explanation, $order_num); //
+                $sql_question = "INSERT INTO questions (quiz_id, question_text, image_url, explanation, order_number) VALUES (?, ?, ?, ?, ?)";
+                $stmt_question = $conn->prepare($sql_question);
+                $order_num = $q_idx + 1;
+                $stmt_question->bind_param("isssi", $quiz_id, $q_text, $q_image_url, $q_explanation, $order_num);
                 
-                if (!$stmt_question->execute()) { //
-                    throw new Exception("প্রশ্ন সংরক্ষণ করতে সমস্যা হয়েছে: " . $stmt_question->error); //
+                if (!$stmt_question->execute()) {
+                    throw new Exception("প্রশ্ন সংরক্ষণ করতে সমস্যা হয়েছে: " . $stmt_question->error);
                 }
-                $question_id = $stmt_question->insert_id; //
-                $stmt_question->close(); //
+                $question_id = $stmt_question->insert_id;
+                $stmt_question->close();
 
-                $correct_option_index = intval($question_data['correct_option']); //
-                foreach ($question_data['options'] as $opt_idx => $opt_text) { //
-                    $option_text = trim($opt_text); //
-                    $is_correct = ($opt_idx == $correct_option_index) ? 1 : 0; //
+                $correct_option_index = intval($question_data['correct_option']);
+                foreach ($question_data['options'] as $opt_idx => $opt_text) {
+                    $option_text = trim($opt_text);
+                    $is_correct = ($opt_idx == $correct_option_index) ? 1 : 0;
 
-                    $sql_option = "INSERT INTO options (question_id, option_text, is_correct) VALUES (?, ?, ?)"; //
-                    $stmt_option = $conn->prepare($sql_option); //
-                    $stmt_option->bind_param("isi", $question_id, $option_text, $is_correct); //
+                    $sql_option = "INSERT INTO options (question_id, option_text, is_correct) VALUES (?, ?, ?)";
+                    $stmt_option = $conn->prepare($sql_option);
+                    $stmt_option->bind_param("isi", $question_id, $option_text, $is_correct);
                     
-                    if (!$stmt_option->execute()) { //
-                        throw new Exception("অপশন সংরক্ষণ করতে সমস্যা হয়েছে: " . $stmt_option->error); //
+                    if (!$stmt_option->execute()) {
+                        throw new Exception("অপশন সংরক্ষণ করতে সমস্যা হয়েছে: " . $stmt_option->error);
                     }
-                    $stmt_option->close(); //
+                    $stmt_option->close();
                 }
             }
 
-            $conn->commit(); //
-            $_SESSION['flash_message'] = "কুইজ \"" . htmlspecialchars($quiz_title) . "\" সফলভাবে তৈরি করা হয়েছে। পার্মালিঙ্ক: <a href='../quiz_page.php?id={$quiz_id}' target='_blank'>../quiz_page.php?id={$quiz_id}</a>"; //
-            $_SESSION['flash_message_type'] = "success"; //
-            header("Location: manage_quizzes.php"); //
-            exit; //
+            $conn->commit();
+            $_SESSION['flash_message'] = "কুইজ \"" . htmlspecialchars($quiz_title) . "\" সফলভাবে তৈরি করা হয়েছে। পার্মালিঙ্ক: <a href='../quiz_page.php?id={$quiz_id}' target='_blank'>../quiz_page.php?id={$quiz_id}</a>";
+            $_SESSION['flash_message_type'] = "success";
+            header("Location: manage_quizzes.php");
+            exit;
 
         } catch (Exception $e) {
-            $conn->rollback(); //
-            $errors[] = "একটি ত্রুটি ঘটেছে: " . $e->getMessage(); //
+            $conn->rollback();
+            $errors[] = "একটি ত্রুটি ঘটেছে: " . $e->getMessage();
         }
     }
 }
@@ -260,6 +261,7 @@ require_once 'includes/header.php';
                         <label for="quiz_status" class="form-label">স্ট্যাটাস <span class="text-danger">*</span></label>
                         <select class="form-select" id="quiz_status" name="quiz_status" required>
                             <option value="draft" <?php echo (isset($_POST['quiz_status']) && $_POST['quiz_status'] == 'draft') ? 'selected' : ''; ?>>ড্রাফট</option>
+                            <option value="upcoming" <?php echo (isset($_POST['quiz_status']) && $_POST['quiz_status'] == 'upcoming') ? 'selected' : ''; ?>>আপকামিং</option>
                             <option value="live" <?php echo (isset($_POST['quiz_status']) && $_POST['quiz_status'] == 'live') ? 'selected' : ''; ?>>লাইভ</option>
                             <option value="archived" <?php echo (isset($_POST['quiz_status']) && $_POST['quiz_status'] == 'archived') ? 'selected' : ''; ?>>আর্কাইভড</option>
                         </select>
@@ -460,7 +462,6 @@ document.addEventListener('DOMContentLoaded', function () {
         });
     }
 
-
     function updateQuestionBlocks() {
         const questionBlocks = document.querySelectorAll('.question-block');
         questionBlocks.forEach((block, index) => {
@@ -473,7 +474,8 @@ document.addEventListener('DOMContentLoaded', function () {
                 qTextarea.name = `questions[${index}][text]`;
                 qTextarea.id = `question_text_${index}`;
                 block.querySelector(`label[for^="question_text_"]`).setAttribute('for', `question_text_${index}`);
-                block.querySelector('.suggestions-container[id^="suggestions_q_"]').id = `suggestions_q_${index}`;
+                const suggestionsContainerQ = block.querySelector('.suggestions-container[id^="suggestions_q_"]');
+                 if (suggestionsContainerQ) suggestionsContainerQ.id = `suggestions_q_${index}`;
             }
             
             const qImage = block.querySelector('input[type="file"][name^="questions["][name$="[image_url]"]');
@@ -540,8 +542,7 @@ document.addEventListener('DOMContentLoaded', function () {
         });
         
         questionsContainer.appendChild(newQuestionBlock);
-        updateQuestionBlocks(); // This will re-index all blocks including the new one
-                                // and setupSuggestionListenersForBlock will be called for each.
+        updateQuestionBlocks(); 
     });
 
     questionsContainer.addEventListener('click', function(event) {
