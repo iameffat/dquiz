@@ -111,7 +111,6 @@ $page_specific_styles = "
         font-size: 0.9rem;
         color: #555; 
         flex-grow: 1; 
-        margin-bottom: 1rem;
     }
 
     .quiz-card ul {
