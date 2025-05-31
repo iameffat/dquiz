@@ -107,7 +107,7 @@ main {
     font-weight: bold;
 }
 
-.card-text p {
+.card-text p, dl, ol, ul {
     margin-bottom: 0!important;
 }
 
