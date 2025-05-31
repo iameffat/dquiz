@@ -131,9 +131,10 @@ if ($result_quiz->num_rows === 1) {
 }
 $stmt_quiz->close();
 
-// Fetch questions and options (including image_url)
+// Fetch questions and options (including image_url and question_info_text)
 $questions = [];
-$sql_questions = "SELECT id, question_text, image_url FROM questions WHERE quiz_id = ? ORDER BY order_number ASC, id ASC";
+// ডেটাবেস থেকে question_info_text কলামটিও সিলেক্ট করা হচ্ছে
+$sql_questions = "SELECT id, question_text, question_info_text, image_url FROM questions WHERE quiz_id = ? ORDER BY order_number ASC, id ASC"; // [MODIFIED]
 $stmt_questions = $conn->prepare($sql_questions);
 $stmt_questions->bind_param("i", $quiz_id);
 $stmt_questions->execute();
@@ -227,6 +228,16 @@ require_once 'includes/header.php';
     margin-left: auto;
     margin-right: auto;
 }
+/* প্রশ্নপত্রের তথ্যের জন্য স্টাইল */
+.question-info-text {
+    background-color: #f0f8ff; /* AliceBlue, or choose another light, distinct color */
+    border-left: 4px solid #17a2b8; /* Bootstrap info color for border */
+    padding: 10px;
+    margin-bottom: 10px;
+    border-radius: 4px;
+    font-size: 0.95em; /* Adjust as needed */
+    line-height: 1.6; /* For better readability */
+}
 </style>
 <div class="timer-progress-bar py-2 px-3 mb-4">
     <div class="container d-flex justify-content-between align-items-center">
@@ -247,6 +258,11 @@ require_once 'includes/header.php';
             <?php foreach ($questions as $index => $question): ?>
             <div class="card question-card mb-4 shadow-sm" id="question_<?php echo $question['id']; ?>" data-question-id="<?php echo $question['id']; ?>">
                 <div class="card-header">
+                    <?php if (!empty($question['question_info_text'])): ?>
+                        <div class="question-info-text">
+                            <?php echo nl2br(escape_html($question['question_info_text'])); // [MODIFIED] Displaying info text ?>
+                        </div>
+                    <?php endif; ?>
                     <h5 class="card-title mb-0">প্রশ্ন <?php echo $index + 1; ?>: <?php echo nl2br(escape_html($question['question_text'])); ?></h5>
                 </div>
                 <div class="card-body">
