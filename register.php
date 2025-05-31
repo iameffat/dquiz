@@ -1,8 +1,5 @@
 <?php
-$page_title = "রেজিস্ট্রেশন";
-$base_url = ''; // Root directory
-require_once 'includes/db_connect.php';
-require_once 'includes/functions.php';
+// register.php
 
 // If a redirect GET parameter is present, store it in a temporary session variable
 // This is useful if the user was trying to access a specific page before being sent to register
@@ -10,6 +7,11 @@ if (isset($_GET['redirect'])) {
     // Store the original redirect target that came with the link to register page
     $_SESSION['redirect_url_on_register_init'] = urldecode($_GET['redirect']);
 }
+
+$page_title = "রেজিস্ট্রেশন";
+$base_url = ''; // Root directory
+require_once 'includes/db_connect.php';
+require_once 'includes/functions.php';
 
 
 $name = $mobile_number = $email = $district_name = $password = $confirm_password = "";
