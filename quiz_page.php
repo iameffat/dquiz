@@ -110,7 +110,7 @@ if (!isset($_SESSION["loggedin"]) || $_SESSION["loggedin"] !== true) {
                 <p class="lead text-center">এই কুইজে অংশগ্রহণ করতে অনুগ্রহ করে লগইন করুন।</p>
                 <div class="d-grid gap-2 d-md-flex justify-content-md-center">
                     <a href="login.php?redirect=<?php echo urlencode('quiz_page.php?id=' . $quiz_id); ?>" class="btn btn-primary btn-lg px-4">লগইন করুন</a>
-                </div>
+                </div><br>
                 <p class="lead text-center">রেজিস্টার করা না থাকলে, উপরের লগিন বাটনে ক্লিক করে রেজিস্টেশন করুন!</p>
                  <p class="text-center mt-3"><a href="<?php echo $base_url; ?>quizzes.php" class="btn btn-outline-secondary btn-sm">সকল কুইজ দেখুন</a></p>
             </div>
