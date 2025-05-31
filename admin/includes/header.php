@@ -36,6 +36,17 @@ $current_admin_base_url = isset($admin_base_url) ? $admin_base_url : '';
         .admin-main-content { margin-left: 280px; padding: 20px; flex-grow: 1; }
         .admin-header { background-color: #fff; padding: 10px 20px; border-bottom: 1px solid #dee2e6; margin-left:280px; }
         .admin-footer { background-color: #f8f9fa; padding:10px 20px; text-align: center; border-top: 1px solid #dee2e6; margin-left:280px; }
+        /* CSS for responsive image preview in admin edit quiz page */
+        .admin-question-image-preview {
+            max-width: 100%; /* Ensures the image is not wider than its container */
+            height: auto; /* Maintains aspect ratio */
+            max-height: 200px; /* Optional: Limits the maximum display height */
+            border: 1px solid #ddd;
+            padding: 5px;
+            border-radius: 4px;
+            margin-bottom: 10px; /* Adds some space below the image */
+            display: block; /* Can help with layout consistency */
+        }
     </style>
 </head>
 <body>
