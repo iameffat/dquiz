@@ -2,15 +2,14 @@
 $page_title = "DeeneLife Quiz";
 $base_url = ''; // Root directory
 require_once 'includes/db_connect.php'; // ডাটাবেস কানেকশন ও সেশন শুরু
-require_once 'includes/functions.php';   // কমন ফাংশন
+require_once 'includes/functions.php';   // কমন ফাংশন (hasUserAttemptedQuiz এখানে থাকা উচিত)
 
-// hasUserAttemptedQuiz ফাংশন (যদি functions.php তে না থাকে, তবে এখানে যুক্ত করুন)
+// hasUserAttemptedQuiz ফাংশন (যদি functions.php তে না থাকে)
 if (!function_exists('hasUserAttemptedQuiz')) {
     function hasUserAttemptedQuiz($conn, $user_id, $quiz_id) {
         if ($user_id === null || !$conn) {
             return [false, null];
         }
-        // Checks for any attempt, regardless of completion status (score IS NOT NULL is removed)
         $sql_check = "SELECT id FROM quiz_attempts WHERE user_id = ? AND quiz_id = ? LIMIT 1";
         $stmt_check = $conn->prepare($sql_check);
         if (!$stmt_check) {
@@ -59,7 +58,7 @@ $sql_upcoming_home = "SELECT q.id, q.title, q.description, q.duration_minutes, q
                     FROM quizzes q
                     WHERE q.status = 'upcoming'
                     ORDER BY q.live_start_datetime ASC, q.id DESC
-                    LIMIT " . $max_recent_quizzes_on_home;
+                    LIMIT " . $max_recent_quizzes_on_home; // Fetch up to max initially
 $result_upcoming_home = $conn->query($sql_upcoming_home);
 if ($result_upcoming_home && $result_upcoming_home->num_rows > 0) {
     while ($row = $result_upcoming_home->fetch_assoc()) {
@@ -261,62 +260,63 @@ $page_specific_styles = "
         border: 1px solid #dee2e6;
         border-radius: 8px;
         transition: transform 0.2s ease-in-out, box-shadow 0.2s ease-in-out;
-        display: flex; 
-        flex-direction: column; 
+        display: flex; /* Ensure cards in a row are same height */
+        flex-direction: column; /* Stack card content vertically */
     }
     .quiz-card-sm:hover {
         transform: translateY(-4px);
         box-shadow: 0 5px 15px rgba(0,0,0,0.1);
     }
     .quiz-card-sm .card-body {
-        flex-grow: 1; 
+        flex-grow: 1; /* Allow card body to expand */
         display: flex;
         flex-direction: column;
     }
     .quiz-card-sm .card-title {
         font-size: 1.1rem;
         font-weight: 600;
-        color: #007bff; 
+        color: #007bff; /* Default title color, can be overridden by specific status */
     }
-    .quiz-card-sm .quiz-description-display { 
+    .quiz-card-sm .quiz-description-display { /* Target the description div */
         font-size: 0.85rem;
         color: #6c757d;
-        margin-bottom: 0.5rem; 
-        flex-grow: 1; 
-        overflow: hidden; 
-        text-overflow: ellipsis; 
+        margin-bottom: 0.5rem; /* Add some space below description */
+        flex-grow: 1; /* Make description take available space */
+        overflow: hidden; /* Prevent long descriptions from breaking layout */
+        text-overflow: ellipsis; /* Add ellipsis for overflow */
+        /* For multi-line ellipsis (requires more complex CSS or JS, or fixed height) */
         display: -webkit-box;
-        -webkit-line-clamp: 3; 
+        -webkit-line-clamp: 3; /* Limit to 3 lines */
         -webkit-box-orient: vertical;  
     }
-    .quiz-card-sm ul { 
-        font-size: 0.8rem; 
-        margin-top: auto; 
+    .quiz-card-sm ul { /* Specific styling for ul within small cards */
+        font-size: 0.8rem; /* Smaller font for details */
+        margin-top: auto; /* Push details and button to bottom */
         padding-top: 0.5rem;
         margin-bottom: 0.5rem;
     }
-    .quiz-card-sm .btn { 
+    .quiz-card-sm .btn { /* General button style for small cards */
         font-size: 0.85rem;
         padding: 0.3rem 0.75rem;
-        align-self: flex-start; 
+        align-self: flex-start; /* Align button to the start of its container */
     }
     
     /* Card styles for homepage recent quizzes section */
     .upcoming-quiz-card-home {
-        background-color: #e0f7fa; 
-        border-left: 4px solid #00bcd4; 
+        background-color: #e0f7fa; /* Light Cyan */
+        border-left: 4px solid #00bcd4; /* Cyan Accent */
     }
     .upcoming-quiz-card-home .card-title { color: #00796b; }
 
     .live-quiz-card-home {
-        background-color: #e6ffed; 
-        border-left: 4px solid #28a745; 
+        background-color: #e6ffed; /* Light Green */
+        border-left: 4px solid #28a745; /* Green Accent */
     }
     .live-quiz-card-home .card-title { color: #155724; }
     
     .archived-quiz-card-home {
-        background-color: #f8f9fa; 
-        border-left: 4px solid #6c757d; 
+        background-color: #f8f9fa; /* Light Grey */
+        border-left: 4px solid #6c757d; /* Grey Accent */
     }
     .archived-quiz-card-home .card-title { color: #343a40; }
 
@@ -373,8 +373,8 @@ require_once 'includes/header.php'; // HTML হেডার অংশ
             
           <div class="upcoming-quiz-info">
             <?php
-            if ($upcoming_quiz_enabled && $upcoming_quiz_title_hero) {
-                echo '<h3>' . $upcoming_quiz_title_hero . '</h3>';
+            if ($upcoming_quiz_enabled && $upcoming_quiz_title_hero) { // Ensure title for hero is also checked
+                echo '<h3>' . $upcoming_quiz_title_hero . '</h3>'; // Use the specific hero title
                 if ($upcoming_quiz_date_str) {
                     try {
                         $target_date = new DateTime($upcoming_quiz_date_str);
@@ -416,8 +416,9 @@ require_once 'includes/header.php'; // HTML হেডার অংশ
         <div class="row row-cols-1 row-cols-md-2 row-cols-lg-3 g-4">
             <?php foreach ($recent_quizzes_for_display as $quiz): ?>
             <?php
+                // Determine card class and button properties based on quiz status
                 $card_class_home = 'quiz-card-sm';
-                $button_text_home = 'অংশগ্রহণ করুন';
+                $button_text_home = 'অংশগ্রহণের জন্য লগইন';
                 $button_class_home = 'btn-outline-primary';
                 $link_href_home = 'quiz_page.php?id=' . $quiz['id'];
                 $additional_info_home = '';
@@ -429,7 +430,7 @@ require_once 'includes/header.php'; // HTML হেডার অংশ
                     $card_class_home .= ' upcoming-quiz-card-home';
                     $button_text_home = 'শীঘ্রই আসছে...';
                     $button_class_home = 'btn-info';
-                    $is_disabled_button = true;
+                    $is_disabled_button = true; // Mark as disabled
                     if ($quiz['live_start_datetime']) {
                         $additional_info_home = '<p class="small text-muted mt-1 mb-0">সম্ভাব্য শুরু: ' . format_datetime($quiz['live_start_datetime']) . '</p>';
                     }
@@ -464,14 +465,9 @@ require_once 'includes/header.php'; // HTML হেডার অংশ
                 <div class="card h-100 <?php echo $card_class_home; ?>">
                     <div class="card-body">
                         <h5 class="card-title"><?php echo htmlspecialchars($quiz['title']); ?></h5>
-                       
-                       <?php $description_html = $quiz['description'] ?? ''; ?>
-                       <?php if (!empty(trim(strip_tags($description_html)))): ?>
                        <div class="quiz-description-display">
-                            <?php echo $description_html; ?>
+                            <?php echo $quiz['description'] ?? ''; // Directly output HTML description ?>
                         </div>
-                       <?php endif; ?>
-
                         <ul class="list-unstyled small">
                             <li><strong>সময়:</strong> <?php echo $quiz['duration_minutes']; ?> মিনিট</li>
                             <li><strong>প্রশ্ন:</strong> <?php echo $quiz['question_count']; ?> টি</li>
