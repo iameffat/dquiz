@@ -27,7 +27,6 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
 
     if (empty($quiz_title)) $errors[] = "কুইজের শিরোনাম আবশ্যক।";
     if ($quiz_duration <= 0) $errors[] = "কুইজের সময় অবশ্যই ০ মিনিটের বেশি হতে হবে।";
-    // Updated status validation
     if (!in_array($quiz_status, ['draft', 'live', 'archived', 'upcoming'])) $errors[] = "অবৈধ কুইজ স্ট্যাটাস।";
 
     if ($quiz_live_start && $quiz_live_end && strtotime($quiz_live_start) >= strtotime($quiz_live_end)) {
@@ -58,18 +57,25 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
             } elseif (isset($_FILES['questions']['error'][$q_idx]['image_url']) && $_FILES['questions']['error'][$q_idx]['image_url'] != UPLOAD_ERR_NO_FILE) {
                 $errors[] = "প্রশ্ন #" . ($q_idx + 1) . ": ছবি আপলোড করতে সমস্যা হয়েছে (Error code: ".$_FILES['questions']['error'][$q_idx]['image_url'].")";
             }
-
-            if (empty($question_data['options']) || count($question_data['options']) < 2) {
-                 $errors[] = "প্রশ্ন #" . ($q_idx + 1) . ": কমপক্ষে দুটি অপশন থাকতে হবে।";
-            } else {
-                $empty_options = 0;
-                foreach ($question_data['options'] as $opt_idx => $opt_text) {
-                    if (empty(trim($opt_text))) $empty_options++;
+            
+            // Validation for options and correct_option
+            $non_empty_options_exist = false;
+            if (isset($question_data['options']) && is_array($question_data['options'])) {
+                if (count($question_data['options']) < 2 && count(array_filter($question_data['options'], 'trim')) > 0) {
+                    // This condition might be too strict if we allow very few options or even one.
+                    // The original check was: if (empty($question_data['options']) || count($question_data['options']) < 2)
+                    // For now, let's focus on empty text. If options are provided, it expects at least two fields by default in HTML.
                 }
-                if ($empty_options > 0) $errors[] = "প্রশ্ন #" . ($q_idx + 1) . ": অপশনের লেখা খালি রাখা যাবে না।";
+                foreach ($question_data['options'] as $opt_text) {
+                    if (!empty(trim($opt_text))) {
+                        $non_empty_options_exist = true;
+                        break;
+                    }
+                }
             }
-            if (!isset($question_data['correct_option']) || $question_data['correct_option'] === '') {
-                $errors[] = "প্রশ্ন #" . ($q_idx + 1) . ": সঠিক উত্তর নির্বাচন করা হয়নি।";
+
+            if ($non_empty_options_exist && (!isset($question_data['correct_option']) || $question_data['correct_option'] === '')) {
+                $errors[] = "প্রশ্ন #" . ($q_idx + 1) . ": যদি অপশনগুলোর মধ্যে কোনোটিতে লেখা থাকে, তবে সঠিক উত্তর নির্বাচন করা আবশ্যক।";
             }
         }
     }
@@ -153,19 +159,39 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
                 $question_id = $stmt_question->insert_id;
                 $stmt_question->close();
 
-                $correct_option_index = intval($question_data['correct_option']);
-                foreach ($question_data['options'] as $opt_idx => $opt_text) {
-                    $option_text = trim($opt_text);
-                    $is_correct = ($opt_idx == $correct_option_index) ? 1 : 0;
-
-                    $sql_option = "INSERT INTO options (question_id, option_text, is_correct) VALUES (?, ?, ?)";
-                    $stmt_option = $conn->prepare($sql_option);
-                    $stmt_option->bind_param("isi", $question_id, $option_text, $is_correct);
-                    
-                    if (!$stmt_option->execute()) {
-                        throw new Exception("অপশন সংরক্ষণ করতে সমস্যা হয়েছে: " . $stmt_option->error);
+                $has_any_actual_options = false;
+                if (isset($question_data['options']) && is_array($question_data['options'])) {
+                    foreach ($question_data['options'] as $opt_text_check) {
+                        if (trim($opt_text_check) !== '') {
+                            $has_any_actual_options = true;
+                            break;
+                        }
                     }
-                    $stmt_option->close();
+                }
+
+                $correct_option_index = -1; 
+                if ($has_any_actual_options && isset($question_data['correct_option']) && $question_data['correct_option'] !== '') {
+                    $correct_option_index = intval($question_data['correct_option']);
+                }
+
+                if (isset($question_data['options']) && is_array($question_data['options'])) {
+                    foreach ($question_data['options'] as $opt_idx => $opt_text) {
+                        $option_text = trim($opt_text);
+                        $is_correct = 0;
+                        if ($has_any_actual_options && $correct_option_index !== -1) {
+                             $is_correct = ($opt_idx == $correct_option_index) ? 1 : 0;
+                        }
+                        // If all options are empty, is_correct will remain 0 for all, which is fine.
+
+                        $sql_option = "INSERT INTO options (question_id, option_text, is_correct) VALUES (?, ?, ?)";
+                        $stmt_option = $conn->prepare($sql_option);
+                        $stmt_option->bind_param("isi", $question_id, $option_text, $is_correct);
+                        
+                        if (!$stmt_option->execute()) {
+                            throw new Exception("অপশন সংরক্ষণ করতে সমস্যা হয়েছে: " . $stmt_option->error);
+                        }
+                        $stmt_option->close();
+                    }
                 }
             }
 
@@ -295,13 +321,13 @@ require_once 'includes/header.php';
                         <small class="form-text text-muted">অনুমোদিত ছবির ধরণ: JPG, PNG, GIF, WEBP. সর্বোচ্চ সাইজ: 5MB.</small>
                     </div>
                     <div class="options-container mb-3">
-                        <label class="form-label">অপশন <span class="text-danger">*</span></label>
+                        <label class="form-label">অপশন <span class="text-muted">(যদি অপশনের লেখা দেন, তাহলে সঠিক উত্তর নির্বাচন করুন)</span></label>
                         <?php for ($i = 0; $i < 4; $i++): ?>
                         <div class="input-group mb-2"> <div class="input-group-text">
-                                <input class="form-check-input mt-0" type="radio" name="questions[0][correct_option]" value="<?php echo $i; ?>" aria-label="সঠিক উত্তর <?php echo $i + 1; ?>" required <?php if($i==0) echo 'checked';?>>
+                                <input class="form-check-input mt-0" type="radio" name="questions[0][correct_option]" value="<?php echo $i; ?>" aria-label="সঠিক উত্তর <?php echo $i + 1; ?>" <?php if($i==0) echo 'checked';?>>
                             </div>
                              <div class="form-control-wrapper flex-grow-1">
-                                <input type="text" class="form-control option-input-suggest" name="questions[0][options][<?php echo $i; ?>]" placeholder="অপশন <?php echo $i + 1; ?>" id="option_text_0_<?php echo $i; ?>" required>
+                                <input type="text" class="form-control option-input-suggest" name="questions[0][options][<?php echo $i; ?>]" placeholder="অপশন <?php echo $i + 1; ?> (ঐচ্ছিক)" id="option_text_0_<?php echo $i; ?>">
                                 <div class="suggestions-container" id="suggestions_q_0_opt_<?php echo $i; ?>"></div> </div>
                         </div>
                         <?php endfor; ?>
@@ -406,46 +432,23 @@ document.addEventListener('DOMContentLoaded', function () {
             }
         }
 
-         // Initialize Quill editor for quiz description
-    if (document.getElementById('quiz_description_editor')) {
-        const quillDescription = new Quill('#quiz_description_editor', {
-            theme: 'snow',
-            modules: {
-                toolbar: [
-                    [{ 'header': [1, 2, 3, false] }],
-                    ['bold', 'italic', 'underline', 'strike'],
-                    [{ 'list': 'ordered'}, { 'list': 'bullet' }],
-                    [{ 'align': [] }],
-                    ['link', 'image'], // 'image' can be added if you want image uploads within description
-                    ['clean']
-                ]
-            }
-        });
-
-        // On form submission, update the hidden input with Quill's HTML content
-        const addQuizForm = document.getElementById('addQuizForm');
-        if (addQuizForm) {
-            addQuizForm.addEventListener('submit', function() {
-                const descriptionHiddenInput = document.getElementById('quiz_description_hidden');
-                if (descriptionHiddenInput) {
-                    descriptionHiddenInput.value = quillDescription.root.innerHTML;
-                }
-            });
-        }
-        
-        // Preserve content if form reloads with an error (Quill initializes with the div's content)
-        <?php if (isset($_POST['quiz_description'])): ?>
-        // The content is already set in the div's HTML by PHP.
-        // If the content was complex HTML, you might need:
-        // quillDescription.root.innerHTML = <?php echo json_encode($_POST['quiz_description']); ?>;
-        <?php endif; ?>
-    }
         // For option inputs
         const optionInputs = questionBlock.querySelectorAll('.option-input-suggest');
         optionInputs.forEach((optInput, optIndex) => {
-            const qIndex = questionBlock.dataset.questionIndex;
-            const suggestionsContainerOption = questionBlock.querySelector(`#suggestions_q_${qIndex}_opt_${optIndex}`);
-            if (suggestionsContainerOption) {
+            const qIndex = questionBlock.dataset.questionIndex; // This is actually the block's live index
+            const currentOptionInputId = optInput.id; // e.g., option_text_0_1 or option_text_dynamicIdx_1
+            // We need to derive the specific suggestion container for *this* option input.
+            // The ID structure for suggestion container is suggestions_q_BLOCKINDEX_opt_OPTIONINDEX_IN_BLOCK
+            // Let's get the option index within its block (0, 1, 2, 3 for initial block)
+            // This can be tricky if IDs are not perfectly stable or if optIndex from querySelectorAll is not the same as in ID
+            // A safer way is to ensure the suggestions container has a predictable ID relative to the input.
+            // Or, traverse from optInput to find its corresponding suggestions container.
+
+            const suggestionsContainerOption = optInput.nextElementSibling; // Assuming suggestions-container is immediately after
+            // Or, if using the structured ID:
+            // const suggestionsContainerOption = questionBlock.querySelector(`#suggestions_q_${qIndex}_opt_${optIndex}`); // This relies on optIndex being sequential from 0
+
+            if (suggestionsContainerOption && suggestionsContainerOption.classList.contains('suggestions-container')) {
                 optInput.addEventListener('input', function () {
                     fetchSuggestions(this.value, 'option', suggestionsContainerOption, this);
                 });
@@ -462,20 +465,51 @@ document.addEventListener('DOMContentLoaded', function () {
         });
     }
 
+     // Initialize Quill editor for quiz description
+    if (document.getElementById('quiz_description_editor')) {
+        const quillDescription = new Quill('#quiz_description_editor', {
+            theme: 'snow',
+            modules: {
+                toolbar: [
+                    [{ 'header': [1, 2, 3, false] }],
+                    ['bold', 'italic', 'underline', 'strike'],
+                    [{ 'list': 'ordered'}, { 'list': 'bullet' }],
+                    [{ 'align': [] }],
+                    ['link', 'image'], 
+                    ['clean']
+                ]
+            }
+        });
+        const addQuizForm = document.getElementById('addQuizForm');
+        if (addQuizForm) {
+            addQuizForm.addEventListener('submit', function() {
+                const descriptionHiddenInput = document.getElementById('quiz_description_hidden');
+                if (descriptionHiddenInput) {
+                    descriptionHiddenInput.value = quillDescription.root.innerHTML;
+                }
+            });
+        }
+        <?php if (isset($_POST['quiz_description'])): ?>
+        <?php endif; ?>
+    }
+
+
     function updateQuestionBlocks() {
         const questionBlocks = document.querySelectorAll('.question-block');
         questionBlocks.forEach((block, index) => {
-            block.dataset.questionIndex = index; // Set/Update the question index on the block itself
+            block.dataset.questionIndex = index; 
             block.querySelector('.question-number').textContent = index + 1;
 
-            // Update IDs and names for question text, image, explanation
             const qTextarea = block.querySelector('textarea[name^="questions["][name$="[text]"]');
             if(qTextarea) {
                 qTextarea.name = `questions[${index}][text]`;
                 qTextarea.id = `question_text_${index}`;
+                qTextarea.required = true; // Question text is always required
                 block.querySelector(`label[for^="question_text_"]`).setAttribute('for', `question_text_${index}`);
                 const suggestionsContainerQ = block.querySelector('.suggestions-container[id^="suggestions_q_"]');
-                 if (suggestionsContainerQ) suggestionsContainerQ.id = `suggestions_q_${index}`;
+                 if (suggestionsContainerQ && !suggestionsContainerQ.id.endsWith(`_opt_${index}`)) { // Ensure not an option sugg. box
+                    suggestionsContainerQ.id = `suggestions_q_${index}`;
+                 }
             }
             
             const qImage = block.querySelector('input[type="file"][name^="questions["][name$="[image_url]"]');
@@ -492,19 +526,23 @@ document.addEventListener('DOMContentLoaded', function () {
                 block.querySelector(`label[for^="question_explanation_"]`).setAttribute('for', `question_explanation_${index}`);
             }
             
-            // Update options
             const optionGroups = block.querySelectorAll('.options-container .input-group');
             optionGroups.forEach((optGroup, optIdx) => {
                 const radio = optGroup.querySelector('input[type="radio"]');
-                if(radio) radio.name = `questions[${index}][correct_option]`;
+                if(radio) {
+                    radio.name = `questions[${index}][correct_option]`;
+                    radio.removeAttribute('required'); // Correct option radio not strictly required
+                }
                 
                 const textInput = optGroup.querySelector('input[type="text"].option-input-suggest');
                 if(textInput) {
                     textInput.name = `questions[${index}][options][${optIdx}]`;
-                    textInput.id = `option_text_${index}_${optIdx}`; // Unique ID for option text input
-                    // Update suggestion container ID for this option
-                    const optSuggestionContainer = optGroup.querySelector('.suggestions-container[id^="suggestions_q_"]');
-                    if(optSuggestionContainer) optSuggestionContainer.id = `suggestions_q_${index}_opt_${optIdx}`;
+                    textInput.id = `option_text_${index}_${optIdx}`; 
+                    textInput.removeAttribute('required'); // Option text not required
+                    const optSuggestionContainer = textInput.nextElementSibling; 
+                    if(optSuggestionContainer && optSuggestionContainer.classList.contains('suggestions-container')) {
+                         optSuggestionContainer.id = `suggestions_q_${index}_opt_${optIdx}`;
+                    }
                 }
             });
             
@@ -512,30 +550,34 @@ document.addEventListener('DOMContentLoaded', function () {
             if (removeBtn) {
                 removeBtn.style.display = questionBlocks.length > 1 ? 'inline-block' : 'none';
             }
-            // After re-indexing, ensure suggestion listeners are correctly set up for this block
             setupSuggestionListenersForBlock(block);
         });
     }
     
     addQuestionBtn.addEventListener('click', function () {
         const currentBlocks = document.querySelectorAll('.question-block');
-        const nextIndex = currentBlocks.length; // This will be the index for the new block
+        const nextIndex = currentBlocks.length; 
 
         const firstQuestionBlock = document.querySelector('.question-block');
-        if (!firstQuestionBlock) return; // Should not happen
+        if (!firstQuestionBlock) return; 
         const newQuestionBlock = firstQuestionBlock.cloneNode(true);
 
-        // Set the data-question-index immediately for the new block
         newQuestionBlock.dataset.questionIndex = nextIndex; 
 
-        // Clear input values and checks
-        newQuestionBlock.querySelectorAll('textarea, input[type="text"], input[type="file"]').forEach(input => input.value = '');
-        newQuestionBlock.querySelectorAll('input[type="radio"]').forEach(radio => radio.checked = false);
+        newQuestionBlock.querySelectorAll('textarea, input[type="text"], input[type="file"]').forEach(input => {
+            input.value = '';
+            if (input.classList.contains('option-input-suggest')) {
+                input.removeAttribute('required');
+            }
+        });
+        newQuestionBlock.querySelectorAll('input[type="radio"]').forEach(radio => {
+            radio.checked = false;
+            radio.removeAttribute('required');
+        });
         
         const firstRadioInNew = newQuestionBlock.querySelector('input[type="radio"][value="0"]');
         if (firstRadioInNew) firstRadioInNew.checked = true;
 
-        // Clear any cloned suggestion items from the template
         newQuestionBlock.querySelectorAll('.suggestions-container').forEach(sc => {
             sc.innerHTML = '';
             sc.style.display = 'none';
@@ -552,7 +594,6 @@ document.addEventListener('DOMContentLoaded', function () {
         }
     });
 
-    // Initial setup for the first block
     updateQuestionBlocks(); 
 });
 </script>
