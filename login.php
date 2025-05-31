@@ -128,22 +128,13 @@ require_once 'includes/header.php';
         <div class="d-grid">
             <button type="submit" class="btn btn-primary">লগইন</button>
         </div>
-        <p class="mt-3 text-center">একাউন্ট নেই? <a href="register.php<?php
-    $redirect_param_for_login_link = '';
-    // if (isset($_SESSION['redirect_url_user_after_reg'])) { // if redirect was passed to register.php
-    //     $redirect_param_for_login_link = '?redirect=' . urlencode($_SESSION['redirect_url_user_after_reg']);
-    // } elseif (isset($_SESSION['redirect_url_user'])) { // Or if a general redirect is already in session
-    //      $redirect_param_for_login_link = '?redirect=' . urlencode($_SESSION['redirect_url_user']);
-    // } // This logic might be better placed in register.php's link to login. For now, direct link.
-    // Keeping it simple for now:
-    if (isset($_SESSION['redirect_url_user'])) {
-         $redirect_param_for_login_link = '?redirect=' . urlencode($_SESSION['redirect_url_user']);
+      <p class="mt-3 text-center">একাউন্ট নেই? <a href="register.php<?php
+    $redirect_param_for_register_link = ''; // Changed variable name for clarity
+    if (isset($_SESSION['redirect_url_user'])) { // Uses the session var that login.php sets
+         $redirect_param_for_register_link = '?redirect=' . urlencode($_SESSION['redirect_url_user']);
     }
-    echo $redirect_param_for_login_link;
+    echo $redirect_param_for_register_link;
 ?>">রেজিস্টার করুন</a></p>
-    </form>
-</div>
-
 <?php 
 // Ensure connection is closed if not closed before including footer
 if ($conn && $conn->ping()) { // Check if connection is active
