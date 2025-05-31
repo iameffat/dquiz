@@ -312,10 +312,7 @@ require_once 'includes/header.php'; // HTML হেডার অংশ
                         <h5 class="card-title"><?php echo htmlspecialchars($quiz['title']); ?></h5>
                        <div class="card-text text-muted small quiz-description-display">
     <?php
-        // Ensure $quiz['description'] is not null
         $description_html = $quiz['description'] ?? '';
-        // Directly echo the HTML content.
-        // You might want to limit the length or height via CSS if descriptions are too long for the card.
         echo $description_html;
     ?>
 </div>

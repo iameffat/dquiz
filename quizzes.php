@@ -272,12 +272,14 @@ require_once 'includes/header.php'; // header.php এখন $page_specific_style
                     <div class="card h-100 shadow-sm quiz-card archived-quiz-card">
                         <div class="card-body d-flex flex-column">
                             <h5 class="card-title"><?php echo escape_html($quiz['title']); ?></h5>
-                            <p class="card-text text-muted small">
-    <?php 
-        $plain_description = strip_tags($quiz['description'] ?? ''); // Remove HTML tags
-        echo htmlspecialchars(mb_substr($plain_description, 0, 100)) . (mb_strlen($plain_description) > 100 ? '...' : ''); // Use mb_substr
+                     <div class="card-text text-muted small quiz-description-display">
+    <?php
+        // Ensure $quiz['description'] is not null
+        $description_html = $quiz['description'] ?? '';
+        // Directly echo the HTML content.
+        echo $description_html;
     ?>
-</p>
+</div>
                              <ul class="list-unstyled mt-auto pt-2">
                                 <li><strong>সময়:</strong> <?php echo $quiz['duration_minutes']; ?> মিনিট</li>
                                 <li><strong>প্রশ্ন সংখ্যা:</strong> <?php echo $quiz['question_count']; ?> টি</li>
