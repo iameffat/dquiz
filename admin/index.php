@@ -15,30 +15,34 @@ $sql_total_users = "SELECT COUNT(id) as total FROM users WHERE role='user'";
 $result_total_users = $conn->query($sql_total_users);
 $total_users = ($result_total_users && $result_total_users->num_rows > 0) ? $result_total_users->fetch_assoc()['total'] : 0;
 
-// --- New Data Fetching ---
-
-// 1. Total Quiz Attempts
-$sql_total_attempts = "SELECT COUNT(id) as total FROM quiz_attempts WHERE end_time IS NOT NULL"; // Assuming end_time means completed
+// Total Quiz Attempts
+$sql_total_attempts = "SELECT COUNT(id) as total FROM quiz_attempts WHERE end_time IS NOT NULL";
 $result_total_attempts = $conn->query($sql_total_attempts);
 $total_attempts = ($result_total_attempts && $result_total_attempts->num_rows > 0) ? $result_total_attempts->fetch_assoc()['total'] : 0;
 
-// 2. Total Questions in the system
+// Total Questions in the system
 $sql_total_questions_system = "SELECT COUNT(id) as total FROM questions";
 $result_total_questions_system = $conn->query($sql_total_questions_system);
 $total_questions_system = ($result_total_questions_system && $result_total_questions_system->num_rows > 0) ? $result_total_questions_system->fetch_assoc()['total'] : 0;
 
-// 3. Number of 'Live' Quizzes
+// Number of 'Live' Quizzes
 $sql_live_quizzes = "SELECT COUNT(id) as total FROM quizzes WHERE status='live' AND (live_start_datetime IS NULL OR live_start_datetime <= NOW()) AND (live_end_datetime IS NULL OR live_end_datetime >= NOW())";
 $result_live_quizzes = $conn->query($sql_live_quizzes);
 $live_quizzes_count = ($result_live_quizzes && $result_live_quizzes->num_rows > 0) ? $result_live_quizzes->fetch_assoc()['total'] : 0;
 
-// 4. Number of 'Draft' Quizzes
+// [NEW] Number of 'Upcoming' Quizzes
+$sql_upcoming_quizzes = "SELECT COUNT(id) as total FROM quizzes WHERE status='upcoming' AND (live_start_datetime IS NULL OR live_start_datetime > NOW())";
+$result_upcoming_quizzes = $conn->query($sql_upcoming_quizzes);
+$upcoming_quizzes_count = ($result_upcoming_quizzes && $result_upcoming_quizzes->num_rows > 0) ? $result_upcoming_quizzes->fetch_assoc()['total'] : 0;
+
+
+// Number of 'Draft' Quizzes
 $sql_draft_quizzes = "SELECT COUNT(id) as total FROM quizzes WHERE status='draft'";
 $result_draft_quizzes = $conn->query($sql_draft_quizzes);
 $draft_quizzes_count = ($result_draft_quizzes && $result_draft_quizzes->num_rows > 0) ? $result_draft_quizzes->fetch_assoc()['total'] : 0;
 
-// 5. Number of 'Archived' Quizzes
-$sql_archived_quizzes = "SELECT COUNT(id) as total FROM quizzes WHERE status='archived' OR (status = 'live' AND live_end_datetime IS NOT NULL AND live_end_datetime < NOW())";
+// Number of 'Archived' Quizzes
+$sql_archived_quizzes = "SELECT COUNT(id) as total FROM quizzes WHERE status='archived' OR (status = 'live' AND live_end_datetime IS NOT NULL AND live_end_datetime < NOW()) OR (status = 'upcoming' AND live_start_datetime IS NOT NULL AND live_start_datetime <= NOW() AND (live_end_datetime IS NULL OR live_end_datetime < NOW()))";
 $result_archived_quizzes = $conn->query($sql_archived_quizzes);
 $archived_quizzes_count = ($result_archived_quizzes && $result_archived_quizzes->num_rows > 0) ? $result_archived_quizzes->fetch_assoc()['total'] : 0;
 
@@ -121,6 +125,21 @@ $archived_quizzes_count = ($result_archived_quizzes && $result_archived_quizzes-
     </div>
 
     <div class="row">
+         <div class="col-xl-3 col-md-6 mb-4">
+            <div class="card border-left-warning shadow h-100 py-2"> <div class="card-body">
+                    <div class="row no-gutters align-items-center">
+                        <div class="col mr-2">
+                            <div class="text-xs font-weight-bold text-warning text-uppercase mb-1">আপকামিং কুইজ</div>
+                            <div class="h5 mb-0 font-weight-bold text-gray-800"><?php echo $upcoming_quizzes_count; ?> টি</div>
+                        </div>
+                        <div class="col-auto">
+                            <i class="fas fa-hourglass-start fa-2x text-gray-300"></i> </div>
+                    </div>
+                     <a href="manage_quizzes.php?status_filter=upcoming" class="stretched-link text-decoration-none"><small class="text-muted">আপকামিং কুইজ দেখুন &rarr;</small></a>
+                </div>
+            </div>
+        </div>
+
         <div class="col-xl-3 col-md-6 mb-4">
             <div class="card border-left-success shadow h-100 py-2">
                 <div class="card-body">
@@ -187,7 +206,6 @@ $archived_quizzes_count = ($result_archived_quizzes && $result_archived_quizzes-
 
 </div>
 <style>
-    /* Custom styles for dashboard cards - can be moved to admin CSS file */
     .card.border-left-primary { border-left: .25rem solid #4e73df!important; }
     .card.border-left-success { border-left: .25rem solid #1cc88a!important; }
     .card.border-left-info { border-left: .25rem solid #36b9cc!important; }
@@ -195,7 +213,6 @@ $archived_quizzes_count = ($result_archived_quizzes && $result_archived_quizzes-
     .card.border-left-danger { border-left: .25rem solid #e74a3b!important; }
     .card.border-left-secondary { border-left: .25rem solid #858796!important; }
     .card.border-left-dark { border-left: .25rem solid #5a5c69!important; }
-
 
     .text-xs { font-size: .8rem; }
     .text-gray-300 { color: #dddfeb!important; }
