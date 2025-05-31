@@ -28,7 +28,7 @@ $sql_recent_live = "SELECT q.id, q.title, q.description, q.duration_minutes,
                     AND (q.live_start_datetime IS NULL OR q.live_start_datetime <= NOW())
                     AND (q.live_end_datetime IS NULL OR q.live_end_datetime >= NOW())
                     ORDER BY q.created_at DESC, q.id DESC
-                    LIMIT 3";
+                    LIMIT 3"; //
 $result_recent_live = $conn->query($sql_recent_live);
 if ($result_recent_live && $result_recent_live->num_rows > 0) {
     while ($row = $result_recent_live->fetch_assoc()) {
@@ -47,7 +47,7 @@ if ($needed_archived > 0) {
                             WHERE q.status = 'archived'
                             OR (q.status = 'live' AND q.live_end_datetime IS NOT NULL AND q.live_end_datetime < NOW())
                             ORDER BY q.created_at DESC, q.id DESC
-                            LIMIT " . $needed_archived;
+                            LIMIT " . $needed_archived; //
     $result_recent_archived = $conn->query($sql_recent_archived);
     if ($result_recent_archived && $result_recent_archived->num_rows > 0) {
         while ($row = $result_recent_archived->fetch_assoc()) {
@@ -75,7 +75,8 @@ $page_specific_styles = "
         /* overflow-x: hidden; Optional: if animations cause horizontal scroll */
     }
     .minimal-hero-section {
-        background-color: #f8f9fa; /* Light grey, very minimal */
+        /* MODIFIED: Changed background-color to a subtle white gradient */
+        background: linear-gradient(180deg, #f8f9fa 0%, #ffffff 100%);
         padding: 6rem 1.5rem;
         text-align: center;
         color: #343a40; /* Darker text for contrast on light background */
@@ -248,7 +249,7 @@ $page_specific_styles = "
             padding: 1.5rem;
         }
     }
-";
+"; //
 
 require_once 'includes/header.php'; // HTML হেডার অংশ
 ?>
@@ -262,7 +263,7 @@ require_once 'includes/header.php'; // HTML হেডার অংশ
             
           <div class="upcoming-quiz-info">
             <?php
-            if ($upcoming_quiz_enabled && $upcoming_quiz_date_str) {
+            if ($upcoming_quiz_enabled && $upcoming_quiz_date_str) { //
                 try {
                     $target_date = new DateTime($upcoming_quiz_date_str);
                     $current_date = new DateTime();
@@ -288,7 +289,7 @@ require_once 'includes/header.php'; // HTML হেডার অংশ
                     // Log error if needed: error_log("Error parsing upcoming quiz date: " . $e->getMessage());
                     echo '<p class="text-warning">আপকামিং কুইজের তারিখ সঠিকভাবে সেট করা হয়নি।</p>';
                 }
-            } elseif ($upcoming_quiz_enabled) {
+            } elseif ($upcoming_quiz_enabled) { //
                  // Enabled but date string is missing
                  echo '<p class="fs-5">আপকামিং কুইজের তথ্য শীঘ্রই আপডেট করা হবে।</p>';
             }
