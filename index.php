@@ -1,9 +1,5 @@
 <?php
-$page_title = "DeeneLife Quiz - জ্ঞানার্জনের একটি আনন্দময় মাধ্যম";
-$page_description = "দ্বীনিলাইফ কুইজ প্লাটফর্মে ইসলামিক জ্ঞান পরীক্ষা করুন। কুরআন, হাদিস, সীরাত এবং ইসলামিক সাধারণ জ্ঞানের উপর আকর্ষণীয় কুইজে অংশগ্রহণ করুন এবং পুরস্কার জিতুন।";
-$page_keywords = "ইসলামিক কুইজ, অনলাইন কুইজ, দ্বীনি কুইজ, বাংলা কুইজ, ইসলামিক জ্ঞান, DeeneLife Quiz, কুরআন কুইজ, হাদিস কুইজ, সীরাত কুইজ";
-// $page_og_image = $base_url . 'assets/images/homepage_og.jpg'; // একটি ভিন্ন OG ইমেজ দিতে পারেন হোমপেজের জন্য
-
+$page_title = "DeeneLife Quiz";
 $base_url = ''; // Root directory
 require_once 'includes/db_connect.php'; // ডাটাবেস কানেকশন ও সেশন শুরু
 require_once 'includes/functions.php';   // কমন ফাংশন
@@ -55,6 +51,7 @@ if ($needed_archived > 0) {
     $result_recent_archived = $conn->query($sql_recent_archived);
     if ($result_recent_archived && $result_recent_archived->num_rows > 0) {
         while ($row = $result_recent_archived->fetch_assoc()) {
+            // Ensure it's not already listed in live_quizzes
             $is_already_live = false;
             foreach ($recent_live_quizzes as $live_quiz) {
                 if ($live_quiz['id'] == $row['id']) {
@@ -68,232 +65,186 @@ if ($needed_archived > 0) {
         }
     }
 }
+
 $recent_quizzes_for_display = array_merge($recent_live_quizzes, $recent_archived_quizzes);
 
 
+// Page-specific CSS for Minimal Hero Section, Animations, Snow
 $page_specific_styles = "
     body {
-        background-color: #f4f7f6; /* হালকা অফ-হোয়াইট ব্যাকগ্রাউন্ড */
+        /* overflow-x: hidden; Optional: if animations cause horizontal scroll */
     }
-    .hero-section {
-        background: linear-gradient(135deg, #007bff 0%, #0056b3 100%);
-        /* আগের স্নো ইফেক্ট এর ক্যানভাস এখানেও কাজ করতে পারে, অথবা ভিন্ন ইফেক্ট */
-        padding: 5rem 1.5rem;
+    .minimal-hero-section {
+        background-color: #f8f9fa; /* Light grey, very minimal */
+        padding: 6rem 1.5rem;
         text-align: center;
-        color: #fff;
-        position: relative;
-        overflow: hidden;
+        color: #343a40; /* Darker text for contrast on light background */
+        position: relative; /* For snow canvas positioning */
+        overflow: hidden; /* To contain snow particles if they go slightly out */
+        border-bottom: 1px solid #dee2e6;
     }
-    #snow-canvas { /* আগের স্নো ক্যানভাস */
+    #snow-canvas {
         position: absolute;
         top: 0;
         left: 0;
         width: 100%;
         height: 100%;
-        z-index: 0;
-        pointer-events: none;
+        z-index: 0; /* Behind the content */
+        pointer-events: none; /* Canvas should not intercept mouse events */
     }
     .hero-content {
-        position: relative;
+        position: relative; /* To ensure content is above the snow canvas */
         z-index: 1;
     }
-    .hero-section h1 {
-        font-size: 2.8rem;
-        font-weight: 700;
+    .minimal-hero-section h1 {
+        font-size: 3rem; /* Slightly smaller than before, but impactful */
+        font-weight: 600; /* Lighter than 700 for a softer feel */
         margin-bottom: 1rem;
-        text-shadow: 1px 1px 3px rgba(0,0,0,0.2);
         animation: fadeInDown 1s ease-out;
     }
-    .hero-section p.lead {
-        font-size: 1.2rem;
-        margin-bottom: 2rem;
-        max-width: 750px;
+    .minimal-hero-section p.lead {
+        font-size: 1.25rem;
+        margin-bottom: 1.5rem;
+        color: #495057; /* Slightly lighter than main text */
+        max-width: 700px; /* Limit width for readability */
         margin-left: auto;
         margin-right: auto;
-        opacity: 0.9;
         animation: fadeInUp 1s ease-out 0.3s;
-        animation-fill-mode: backwards;
+        animation-fill-mode: backwards; /* Start animation from hidden state */
     }
-    .hero-section .upcoming-quiz-box {
-        background-color: rgba(255,255,255,0.15);
-        border: 1px solid rgba(255,255,255,0.3);
-        padding: 1.5rem;
-        border-radius: 10px;
-        margin-top: 2rem;
-        margin-bottom: 2.5rem;
-        display: inline-block; /* কন্টেন্ট অনুযায়ী সাইজ */
+    .minimal-hero-section .upcoming-quiz-info h3 {
+        font-size: 1.5rem;
+        font-weight: 500;
+        color: #007bff; /* Bootstrap primary color */
+        margin-top: 1.5rem;
         animation: fadeInUp 1s ease-out 0.5s;
         animation-fill-mode: backwards;
     }
-    .hero-section .upcoming-quiz-box h3 {
-        font-size: 1.4rem;
-        font-weight: 600;
-        color: #fff; /* হলুদ বা উজ্জ্বল রঙ ভালো লাগবে */
-        margin-bottom: 0.5rem;
-    }
-    .hero-section .upcoming-quiz-box p {
+    .minimal-hero-section .upcoming-quiz-info p {
         font-size: 1.1rem;
-        color: #f0f0f0;
-        margin-bottom: 0;
-    }
-    .hero-section .btn-participate {
-        background-color: #ffc107; /* হলুদ */
-        border-color: #ffc107;
-        color: #212529; /* গাঢ় টেক্সট */
-        padding: 0.8rem 2rem;
-        font-size: 1.15rem;
-        font-weight: 600;
-        border-radius: 50px;
-        transition: all 0.3s ease;
-        box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+        margin-bottom: 1.5rem;
         animation: fadeInUp 1s ease-out 0.7s;
         animation-fill-mode: backwards;
     }
-    .hero-section .btn-participate:hover {
-        background-color: #e0a800;
-        border-color: #d39e00;
-        transform: translateY(-3px);
-        box-shadow: 0 6px 20px rgba(0,0,0,0.15);
+    .minimal-hero-section .btn-custom-primary {
+        background-color: #007bff;
+        border-color: #007bff;
+        color: white;
+        padding: 0.75rem 1.8rem;
+        font-size: 1.1rem;
+        border-radius: 50px; /* Pill-shaped button */
+        transition: all 0.3s ease;
+        animation: fadeInUp 1s ease-out 0.9s;
+        animation-fill-mode: backwards;
+    }
+    .minimal-hero-section .btn-custom-primary:hover {
+        background-color: #0056b3;
+        border-color: #0056b3;
+        transform: translateY(-2px);
+        box-shadow: 0 4px 15px rgba(0, 123, 255, 0.3);
     }
 
-    .content-section {
-        padding: 3.5rem 0;
+    .content-section { /* For rules section and future sections */
+        padding: 3rem 0;
+        animation: fadeIn 1.5s ease-out;
     }
-    .section-card {
-        background-color: #ffffff;
-        border: none; /* বর্ডার উঠিয়ে শ্যাডো ব্যবহার */
-        border-radius: 12px;
+    .quiz-rules-minimal, .how-to-participate, .recent-quizzes-section {
+        background-color: #ffffff; /* White background for rules */
+        border: 1px solid #e9ecef; /* Subtle border */
+        border-radius: 12px; /* Softer radius */
         padding: 2.5rem;
-        box-shadow: 0 8px 25px rgba(0,0,0,0.08);
+        box-shadow: 0 6px 18px rgba(0,0,0,0.07);
         margin-bottom: 2.5rem;
-        transition: transform 0.3s ease, box-shadow 0.3s ease;
-    }
-    .section-card:hover {
-        transform: translateY(-5px);
-        box-shadow: 0 12px 30px rgba(0,0,0,0.12);
     }
     .section-title {
         color: #343a40;
-        margin-bottom: 2rem;
+        margin-bottom: 1.5rem;
         text-align: center;
-        font-weight: 700;
-        font-size: 2rem;
-        position: relative;
-        padding-bottom: 0.75rem;
+        font-weight: 600;
+        font-size: 1.8rem;
     }
-    .section-title::after { /* টাইটেলের নিচে একটি ছোট আন্ডারলাইন */
-        content: '';
-        display: block;
-        width: 70px;
-        height: 3px;
-        background-color: #007bff;
-        margin: 0.5rem auto 0;
-        border-radius: 2px;
+     .quiz-rules-minimal p, .how-to-participate ul li {
+        font-size: 1rem;
+        line-height: 1.7;
+        color: #495057;
     }
-     .quiz-rules-list p, .how-to-list li {
-        font-size: 1.05rem;
-        line-height: 1.8;
-        color: #555;
-        margin-bottom: 0.8rem;
-    }
-    .how-to-list {
+    .how-to-participate ul {
         list-style: none;
         padding-left: 0;
     }
-    .how-to-list li {
+    .how-to-participate ul li {
         position: relative;
-        padding-left: 30px;
+        padding-left: 25px; /* Space for custom bullet */
+        margin-bottom: 0.75rem;
     }
-    .how-to-list li::before {
-        content: '\\27A4'; /* আকর্ষণীয় বুলেট পয়েন্ট */
-        color: #007bff;
-        font-size: 1.2rem;
+    .how-to-participate ul li::before {
+        content: '\\2713'; /* Checkmark unicode */
+        color: #28a745; /* Bootstrap success color */
+        font-weight: bold;
         position: absolute;
         left: 0;
-        top: 3px;
+        top: 2px; /* Adjust vertical alignment */
     }
 
-    .recent-quiz-card {
-        border: 1px solid #e0e0e0;
-        border-radius: 10px;
-        transition: transform 0.25s ease-in-out, box-shadow 0.25s ease-in-out;
-        background-color: #fff;
+    .quiz-card-sm { /* For recent quizzes on homepage */
+        border: 1px solid #dee2e6;
+        border-radius: 8px;
+        transition: transform 0.2s ease-in-out, box-shadow 0.2s ease-in-out;
     }
-    .recent-quiz-card:hover {
-        transform: translateY(-6px);
-        box-shadow: 0 8px 20px rgba(0,0,0,0.1);
+    .quiz-card-sm:hover {
+        transform: translateY(-4px);
+        box-shadow: 0 5px 15px rgba(0,0,0,0.1);
     }
-    .recent-quiz-card .card-body {
-        padding: 1.25rem;
-    }
-    .recent-quiz-card .card-title {
-        font-size: 1.15rem;
+    .quiz-card-sm .card-title {
+        font-size: 1.1rem;
         font-weight: 600;
-        color: #0056b3; /* গাঢ় নীল */
-        margin-bottom: 0.5rem;
+        color: #007bff;
     }
-    .recent-quiz-card .card-text {
-        font-size: 0.9rem;
-        color: #5a6268;
-        min-height: 60px; /* বিবরণীর জন্য একটি নির্দিষ্ট উচ্চতা */
-    }
-     .recent-quiz-card ul {
+    .quiz-card-sm .card-text {
         font-size: 0.85rem;
-        color: #495057;
+        color: #6c757d;
     }
-    .recent-quiz-card .btn-view-quiz {
-        font-size: 0.9rem;
-        padding: 0.4rem 1rem;
-        background-color: #28a745; /* সবুজ বাটন */
-        border-color: #28a745;
-        color:white;
+    .quiz-card-sm .btn-outline-primary {
+        font-size: 0.85rem;
+        padding: 0.3rem 0.75rem;
     }
-    .recent-quiz-card .btn-view-quiz:hover {
-        background-color: #218838;
-        border-color: #1e7e34;
-    }
-    .all-quizzes-link-container {
-        margin-top: 2.5rem;
-    }
-    .all-quizzes-link-container .btn-light {
-        border: 1px solid #ccc;
-        padding: 0.6rem 1.5rem;
-        font-weight: 500;
-    }
+
 
     /* CSS Animations */
     @keyframes fadeInDown {
-        from { opacity: 0; transform: translateY(-25px); }
+        from { opacity: 0; transform: translateY(-30px); }
         to { opacity: 1; transform: translateY(0); }
     }
     @keyframes fadeInUp {
-        from { opacity: 0; transform: translateY(25px); }
+        from { opacity: 0; transform: translateY(30px); }
         to { opacity: 1; transform: translateY(0); }
+    }
+    @keyframes fadeIn {
+        from { opacity: 0; }
+        to { opacity: 1; }
     }
 
     /* Responsive adjustments */
     @media (max-width: 768px) {
-        .hero-section {
+        .minimal-hero-section {
             padding: 4rem 1rem;
         }
-        .hero-section h1 {
+        .minimal-hero-section h1 {
             font-size: 2.2rem;
         }
-        .hero-section p.lead {
-            font-size: 1.1rem;
+        .minimal-hero-section p.lead {
+            font-size: 1rem;
         }
-        .hero-section .upcoming-quiz-box {
-            padding: 1rem;
-            margin-top: 1.5rem;
-            margin-bottom: 2rem;
+        .minimal-hero-section .upcoming-quiz-info h3 {
+            font-size: 1.3rem;
         }
-        .hero-section .upcoming-quiz-box h3 {
-            font-size: 1.2rem;
+        .minimal-hero-section .upcoming-quiz-info p {
+            font-size: 1rem;
         }
         .section-title {
-            font-size: 1.7rem;
+            font-size: 1.5rem;
         }
-        .section-card {
+        .quiz-rules-minimal, .how-to-participate, .recent-quizzes-section {
             padding: 1.5rem;
         }
     }
@@ -302,97 +253,98 @@ $page_specific_styles = "
 require_once 'includes/header.php'; // HTML হেডার অংশ
 ?>
 
-<div class="hero-section">
-    <canvas id="snow-canvas"></canvas> <div class="hero-content container">
-        <h1>দ্বীনিলাইফ কুইজে আপনাকে স্বাগতম!</h1>
-        <p class="lead">জ্ঞানার্জনের একটি আনন্দময় এবং প্রতিযোগিতামূলক পরিবেশে আপনার ইসলামিক জ্ঞানকে আরও সমৃদ্ধ করুন। আমাদের সাথে নিয়মিত কুইজে অংশগ্রহণ করে জিতে নিন মূল্যবান পুরস্কার এবং অর্জন করুন আল্লাহর সন্তুষ্টি।</p>
-        
-        <?php if ($upcoming_quiz_enabled && $upcoming_quiz_date_str): ?>
-        <div class="upcoming-quiz-box">
+<div class="minimal-hero-section">
+    <canvas id="snow-canvas"></canvas>
+    <div class="hero-content">
+        <div class="container">
+            <h1>দ্বীনিলাইফ কুইজে আপনাকে স্বাগতম!</h1>
+            <p class="lead">জ্ঞানার্জন ইবাদতের অংশ এবং প্রতিটি মুসলমানের জন্য ফরজ। তাই নিয়মিত দ্বীনিলাইফে আয়োজন হচ্ছে কুইজ প্রতিযোগিতা, যেখানে আপনি ইসলামের মৌলিক জ্ঞানকে যাচাই করতে পারবেন শিক্ষণীয় কুইজের মাধ্যমে।</p>
+            
+          <div class="upcoming-quiz-info">
             <?php
-            try {
-                $target_date = new DateTime($upcoming_quiz_date_str);
-                $current_date = new DateTime();
-                $target_date_for_diff = new DateTime($target_date->format('Y-m-d'));
-                $current_date_for_diff = new DateTime($current_date->format('Y-m-d'));
+            if ($upcoming_quiz_enabled && $upcoming_quiz_date_str) {
+                try {
+                    $target_date = new DateTime($upcoming_quiz_date_str);
+                    $current_date = new DateTime();
+                    // Compare only dates, not time.
+                    $target_date_for_diff = new DateTime($target_date->format('Y-m-d'));
+                    $current_date_for_diff = new DateTime($current_date->format('Y-m-d'));
 
-                if ($current_date_for_diff > $target_date_for_diff) {
-                    echo '<h3>' . $upcoming_quiz_title . '</h3>';
-                    echo '<p>এই কুইজটি ইতিমধ্যে শেষ হয়ে গিয়েছে। পরবর্তী কুইজের জন্য আমাদের সাথেই থাকুন!</p>';
-                } else {
-                    $interval = $current_date_for_diff->diff($target_date_for_diff);
-                    $days_left = $interval->days;
-                    echo '<h3>' . $upcoming_quiz_title . '</h3>';
-                    if ($days_left > 0) {
-                        echo '<p>শুরু হতে আর মাত্র <span class="fw-bold fs-4 text-warning">' . $days_left . '</span> দিন বাকি!</p>';
+
+                    if ($current_date_for_diff > $target_date_for_diff) {
+                        echo '<h3>' . $upcoming_quiz_title . '</h3>';
+                        echo '<p>এই কুইজটি ইতিমধ্যে শেষ হয়ে গিয়েছে। পরবর্তী কুইজের জন্য অপেক্ষা করুন।</p>';
                     } else {
-                        echo '<p class="text-warning fw-bold fs-4">আজকেই কুইজ!</p>';
+                        $interval = $current_date_for_diff->diff($target_date_for_diff);
+                        $days_left = $interval->days;
+                        echo '<h3>' . $upcoming_quiz_title . '</h3>';
+                        if ($days_left > 0) {
+                            echo '<p>আর মাত্র <span class="fw-bold fs-4">' . $days_left . '</span> দিন বাকি</p>';
+                        } else { // days_left is 0, means today
+                            echo '<p class="text-primary fw-bold fs-4">আজকেই কুইজ!</p>';
+                        }
                     }
+                } catch (Exception $e) {
+                    // Log error if needed: error_log("Error parsing upcoming quiz date: " . $e->getMessage());
+                    echo '<p class="text-warning">আপকামিং কুইজের তারিখ সঠিকভাবে সেট করা হয়নি।</p>';
                 }
-            } catch (Exception $e) {
-                echo '<p class="text-light">আপকামিং কুইজের তথ্য শীঘ্রই আসছে...</p>';
+            } elseif ($upcoming_quiz_enabled) {
+                 // Enabled but date string is missing
+                 echo '<p class="fs-5">আপকামিং কুইজের তথ্য শীঘ্রই আপডেট করা হবে।</p>';
             }
             ?>
-        </div>
-        <?php elseif($upcoming_quiz_enabled): ?>
-         <div class="upcoming-quiz-box">
-            <h3><?php echo $upcoming_quiz_title; ?></h3>
-            <p>শীঘ্রই আসছে... বিস্তারিত তথ্যের জন্য আমাদের সাথেই থাকুন।</p>
-        </div>
-        <?php endif; ?>
-
-        <div>
-            <a href="quizzes.php" class="btn btn-participate btn-lg" type="button">কুইজে অংশগ্রহণ করুন</a>
+            </div>
+            <a href="quizzes.php" class="btn btn-custom-primary btn-lg mt-3" type="button">কুইজে অংশগ্রহণ করুন</a>
         </div>
     </div>
 </div>
 
 <div class="container content-section">
     <?php if (!empty($recent_quizzes_for_display)): ?>
-    <div class="section-card recent-quizzes-home">
+    <div class="recent-quizzes-section">
         <h2 class="section-title">সাম্প্রতিক কুইজসমূহ</h2>
         <div class="row row-cols-1 row-cols-md-2 row-cols-lg-3 g-4">
             <?php foreach ($recent_quizzes_for_display as $quiz): ?>
-            <div class="col d-flex align-items-stretch">
-                <div class="card h-100 recent-quiz-card w-100">
+            <div class="col">
+                <div class="card h-100 quiz-card-sm">
                     <div class="card-body d-flex flex-column">
                         <h5 class="card-title"><?php echo htmlspecialchars($quiz['title']); ?></h5>
-                        <p class="card-text">
-                            <?php echo htmlspecialchars(substr($quiz['description'] ?? '', 0, 70)) . (strlen($quiz['description'] ?? '') > 70 ? '...' : ''); ?>
+                        <p class="card-text text-muted small">
+                            <?php echo htmlspecialchars(substr($quiz['description'] ?? '', 0, 80)) . (strlen($quiz['description'] ?? '') > 80 ? '...' : ''); ?>
                         </p>
                         <ul class="list-unstyled small mt-auto pt-2 mb-2">
-                            <li><i class="fas fa-clock me-1 text-primary"></i> <strong>সময়:</strong> <?php echo $quiz['duration_minutes']; ?> মিনিট</li>
-                            <li><i class="fas fa-question-circle me-1 text-primary"></i> <strong>প্রশ্ন:</strong> <?php echo $quiz['question_count']; ?> টি</li>
+                            <li><strong>সময়:</strong> <?php echo $quiz['duration_minutes']; ?> মিনিট</li>
+                            <li><strong>প্রশ্ন:</strong> <?php echo $quiz['question_count']; ?> টি</li>
                         </ul>
-                        <a href="quiz_page.php?id=<?php echo $quiz['id']; ?>" class="btn btn-view-quiz mt-2 align-self-start">অংশগ্রহণ করুন <i class="fas fa-arrow-right ms-1"></i></a>
+                        <a href="quiz_page.php?id=<?php echo $quiz['id']; ?>" class="btn btn-sm btn-outline-primary align-self-start">অংশগ্রহণ করুন</a>
                     </div>
                 </div>
             </div>
             <?php endforeach; ?>
         </div>
-        <div class="text-center all-quizzes-link-container">
-            <a href="quizzes.php" class="btn btn-light shadow-sm">সকল কুইজ দেখুন</a>
+         <div class="text-center mt-4">
+            <a href="quizzes.php" class="btn btn-light">সকল কুইজ দেখুন</a>
         </div>
     </div>
     <?php endif; ?>
 
 
     <div class="row">
-        <div class="col-lg-7 col-md-6 mb-4 mb-md-0 d-flex">
-            <div class="section-card quiz-rules-list w-100">
+        <div class="col-lg-7 col-md-6 mb-4 mb-md-0">
+            <div class="quiz-rules-minimal h-100">
                 <h2 class="section-title">কুইজের নিয়মাবলী</h2>
-                <p><i class="fas fa-user-check me-2 text-primary"></i>প্রতিটি কুইজে অংশগ্রহণের জন্য লগইন/রেজিস্ট্রেশন করা আবশ্যক।</p>
-                <p><i class="fas fa-list-ol me-2 text-primary"></i>প্রতিটি প্রশ্নের চারটি অপশন থাকবে, যার মধ্যে একটি সঠিক উত্তর নির্বাচন করতে হবে।</p>
-                <p><i class="fas fa-undo-alt me-2 text-primary"></i>একবার উত্তর নির্বাচন করার পর তা পরিবর্তন করা যাবে না।</p>
-                <p><i class="fas fa-hourglass-half me-2 text-primary"></i>নির্দিষ্ট সময়ের মধ্যে কুইজ সম্পন্ন করতে হবে। সময় শেষ হলে স্বয়ংক্রিয়ভাবে সাবমিট হয়ে যাবে।</p>
-                <p><i class="fas fa-trophy me-2 text-primary"></i>ফলাফলের ভিত্তিতে র‍্যাংকিং নির্ধারিত হবে। সর্বোচ্চ স্কোর এবং কম সময়ে সম্পন্নকারীরা তালিকায় উপরে থাকবেন।</p>
-                <p><i class="fas fa-times-circle me-2 text-danger"></i>কোনো প্রকার অসদুপায় অবলম্বন করলে অংশগ্রহণ বাতিল বলে গণ্য হবে।</p>
+                <p>১. প্রতিটি কুইজে অংশগ্রহণের জন্য লগইন/রেজিস্ট্রেশন করা আবশ্যক।</p>
+                <p>২. প্রতিটি প্রশ্নের চারটি অপশন থাকবে, যার মধ্যে একটি সঠিক উত্তর নির্বাচন করতে হবে।</p>
+                <p>৩. একবার উত্তর নির্বাচন করার পর তা পরিবর্তন করা যাবে না।</p>
+                <p>৪. নির্দিষ্ট সময়ের মধ্যে কুইজ সম্পন্ন করতে হবে। সময় শেষ হলে স্বয়ংক্রিয়ভাবে সাবমিট হয়ে যাবে।</p>
+                <p>৫. ফলাফলের ভিত্তিতে র‍্যাংকিং নির্ধারিত হবে। সর্বোচ্চ স্কোর এবং কম সময়ে সম্পন্নকারীরা তালিকায় উপরে থাকবেন।</p>
+                <p>৬. কোনো প্রকার অসদুপায় অবলম্বন করলে অংশগ্রহণ বাতিল বলে গণ্য হবে।</p>
             </div>
         </div>
-        <div class="col-lg-5 col-md-6 d-flex">
-            <div class="section-card how-to-list w-100">
+        <div class="col-lg-5 col-md-6">
+            <div class="how-to-participate h-100">
                 <h2 class="section-title">কিভাবে অংশগ্রহণ করবেন</h2>
-                <ul class="how-to-list">
+                <ul>
                     <li>প্রথমে, সাইটে <a href="register.php">রেজিস্ট্রেশন</a> করুন অথবা <a href="login.php">লগইন</a> করুন।</li>
                     <li>"সকল কুইজ" পেইজ থেকে আপনার পছন্দের কুইজটি নির্বাচন করুন।</li>
                     <li>"অংশগ্রহণ করুন" বাটনে ক্লিক করে কুইজ শুরু করুন।</li>
@@ -407,9 +359,6 @@ require_once 'includes/header.php'; // HTML হেডার অংশ
 
 
 <?php
-// Font Awesome CDN (যদি header.php তে না থাকে)
-// echo '<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css">';
-
 if ($conn) {
     $conn->close();
 }
@@ -417,15 +366,14 @@ include 'includes/footer.php';
 ?>
 
 <script>
-// আগের জাভাস্ক্রিপ্ট কোড (স্নো ইফেক্টের জন্য) অপরিবর্তিত থাকবে
 document.addEventListener('DOMContentLoaded', function() {
     const canvas = document.getElementById('snow-canvas');
-    if (!canvas) return;
+    if (!canvas) return; // Exit if canvas not found
 
-    const heroSection = document.querySelector('.hero-section'); // পরিবর্তিত ক্লাস নেম
+    const heroSection = document.querySelector('.minimal-hero-section');
     const ctx = canvas.getContext('2d');
     let particles = [];
-    const particleCount = 60; // একটু বাড়িয়েছি
+    const particleCount = 50; // Keep it low for minimal effect
 
     function resizeCanvas() {
         if(!heroSection) return;
@@ -433,9 +381,11 @@ document.addEventListener('DOMContentLoaded', function() {
         canvas.height = heroSection.offsetHeight;
     }
 
+    // Initialize and resize canvas
     resizeCanvas();
     window.addEventListener('resize', resizeCanvas);
 
+    // Particle object
     function Particle(x, y, size, speed, opacity) {
         this.x = x;
         this.y = y;
@@ -445,36 +395,40 @@ document.addEventListener('DOMContentLoaded', function() {
 
         this.update = function() {
             this.y += this.speed;
-            this.x += Math.sin(this.y / (40 + Math.random()*60)) * 0.4; // সামান্য পরিবর্তন
+            // Add a little horizontal sway
+            this.x += Math.sin(this.y / (50 + Math.random()*50)) * 0.3;
+
 
             if (this.y > canvas.height) {
-                this.y = 0 - this.size;
-                this.x = Math.random() * canvas.width;
-                this.speed = Math.random() * 0.6 + 0.2; // সামান্য পরিবর্তন
-                this.size = Math.random() * 2.5 + 0.8; // সামান্য পরিবর্তন
+                this.y = 0 - this.size; // Reset to top
+                this.x = Math.random() * canvas.width; // Random x position
+                this.speed = Math.random() * 0.5 + 0.2; // Random speed
+                this.size = Math.random() * 2 + 1; // Random size
             }
         };
 
         this.draw = function() {
             ctx.beginPath();
             ctx.arc(this.x, this.y, this.size, 0, Math.PI * 2);
-            ctx.fillStyle = `rgba(255, 255, 255, ${this.opacity * 0.7})`; // স্নো এর রঙ সাদাটে, অপাসিটি একটু কমানো
+            ctx.fillStyle = `rgba(200, 200, 200, ${this.opacity})`; // Light greyish snow
             ctx.fill();
         };
     }
 
+    // Create particles
     function initParticles() {
-        particles = [];
+        particles = []; // Clear existing particles on resize/re-init
         for (let i = 0; i < particleCount; i++) {
             const x = Math.random() * canvas.width;
-            const y = Math.random() * canvas.height;
-            const size = Math.random() * 2 + 0.7; // সাইজ
-            const speed = Math.random() * 0.4 + 0.15; // গতি
-            const opacity = Math.random() * 0.6 + 0.2; // অপাসিটি
+            const y = Math.random() * canvas.height; // Start at random y positions
+            const size = Math.random() * 1.5 + 0.5; // Smaller particles: 0.5 to 2px
+            const speed = Math.random() * 0.3 + 0.1; // Slower speed: 0.1 to 0.4
+            const opacity = Math.random() * 0.5 + 0.3; // More transparent: 0.3 to 0.8
             particles.push(new Particle(x, y, size, speed, opacity));
         }
     }
 
+    // Animation loop
     function animateParticles() {
         if(!heroSection || !canvas) return;
         ctx.clearRect(0, 0, canvas.width, canvas.height);
@@ -485,13 +439,15 @@ document.addEventListener('DOMContentLoaded', function() {
         requestAnimationFrame(animateParticles);
     }
 
+    // Only start if hero section is visible (basic check)
     if (heroSection && heroSection.offsetHeight > 0) {
         initParticles();
         animateParticles();
     }
+    // Re-initialize particles on resize to adapt to new canvas size
     window.addEventListener('resize', function() {
         resizeCanvas();
-        initParticles();
+        initParticles(); // Re-create particles for new dimensions
     });
 });
 </script>
