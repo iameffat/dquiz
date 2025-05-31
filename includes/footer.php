@@ -1,4 +1,4 @@
-</main> <footer class="footer mt-auto py-3 bg-light">
+</main> <br><footer class="footer mt-auto py-3 bg-light">
     <div class="container text-center">
         <span class="text-muted"><?php echo date("Y"); ?> Powered by DeeneLife Team</span>
     </div>
