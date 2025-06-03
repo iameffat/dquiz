@@ -60,11 +60,18 @@ function prepare_results_data($conn, $current_attempt_id, $current_quiz_id, $cur
     if ($result_attempt->num_rows === 1) {
         $attempt_data = $result_attempt->fetch_assoc();
 
-        // Verify user ID
-        if ($attempt_data['user_id'] != $current_user_id) {
+        // Verify user ID - ALLOW ADMINS TO VIEW ANYONE'S RESULTS
+        // The $current_user_id is the ID of the logged-in user (viewer)
+        // $attempt_data['user_id'] is the ID of the user who took the quiz attempt
+        if (isset($_SESSION['role']) && $_SESSION['role'] === 'admin') {
+            // Admin can view any result, so bypass the user ID check.
+        } elseif ($attempt_data['user_id'] != $current_user_id) {
             $_SESSION['flash_message'] = "আপনি এই কুইজের ফলাফল দেখার জন্য অনুমোদিত নন।";
             $_SESSION['flash_message_type'] = "warning";
-            return $display_data; // Important: stop further processing
+            // Redirect to prevent further data loading for non-admin, non-owner
+            header("Location: quizzes.php");
+            exit;
+            // return $display_data; // Or alternatively, just return and let the calling script handle redirect
         }
 
 
@@ -159,7 +166,7 @@ function prepare_results_data($conn, $current_attempt_id, $current_quiz_id, $cur
         $display_data['success'] = true; // Mark data preparation as successful
 
     } else {
-        $_SESSION['flash_message'] = "কুইজের প্রচেষ্টা খুঁজে পাওয়া যায়নি অথবা এটি আপনার নয়।";
+        $_SESSION['flash_message'] = "কুইজের প্রচেষ্টা খুঁজে পাওয়া যায়নি ।"; // Removed "অথবা এটি আপনার নয়" as admin can view others
         $_SESSION['flash_message_type'] = "warning";
     }
     $stmt_attempt->close();
@@ -321,7 +328,14 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['quiz_id']) && isset($_
         extract($results_display_data); // Extracts variables like $page_title, $total_score etc.
     } else {
         // If prepare_results_data fails (e.g., flash message already set by it)
-        header("Location: quizzes.php"); // Redirect or handle error
+        // The prepare_results_data function itself handles redirection if not admin and not owner.
+        // If it returns success=false for other reasons, we might redirect generally or show an error here.
+        // For now, assuming the redirect inside prepare_results_data covers the main auth failure case.
+        if (!isset($_SESSION['flash_message'])) { // If no specific flash message was set by the function
+             $_SESSION['flash_message'] = "ফলাফল দেখাতে একটি সমস্যা হয়েছে।";
+             $_SESSION['flash_message_type'] = "danger";
+        }
+        header("Location: quizzes.php"); 
         exit;
     }
 
