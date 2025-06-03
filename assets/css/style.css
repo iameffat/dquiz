@@ -1,0 +1,819 @@
+/* assets/css/style.css */
+@font-face {
+  font-family: 'SolaimanLipi';
+  src: url('https://cdn.jsdelivr.net/gh/iameffat/font@master/solaimanv2.woff2') format('truetype'); /* Consider self-hosting if possible */
+  font-weight: normal;
+  font-style: normal;
+  font-display: swap;
+}
+
+:root {
+    --bs-body-font-family: 'SolaimanLipi', sans-serif;
+    --bs-body-font-size: 1rem;
+    --bs-body-font-weight: 400;
+    --bs-body-line-height: 1.6;
+
+    /* Light Theme Colors (Aligned with Bootstrap 5.3 defaults where applicable) */
+    --body-bg: #fff;
+    --body-color: #212529;
+    --text-muted-color: #6c757d;
+    --secondary-bg-color: #e9ecef;
+    --tertiary-bg-color: #f8f9fa;
+    --border-color: #dee2e6;
+    --border-color-translucent: rgba(0, 0, 0, 0.175);
+    --link-color: #0d6efd;
+    --link-hover-color: #0a58ca;
+    
+    --card-bg: var(--body-bg);
+    --card-color: var(--body-color);
+    --card-border-color: var(--border-color-translucent);
+    --card-header-bg: rgba(0, 0, 0, 0.03); /* Bootstrap's default for card header */
+    --card-header-color: inherit;
+
+    --primary-color: #0d6efd;
+    --secondary-color: #6c757d;
+    --success-color: #198754;
+    --info-color: #0dcaf0;
+    --warning-color: #ffc107;
+    --danger-color: #dc3545;
+    --light-color: #f8f9fa;
+    --dark-color: #212529;
+    
+    --primary-rgb: 13,110,253;
+    --secondary-rgb: 108,117,125;
+    --body-color-rgb: 33,37,41;
+    --body-bg-rgb: 255,255,255;
+
+    /* Custom component colors */
+    --auth-form-bg: var(--tertiary-bg-color);
+    --upcoming-quiz-section-bg: #e9f5ff; /* Light blue */
+    --quiz-rules-bg: #fff9e6; /* Light yellow */
+    --quiz-rules-border: #ffecb3;
+    --timer-progress-bar-bg: var(--tertiary-bg-color);
+    --question-option-border: #eee;
+    --question-option-selected-bg: #e0e0e0;
+    --question-option-hover-bg: #f5f5f5;
+
+    --feedback-very-good-bg: #d1e7dd56; /* BS success-bg-subtle */
+    --feedback-very-good-color: #0f5132;
+    --feedback-good-bg: #cff4fc64;      /* BS info-bg-subtle */
+    --feedback-good-color: #055160;
+    --feedback-average-bg: #fff3cd5a;   /* BS warning-bg-subtle */
+    --feedback-average-color: #664d03;
+    --feedback-improve-bg: #f8d7da52;   /* BS danger-bg-subtle */
+    --feedback-improve-color: #721c24;
+
+    --answer-review-correct-user-bg: #d4edda;
+    --answer-review-correct-user-border: #c3e6cb;
+    --answer-review-incorrect-user-bg: #f8d7da;
+    --answer-review-incorrect-user-border: #f5c6cb;
+    --answer-review-actual-correct-bg: #fff3cd;
+    --answer-review-actual-correct-border: #ffeeba;
+    
+    --admin-sidebar-bg: #343a40;
+    --admin-sidebar-text-color: #adb5bd;
+    --admin-sidebar-hover-bg: #495057;
+    --admin-sidebar-hover-text-color: #fff;
+    --admin-header-bg: #fff;
+    --admin-header-border: #dee2e6;
+    --admin-footer-bg: #f8f9fa;
+
+    --suggestions-container-bg: #fff;
+    --suggestions-container-border: #ced4da;
+    --suggestion-item-hover-bg: #e9ecef;
+
+    --quill-toolbar-bg: var(--secondary-bg-color);
+    --quill-toolbar-border: var(--border-color);
+    --quill-toolbar-icon: #444;
+    --quill-container-bg: var(--body-bg);
+    --quill-container-border: var(--border-color);
+    --quill-container-text: var(--body-color);
+
+    /* Bootstrap specific text emphasis colors for light theme */
+    --bs-primary-text-emphasis: #052c65;
+    --bs-secondary-text-emphasis: #2b2f32;
+    --bs-success-text-emphasis: #0a3622;
+    --bs-info-text-emphasis: #055160;
+    --bs-warning-text-emphasis: #664d03;
+    --bs-danger-text-emphasis: #58151c;
+    --bs-light-text-emphasis: #495057;
+    --bs-dark-text-emphasis: #495057;
+
+    /* Bootstrap Table Variables (Light Mode - already defaults from bootstrap.min.css) */
+    /* You usually don't need to redefine these for light mode here unless you're changing them from Bootstrap defaults */
+    /* --bs-table-color: var(--body-color); */
+    /* --bs-table-bg: transparent; */ /* Or var(--body-bg) if tables should explicitly have the body bg */
+    /* --bs-table-border-color: var(--border-color); */
+    /* --bs-table-striped-bg: rgba(0, 0, 0, 0.05); */ /* Example default */
+    /* --bs-table-striped-color: var(--body-color); */
+    /* --bs-table-hover-bg: rgba(0, 0, 0, 0.075); */ /* Example default */
+    /* --bs-table-hover-color: var(--body-color); */
+}
+
+body.dark-mode {
+    --body-bg: #212529; /* Dark grey */
+    --body-color: #dee2e6; /* Light grey text */
+    --text-muted-color: #adb5bd;
+    --secondary-bg-color: #343a40; /* Medium dark grey */
+    --tertiary-bg-color: #2b3035;  /* Slightly darker grey */
+    --border-color: #495057; /* Darker borders */
+    --border-color-translucent: rgba(255, 255, 255, 0.15);
+    --link-color: #6ea8fe; /* Lighter blue for links */
+    --link-hover-color: #8bb9fe;
+
+    --card-bg: #2b3035;
+    --card-color: var(--body-color);
+    --card-border-color: #454c54;
+    --card-header-bg: #343a40;
+    --card-header-color: var(--body-color);
+
+    --primary-rgb: 110,168,254; /* For links primarily */
+    --secondary-rgb: 173,181,189;
+    --body-color-rgb: 222,226,230;
+    --body-bg-rgb: 33,37,41;
+
+    /* Custom component colors for dark mode */
+    --auth-form-bg: var(--secondary-bg-color);
+    --upcoming-quiz-section-bg: #2c3e50; /* Darker blue-grey */
+    --quiz-rules-bg: #423b2e; /* Darker yellow-brown */
+    --quiz-rules-border: #5a5141;
+    --timer-progress-bar-bg: var(--secondary-bg-color);
+    --question-option-border: #495057;
+    --question-option-selected-bg: #007bff; /* Primary blue for selection */
+    --question-option-hover-bg: #3e444a;
+    
+    --feedback-very-good-bg: #051b11;
+    --feedback-very-good-color: #75b798;
+    --feedback-good-bg: #032830;
+    --feedback-good-color: #6edff6;
+    --feedback-average-bg: #332701;
+    --feedback-average-color: #ffda6a;
+    --feedback-improve-bg: #2c0b0e;
+    --feedback-improve-color: #ea868f;
+
+    --answer-review-correct-user-bg: var(--feedback-very-good-bg);
+    --answer-review-correct-user-border: var(--feedback-very-good-color);
+    --answer-review-incorrect-user-bg: var(--feedback-improve-bg);
+    --answer-review-incorrect-user-border: var(--feedback-improve-color);
+    --answer-review-actual-correct-bg: var(--feedback-average-bg);
+    --answer-review-actual-correct-border: var(--feedback-average-color);
+
+    --admin-sidebar-bg: #1c1f23;
+    --admin-sidebar-text-color: #9fa6ad;
+    --admin-sidebar-hover-bg: #2c3136;
+    --admin-sidebar-hover-text-color: #f8f9fa;
+    --admin-header-bg: #2b3035;
+    --admin-header-border: #495057;
+    --admin-footer-bg: #2b3035;
+
+    --suggestions-container-bg: var(--secondary-bg-color);
+    --suggestions-container-border: var(--border-color);
+    --suggestion-item-hover-bg: var(--tertiary-bg-color);
+    
+    --quill-toolbar-bg: var(--secondary-bg-color);
+    --quill-toolbar-border: var(--border-color);
+    --quill-toolbar-icon: var(--body-color);
+    --quill-container-bg: var(--tertiary-bg-color);
+    --quill-container-border: var(--border-color);
+    --quill-container-text: var(--body-color);
+
+    /* Bootstrap specific text emphasis colors for dark theme */
+    --bs-primary-text-emphasis: #6ea8fe;
+    --bs-secondary-text-emphasis: #a7acb1;
+    --bs-success-text-emphasis: #75b798;
+    --bs-info-text-emphasis: #6edff6;
+    --bs-warning-text-emphasis: #ffda6a;
+    --bs-danger-text-emphasis: #ea868f;
+    --bs-light-text-emphasis: #f8f9fa;  
+    --bs-dark-text-emphasis: #dee2e6;
+    
+    /* Added/Corrected Styles Below */
+
+    /* Admin Dashboard Card Text Overrides */
+    .text-gray-100 { color: #f8f9fa !important; }
+    .text-gray-200 { color: #e9ecef !important; }
+    .text-gray-300 { color: #dee2e6 !important; }
+    .text-gray-400 { color: #ced4da !important; }
+    .text-gray-500 { color: #adb5bd !important; }
+    .text-gray-600 { color: var(--text-muted-color) !important; }
+    .text-gray-700 { color: #7a828a !important; }
+    .text-gray-800 { color: var(--body-color) !important; }
+    .text-gray-900 { color: var(--bs-light-text-emphasis) !important; }
+
+    /* Bootstrap utility class overrides for dark mode if not covered by variables */
+    .bg-light {
+        background-color: var(--secondary-bg-color) !important;
+        /* color: var(--body-color) !important; /* Removed as text-muted on footer handles its own color */
+    }
+
+    /* Ensure .text-muted in main site footer (with .bg-light) is correctly styled */
+    .footer.bg-light .text-muted { /* Increased specificity */
+        color: var(--text-muted-color) !important;
+    }
+    
+    /* Dashboard card header text colors */
+    .border-left-primary .text-primary,
+    .text-xs.text-primary {
+        color: var(--bs-primary-text-emphasis) !important;
+    }
+    .border-left-success .text-success,
+    .text-xs.text-success {
+        color: var(--bs-success-text-emphasis) !important;
+    }
+    .border-left-info .text-info,
+    .text-xs.text-info {
+        color: var(--bs-info-text-emphasis) !important;
+    }
+    .border-left-warning .text-warning,
+    .text-xs.text-warning {
+        color: var(--bs-warning-text-emphasis) !important;
+    }
+    .border-left-danger .text-danger,
+    .text-xs.text-danger {
+        color: var(--bs-danger-text-emphasis) !important;
+    }
+    .border-left-secondary .text-secondary,
+    .text-xs.text-secondary {
+        color: var(--bs-secondary-text-emphasis) !important;
+    }
+    .border-left-dark .text-dark,
+    .text-xs.text-dark {
+        color: var(--bs-dark-text-emphasis) !important;
+    }
+
+    /* Dark Mode Table Styles - START */
+    .table {
+        --bs-table-color: var(--body-color);
+        --bs-table-bg: var(--secondary-bg-color); /* Table background */
+        --bs-table-border-color: var(--border-color);
+        --bs-table-striped-bg: rgba(255, 255, 255, 0.03); /* Darker stripe */
+        --bs-table-striped-color: var(--body-color);
+        --bs-table-active-bg: rgba(255, 255, 255, 0.07); /* Active row */
+        --bs-table-active-color: var(--body-color);
+        --bs-table-hover-bg: rgba(255, 255, 255, 0.05); /* Hover row */
+        --bs-table-hover-color: var(--body-color);
+    }
+
+    .table thead th {
+        background-color: var(--tertiary-bg-color); /* Slightly different for header */
+        color: var(--body-color);
+        border-bottom-color: var(--border-color);
+    }
+
+    .table td,
+    .table th {
+        border-color: var(--border-color);
+    }
+
+    /* Override for specific Bootstrap table variant classes if used */
+    .table-light {
+        --bs-table-color: var(--body-color);
+        --bs-table-bg: var(--tertiary-bg-color); /* Lighter dark background for .table-light */
+        --bs-table-border-color: var(--border-color);
+        --bs-table-striped-bg: rgba(255, 255, 255, 0.02);
+        --bs-table-hover-bg: rgba(255, 255, 255, 0.04);
+    }
+
+    .table-dark { /* Ensure this is still distinct if used explicitly */
+        --bs-table-color: #fff;
+        --bs-table-bg: #1a1d20; /* Very dark */
+        --bs-table-border-color: #373b3e;
+        --bs-table-striped-bg: #23272b;
+        --bs-table-hover-bg: #272b2f;
+    }
+    /* Dark Mode Table Styles - END */
+    
+    /* End of Added/Corrected Styles */
+} /* End of body.dark-mode */
+
+
+body {
+    font-family: var(--bs-body-font-family);
+    font-size: var(--bs-body-font-size);
+    font-weight: var(--bs-body-font-weight);
+    line-height: var(--bs-body-line-height);
+    display: flex;
+    flex-direction: column;
+    min-height: 100vh;
+    background-color: var(--body-bg);
+    color: var(--body-color);
+    transition: background-color 0.3s ease, color 0.3s ease;
+}
+
+main {
+    flex: 1;
+}
+
+.footer {
+    background-color: var(--tertiary-bg-color);
+    padding: 20px 0;
+    text-align: center;
+    margin-top: auto;
+    border-top: 1px solid var(--border-color);
+    color: var(--text-muted-color);
+}
+/* Ensure general text-muted class also uses the variable */
+body.dark-mode .text-muted {
+    color: var(--text-muted-color) !important;
+}
+
+
+.auth-form {
+    max-width: 400px;
+    margin: 50px auto;
+    padding: 20px;
+    border: 1px solid var(--border-color);
+    border-radius: 5px;
+    background-color: var(--auth-form-bg);
+    box-shadow: 0 0.125rem 0.25rem rgba(0, 0, 0, 0.075);
+}
+body.dark-mode .auth-form {
+    box-shadow: 0 0.125rem 0.25rem rgba(255, 255, 255, 0.075);
+}
+
+
+.upcoming-quiz-section {
+    background-color: var(--upcoming-quiz-section-bg);
+    padding: 20px;
+    border-radius: 8px;
+    margin-bottom: 20px;
+}
+.quiz-rules {
+    background-color: var(--quiz-rules-bg);
+    padding: 15px;
+    border-radius: 8px;
+    border: 1px solid var(--quiz-rules-border);
+}
+.quiz-card {
+    margin-bottom: 20px;
+    background-color: var(--card-bg);
+    border-color: var(--card-border-color);
+    color: var(--card-color);
+}
+.quiz-card .card-header{
+    background-color: var(--card-header-bg);
+    color: var(--card-header-color);
+    border-bottom-color: var(--card-border-color);
+}
+
+/* Quiz Page Specific */
+.timer-progress-bar {
+    position: sticky;
+    top: 0;
+    z-index: 1030;
+    background-color: var(--timer-progress-bar-bg);
+    padding: 10px 0;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    border-bottom: 1px solid var(--border-color);
+}
+body.dark-mode .timer-progress-bar {
+    box-shadow: 0 2px 4px rgba(255,255,255,0.1);
+}
+
+.timer.critical {
+    color: var(--danger-color) !important;
+    font-weight: bold;
+}
+.question-card {
+    background-color: var(--card-bg);
+    border-color: var(--card-border-color);
+}
+.question-card .card-header {
+    background-color: var(--card-header-bg);
+    border-bottom-color: var(--card-border-color);
+}
+.question-option {
+    cursor: pointer;
+    padding: 10px;
+    border: 1px solid var(--question-option-border);
+    margin-bottom: 5px;
+    border-radius: 4px;
+}
+.question-option.selected {
+    background-color: var(--question-option-selected-bg);
+    pointer-events: none;
+}
+body.dark-mode .question-option.selected {
+    color: #fff; /* Ensure text is visible on primary blue */
+}
+
+.question-option:hover:not(.selected) {
+    background-color: var(--question-option-hover-bg);
+}
+.question-option-wrapper .form-check-label {
+    cursor: pointer;
+    transition: background-color 0.2s ease-in-out, border-color 0.2s ease-in-out;
+}
+.question-option-wrapper .form-check-label:hover {
+    background-color: var(--question-option-hover-bg);
+}
+.question-option-wrapper label.selected-option-display {
+    background-color: var(--primary-color) !important;
+    border-color: var(--primary-color) !important;
+    color: #fff !important;
+    font-weight: bold;
+}
+
+
+/* Results Page Specific */
+.feedback-message {
+    padding: 10px 15px;
+    border-radius: 5px;
+    margin-bottom: 15px;
+    font-size: 1.1rem;
+    font-weight: bold;
+    border: 1px solid transparent; /* Base for border */
+}
+.feedback-message.very-good { background-color: var(--feedback-very-good-bg);}
+.feedback-message.good { background-color: var(--feedback-good-bg);}
+.feedback-message.average { background-color: var(--feedback-average-bg);}
+.feedback-message.improve { background-color: var(--feedback-improve-bg);}
+
+.answer-review .list-group-item {
+    padding: 0.75rem 1.25rem;
+}
+.answer-review .correct-user-answer {
+    background-color: var(--answer-review-correct-user-bg);
+    color: var(--feedback-very-good-color);
+    border-left: 5px solid var(--feedback-very-good-color);
+}
+.answer-review .incorrect-user-answer {
+    background-color: var(--answer-review-incorrect-user-bg);
+    color: var(--feedback-improve-color);
+    border-left: 5px solid var(--feedback-improve-color);
+}
+.answer-review .actual-correct-answer {
+    background-color: var(--answer-review-actual-correct-bg);
+    color: var(--feedback-average-color);
+    border-left: 5px solid var(--feedback-average-color);
+}
+.answer-review .list-group-item .fw-bold {
+    font-size: 0.9em;
+}
+
+.quiz-card .card-title {
+    font-size: 1.1rem;
+    font-weight: bold;
+}
+
+.card-text p, dl, ol, ul {
+    margin-bottom: 0!important;
+}
+
+.quiz-card .card-text {
+    font-size: 0.9rem;
+    flex-grow: 1;
+}
+
+.quiz-card ul {
+    font-size: 0.9rem;
+    margin-bottom: 0.5rem;
+}
+
+/* Images */
+.question-image, .question-image-review, .admin-question-image-preview {
+    max-width: 100%;
+    height: auto;
+    border-radius: 5px;
+    box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+    display: block;
+    margin-left: auto;
+    margin-right: auto;
+    border: 1px solid var(--border-color);
+    padding: 3px;
+    background-color: var(--body-bg); /* Ensure image background contrasts if it's transparent */
+}
+
+body.dark-mode .question-image, 
+body.dark-mode .question-image-review, 
+body.dark-mode .admin-question-image-preview {
+    box-shadow: 0 2px 5px rgba(255,255,255,0.05);
+}
+.question-image { max-height: 350px; margin-bottom: 15px; }
+.question-image-review { max-height: 250px; margin-bottom: 10px; }
+.admin-question-image-preview { max-width: 200px; max-height: 150px; margin-bottom: 5px; }
+
+/* General Component Theming for Dark Mode */
+body.dark-mode .navbar-light.bg-light {
+    background-color: #2c3136 !important; /* Darker navbar */
+    border-bottom: 1px solid var(--border-color);
+}
+body.dark-mode .navbar-brand,
+body.dark-mode .nav-link {
+    color: var(--body-color) !important;
+}
+body.dark-mode .nav-link:hover {
+    color: var(--link-hover-color) !important;
+}
+body.dark-mode .navbar-toggler-icon {
+    filter: invert(1) grayscale(100%) brightness(200%); /* Makes toggler icon white */
+}
+
+body.dark-mode .quiz-page-main-title-container {
+    background: linear-gradient(135deg, var(--secondary-bg-color) 0%, var(--tertiary-bg-color) 100%);
+    box-shadow: 0 4px 15px rgba(255, 255, 255, 0.04); 
+}
+
+body.dark-mode .quiz-page-main-title {
+    color: var(--bs-light-text-emphasis); /* প্রধান শিরোনামের জন্য খুব হালকা রঙ */
+}
+
+body.dark-mode .quiz-page-main-subtitle {
+    color: var(--text-muted-color); /* উপ-শিরোনামের জন্য হালকা ধূসর রঙ */
+}
+
+body.dark-mode .form-control,
+body.dark-mode .form-select {
+    background-color: #2b3035;
+    color: var(--body-color);
+    border-color: var(--border-color);
+}
+body.dark-mode .form-control:focus,
+body.dark-mode .form-select:focus {
+    background-color: #2b3035;
+    color: var(--body-color);
+    border-color: var(--link-color); /* Or primary color */
+    box-shadow: 0 0 0 0.25rem rgba(var(--primary-rgb), .25);
+}
+body.dark-mode .form-control::placeholder {
+    color: var(--text-muted-color);
+}
+body.dark-mode .form-check-input {
+    background-color: #343a40;
+    border-color: var(--border-color);
+}
+body.dark-mode .form-check-input:checked {
+    background-color: var(--primary-color);
+    border-color: var(--primary-color);
+}
+
+body.dark-mode .list-group-item {
+    background-color: var(--card-bg);
+    border-color: var(--border-color);
+    color: var(--body-color);
+}
+
+/* .table styles are now within body.dark-mode selector above */
+
+body.dark-mode .alert-light {
+    background-color: var(--secondary-bg-color);
+    color: var(--body-color);
+    border-color: var(--border-color);
+}
+body.dark-mode .alert-info {
+    background-color: #032830;
+    color: #6edff6;
+    border-color: #087990;
+}
+
+/* Quill Editor Dark Mode */
+body.dark-mode .ql-toolbar {
+    background-color: var(--quill-toolbar-bg) !important;
+    border-color: var(--quill-toolbar-border) !important;
+}
+body.dark-mode .ql-toolbar .ql-stroke { stroke: var(--quill-toolbar-icon) !important; }
+body.dark-mode .ql-toolbar .ql-fill { fill: var(--quill-toolbar-icon) !important; }
+body.dark-mode .ql-toolbar .ql-picker-label { color: var(--quill-toolbar-icon) !important; }
+body.dark-mode .ql-toolbar button:hover,
+body.dark-mode .ql-toolbar .ql-picker-label:hover,
+body.dark-mode .ql-toolbar .ql-picker-item:hover {
+    background-color: var(--tertiary-bg-color) !important;
+    color: var(--link-hover-color) !important;
+}
+body.dark-mode .ql-toolbar .ql-picker-item.ql-selected {
+    color: var(--link-color) !important; /* Or var(--primary-color) */
+}
+body.dark-mode .ql-toolbar .ql-active .ql-stroke,
+body.dark-mode .ql-toolbar button:hover .ql-stroke,
+body.dark-mode .ql-toolbar .ql-picker-label:hover .ql-stroke,
+body.dark-mode .ql-toolbar .ql-picker-item:hover .ql-stroke {
+    stroke: var(--link-hover-color) !important;
+}
+body.dark-mode .ql-toolbar .ql-active .ql-fill,
+body.dark-mode .ql-toolbar button:hover .ql-fill,
+body.dark-mode .ql-toolbar .ql-picker-label:hover .ql-fill,
+body.dark-mode .ql-toolbar .ql-picker-item:hover .ql-fill {
+     fill: var(--link-hover-color) !important;
+}
+
+body.dark-mode .ql-container.ql-snow {
+    background-color: var(--quill-container-bg) !important;
+    border-color: var(--quill-container-border) !important;
+    color: var(--quill-container-text) !important;
+}
+body.dark-mode .ql-editor {
+    color: var(--quill-container-text) !important;
+}
+body.dark-mode .ql-editor.ql-blank::before {
+    color: rgba(var(--body-color-rgb), 0.6) !important;
+}
+
+
+/* Suggestions Box for Dark Mode */
+body.dark-mode .suggestions-container {
+    background-color: var(--suggestions-container-bg);
+    border-color: var(--suggestions-container-border);
+    color: var(--body-color);
+}
+body.dark-mode .suggestion-item:hover {
+    background-color: var(--suggestion-item-hover-bg);
+}
+
+/* Admin Panel Specific Dark Mode */
+body.dark-mode .admin-sidebar {
+    background-color: var(--admin-sidebar-bg);
+    color: var(--admin-sidebar-text-color);
+}
+body.dark-mode .admin-sidebar a {
+    color: var(--admin-sidebar-text-color);
+}
+body.dark-mode .admin-sidebar a:hover,
+body.dark-mode .admin-sidebar a.active {
+    color: var(--admin-sidebar-hover-text-color);
+    background-color: var(--admin-sidebar-hover-bg);
+}
+body.dark-mode .admin-page-wrapper {
+    background-color: var(--body-bg); /* Main dark background */
+    color: var(--body-color);
+}
+body.dark-mode .admin-header {
+    background-color: var(--admin-header-bg);
+    border-bottom-color: var(--admin-header-border);
+    color: var(--body-color);
+}
+body.dark-mode .admin-footer {
+    background-color: var(--admin-footer-bg);
+    border-top-color: var(--admin-header-border); /* Using same as header border for consistency */
+    color: var(--text-muted-color);
+}
+body.dark-mode .btn-close { /* For alert dismiss and modal close */
+    filter: invert(1) grayscale(100%) brightness(200%);
+}
+body.dark-mode .btn-outline-secondary {
+    color: var(--text-muted-color);
+    border-color: var(--text-muted-color);
+}
+body.dark-mode .btn-outline-secondary:hover {
+    color: var(--body-bg);
+    background-color: var(--text-muted-color);
+    border-color: var(--text-muted-color);
+}
+
+
+/* Additional card styles from index.php and quizzes.php */
+body.dark-mode .minimal-hero-section {
+    background: linear-gradient(180deg, #2b3035 0%, #212529 100%);
+    color: #dee2e6;
+    border-bottom-color: #495057;
+}
+body.dark-mode .minimal-hero-section p.lead {
+    color: #adb5bd;
+}
+body.dark-mode .minimal-hero-section .upcoming-quiz-info h3 {
+    color: #6ea8fe; /* Light blue */
+}
+body.dark-mode .minimal-hero-section .btn-custom-primary {
+    background-color: #6ea8fe;
+    border-color: #6ea8fe;
+    color: #212529; /* Dark text on light blue button */
+}
+body.dark-mode .minimal-hero-section .btn-custom-primary:hover {
+    background-color: #8bb9fe;
+    border-color: #8bb9fe;
+    box-shadow: 0 4px 15px rgba(110, 168, 254, 0.2);
+}
+body.dark-mode .quiz-rules-minimal, 
+body.dark-mode .how-to-participate, 
+body.dark-mode .recent-quizzes-section,
+body.dark-mode .quiz-page-main-title-container {
+    background-color: #2b3035;
+    border-color: #495057;
+    box-shadow: 0 6px 18px rgba(0,0,0,0.25);
+}
+body.dark-mode .section-title,
+body.dark-mode .quiz-page-main-title {
+    color: #f8f9fa;
+}
+body.dark-mode .quiz-rules-minimal p, 
+body.dark-mode .how-to-participate ul li,
+body.dark-mode .quiz-page-main-subtitle {
+    color: #adb5bd;
+}
+body.dark-mode .how-to-participate ul li::before {
+    color: #20c997; /* Teal for checkmark */
+}
+body.dark-mode .quiz-card-sm,
+body.dark-mode .quiz-item-card {
+    background-color: #2c3136; /* Slightly different shade for cards */
+    border-color: #454a4f;
+}
+body.dark-mode .quiz-card-sm:hover,
+body.dark-mode .quiz-item-card:hover {
+    box-shadow: 0 8px 20px rgba(0,0,0,0.3);
+}
+body.dark-mode .quiz-card-sm .card-title,
+body.dark-mode .quiz-item-card .card-title-custom {
+    color: #e9ecef;
+}
+body.dark-mode .quiz-card-sm .quiz-description-display,
+body.dark-mode .quiz-item-card .quiz-description-custom {
+    color: #b0b7bf;
+}
+body.dark-mode .quiz-description-custom.no-real-description p.text-muted,
+body.dark-mode .quiz-card-sm .quiz-description-display.no-real-description p.text-muted {
+    color: var(--text-muted-color) !important;
+}
+body.dark-mode .quiz-card-sm ul.list-unstyled,
+body.dark-mode .quiz-item-card .quiz-details-custom {
+    color: #9fa6ad;
+}
+body.dark-mode .quiz-card-sm ul.list-unstyled strong,
+body.dark-mode .quiz-item-card .quiz-details-custom strong {
+    color: #ced4da;
+}
+body.dark-mode .quiz-item-card .quiz-details-custom li i {
+    color: #6ea8fe;
+}
+body.dark-mode .nav-pills-custom .nav-link {
+    background-color: var(--secondary-bg-color);
+    color: var(--body-color);
+}
+body.dark-mode .nav-pills-custom .nav-link.active {
+    background-color: var(--primary-color);
+    color: #fff; /* Text color for active pill in dark mode */
+}
+body.dark-mode .alert-no-quizzes {
+    background-color: var(--tertiary-bg-color);
+    border-color: var(--border-color);
+    color: var(--text-muted-color);
+}
+
+body.dark-mode .btn-outline-info-custom {
+    color: var(--info-color);
+    border-color: var(--info-color);
+}
+body.dark-mode .btn-outline-info-custom:hover {
+    background-color: var(--info-color);
+    color: #000; /* Text color for info button hover in dark mode */
+}
+
+/* Ensure Bootstrap buttons use our CSS variables for consistency if needed */
+body.dark-mode .btn-primary {
+    background-color: var(--primary-color);
+    border-color: var(--primary-color);
+    color: #fff; /* Assuming primary is a blue that works with white text */
+}
+body.dark-mode .btn-primary:hover {
+    /* Standard Bootstrap behavior is to darken slightly. 
+       If var(--link-hover-color) is lighter, adjust or use a calculated darker shade of var(--primary-color)
+       For simplicity, an opacity change or a slight brightness filter can work.
+    */
+    background-color: var(--link-hover-color); /* Using link-hover-color if it's darker, or define a specific --btn-primary-hover-bg */
+    border-color: var(--link-hover-color);
+}
+body.dark-mode .btn-outline-primary {
+    color: var(--primary-color);
+    border-color: var(--primary-color);
+}
+body.dark-mode .btn-outline-primary:hover {
+    color: #fff;
+    background-color: var(--primary-color);
+    border-color: var(--primary-color);
+}
+
+body.dark-mode .btn-secondary {
+    background-color: var(--secondary-color);
+    border-color: var(--secondary-color);
+    color: #fff;
+}
+body.dark-mode .btn-secondary:hover {
+    background-color: #5a6268; /* Bootstrap's default hover for secondary */
+    border-color: #545b62;
+}
+body.dark-mode .btn-outline-secondary {
+    color: var(--secondary-color); /* Should be a light gray for dark mode, var(--text-muted-color) might be better */
+    border-color: var(--secondary-color);
+}
+body.dark-mode .btn-outline-secondary:hover {
+    color: var(--body-bg); /* e.g. dark background color */
+    background-color: var(--secondary-color);
+    border-color: var(--secondary-color);
+}
+
+/* Ensure card text is readable */
+body.dark-mode .card, 
+body.dark-mode .card-body {
+    color: var(--body-color); /* Use body-color for card text in dark mode */
+    background-color: #343a40;
+}
+
+body.dark-mode .quiz-rules-minimal,
+body.dark-mode .how-to-participate,
+body.dark-mode .recent-quizzes-section,
+body.dark-mode .recent-study-materials-section, /* এই লাইনটি যোগ করা হয়েছে/নিশ্চিত করা হয়েছে */
+body.dark-mode .quiz-page-main-title-container {
+    background-color: var(--tertiary-bg-color); /* Changed from #2b3035 */
+    border-color: var(--border-color);    /* Changed from #495057 */
+    box-shadow: 0 6px 18px rgba(0,0,0,0.25);
+    /* color: var(--body-color); /* টেক্সটের রঙ নিশ্চিত করুন যদি প্রয়োজন হয় */
+}
