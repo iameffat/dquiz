@@ -378,31 +378,28 @@ require_once 'includes/header.php';
                 if ($upcoming_quiz_date_str) {
                     try {
                         $target_date = new DateTime($upcoming_quiz_date_str);
-                        // আমরা দিনের শেষ পর্যন্ত কাউন্টডাউন করবো, তাই সময় 23:59:59 সেট করছি
-                        $target_date_for_countdown = new DateTime($target_date->format('Y-m-d') . ' 23:59:59', new DateTimeZone('Asia/Dhaka'));
-                        $current_date = new DateTime('now', new DateTimeZone('Asia/Dhaka'));
+                        $current_date = new DateTime();
+                        $target_date_for_diff = new DateTime($target_date->format('Y-m-d'));
+                        $current_date_for_diff = new DateTime($current_date->format('Y-m-d'));
 
-
-                        if ($current_date > $target_date_for_countdown) {
+                        if ($current_date_for_diff > $target_date_for_diff) {
                             echo '<p>এই কুইজটি ইতিমধ্যে শেষ হয়ে গিয়েছে। পরবর্তী কুইজের জন্য অপেক্ষা করুন।</p>';
                         } else {
-                            // এই div টিতে কাউন্টডাউন দেখানো হবে
-                            echo '<div id="upcomingQuizCountdown" class="fs-5 mb-3 fw-bold text-primary">লোড হচ্ছে...</div>';
-                            // জাভাস্ক্রিপ্টের জন্য তারিখটি একটি ভেরিয়েবলে সেট করা হচ্ছে
-                            echo '<script>';
-                            // Ensure the date is in a format JavaScript can easily parse, like ISO 8601
-                            echo 'const upcomingQuizEndDate = "' . $target_date_for_countdown->format(DateTime::ATOM) . '";'; // যেমন: 2024-07-15T23:59:59+06:00
-                            echo '</script>';
+                            $interval = $current_date_for_diff->diff($target_date_for_diff);
+                            $days_left = $interval->days;
+                            if ($days_left > 0) {
+                                echo '<p>আর মাত্র <span class="fw-bold fs-4">' . $days_left . '</span> দিন বাকি</p>';
+                            } else { 
+                                echo '<p class="text-primary fw-bold fs-4">আজকেই কুইজ!</p>';
+                            }
                         }
                     } catch (Exception $e) {
-                        // Handle invalid date format in settings
                         echo '<p class="text-warning">আপকামিং কুইজের তারিখ সঠিকভাবে সেট করা হয়নি।</p>';
-                        error_log("Error parsing upcoming_quiz_end_date: " . $e->getMessage());
                     }
                 } else {
                      echo '<p class="fs-5">শীঘ্রই আসছে... বিস্তারিত তথ্যের জন্য অপেক্ষা করুন।</p>';
                 }
-            } elseif ($upcoming_quiz_enabled) { // যদি সেকশন এনাবলড কিন্তু টাইটেল বা তারিখ না থাকে
+            } elseif ($upcoming_quiz_enabled) { 
                  echo '<p class="fs-5">আপকামিং কুইজের তথ্য শীঘ্রই আপডেট করা হবে।</p>';
             }
             ?>
@@ -602,7 +599,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
         this.update = function() {
             this.y += this.speed;
-            this.x += Math.sin(this.y / (50 + Math.random()*50)) * 0.3; // Slight horizontal sway
+            this.x += Math.sin(this.y / (50 + Math.random()*50)) * 0.3;
 
             if (this.y > canvas.height) {
                 this.y = 0 - this.size; 
@@ -642,77 +639,13 @@ document.addEventListener('DOMContentLoaded', function() {
         requestAnimationFrame(animateParticles);
     }
 
-    if (heroSection && heroSection.offsetHeight > 0) { // Ensure hero section has height before drawing
+    if (heroSection && heroSection.offsetHeight > 0) {
         initParticles();
         animateParticles();
     }
-    // Re-initialize on resize might be too much if particles array gets very large,
-    // but for a small number like 50, it should be fine.
     window.addEventListener('resize', function() {
-        resizeCanvas(); // Resize canvas first
-        initParticles(); // Then re-initialize particles for new dimensions
+        resizeCanvas();
+        initParticles(); 
     });
-
-    // --- Countdown Timer Logic ---
-    const countdownElement = document.getElementById('upcomingQuizCountdown');
-    
-    if (typeof upcomingQuizEndDate !== 'undefined' && upcomingQuizEndDate && countdownElement) {
-        const targetDate = new Date(upcomingQuizEndDate).getTime();
-
-        if (isNaN(targetDate)) {
-            countdownElement.innerHTML = "আপকামিং কুইজের তারিখ সঠিকভাবে সেট করা হয়নি।";
-            countdownElement.classList.remove('text-primary');
-            countdownElement.classList.add('text-danger');
-            return;
-        }
-
-        const updateCountdown = () => {
-            const now = new Date().getTime();
-            const distance = targetDate - now;
-
-            if (distance < 0) {
-                clearInterval(countdownInterval);
-                countdownElement.innerHTML = "এই কুইজটি এখন লাইভ অথবা সময় শেষ!";
-                countdownElement.classList.remove('text-primary', 'fw-bold');
-                countdownElement.classList.add('text-success', 'fw-bold', 'fs-5'); 
-                return;
-            }
-
-            const days = Math.floor(distance / (1000 * 60 * 60 * 24));
-            const hours = Math.floor((distance % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
-            const minutes = Math.floor((distance % (1000 * 60 * 60)) / (1000 * 60));
-            const seconds = Math.floor((distance % (1000 * 60)) / 1000);
-
-            let countdownText = "";
-            if (days > 0) {
-                countdownText += `<span class="badge bg-secondary p-2 me-1 fs-6">${days} দিন</span>`;
-            }
-            if (hours > 0 || days > 0) {
-                countdownText += `<span class="badge bg-secondary p-2 me-1 fs-6">${hours} ঘণ্টা</span>`;
-            }
-            if (minutes > 0 || hours > 0 || days > 0) {
-                countdownText += `<span class="badge bg-secondary p-2 me-1 fs-6">${minutes} মিনিট</span>`;
-            }
-            countdownText += `<span class="badge bg-danger p-2 fs-6">${seconds} সেকেন্ড</span>`;
-            
-            countdownElement.innerHTML = `সময় বাকি: ${countdownText}`;
-        };
-
-        const countdownInterval = setInterval(updateCountdown, 1000);
-        updateCountdown(); 
-
-    } else if (countdownElement && countdownElement.innerHTML === "লোড হচ্ছে...") {
-        // If upcomingQuizEndDate is not defined or invalid, and PHP didn't replace "লোড হচ্ছে..."
-        // It implies PHP logic already handled the "coming soon" or "invalid date" case.
-        // We can remove the "লোড হচ্ছে..." if it's still there.
-         // Check if PHP already outputted a specific message. If not, and still "লোড হচ্ছে...", clear it.
-        const parentDiv = countdownElement.parentNode;
-        const otherMessages = Array.from(parentDiv.children).filter(child => child !== countdownElement && child.tagName === 'P');
-        if (otherMessages.length === 0) { // No other specific message from PHP in the parent
-            countdownElement.innerHTML = ""; // Clear "লোড হচ্ছে..." if no other info
-        } else if (countdownElement.innerHTML === "লোড হচ্ছে..."){
-             countdownElement.style.display = 'none'; // Hide if PHP message already exists
-        }
-    }
 });
 </script>
