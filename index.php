@@ -660,7 +660,7 @@ document.addEventListener('DOMContentLoaded', function() {
         const targetDate = new Date(upcomingQuizEndDate).getTime();
 
         if (isNaN(targetDate)) {
-            countdownElement.innerHTML = "আপকামিং কুইজের তারিখ সঠিকভাবে সেট করা হয়নি!ad";
+            countdownElement.innerHTML = "আপকামিং কুইজের তারিখ সঠিকভাবে সেট করা হয়নি।";
             countdownElement.classList.remove('text-primary');
             countdownElement.classList.add('text-danger');
             return;
