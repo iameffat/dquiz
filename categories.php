@@ -6,15 +6,16 @@ require_once 'includes/db_connect.php';
 require_once 'includes/functions.php';
 
 $categories = [];
-// icon_class কলামটি আর সিলেক্ট করার প্রয়োজন নেই, কারণ আমরা এটি ব্যবহার করছি না।
-$sql = "SELECT c.id, c.name, c.description, COUNT(q.id) as question_count 
+// SQL কুয়েরি আপডেট করা হয়েছে: description এবং icon_class বাদ দেওয়া হয়েছে
+$sql = "SELECT c.id, c.name, COUNT(q.id) as question_count 
         FROM categories c
         LEFT JOIN questions q ON c.id = q.category_id
-        GROUP BY c.id, c.name, c.description 
+        GROUP BY c.id, c.name  -- description এবং icon_class গ্রুপ বাই থেকে সরানো হয়েছে
         HAVING question_count > 0 
         ORDER BY c.name ASC";
 
 $result = $conn->query($sql);
+
 if ($result) {
     if ($result->num_rows > 0) {
         while ($row = $result->fetch_assoc()) {
@@ -22,28 +23,15 @@ if ($result) {
         }
     }
 } else {
+    // যদি কুয়েরিতে এরর হয়, তাহলে লগ করুন এবং ইউজারকে একটি বার্তা দেখান
     error_log("Error fetching categories: " . $conn->error);
+    // একটি সাধারণ এরর মেসেজ দেখানো যেতে পারে, অথবা পেইজটি একটি এরর বার্তা দিয়ে লোড হতে পারে
+    // যেমন: echo "ক্যাটাগরি আনতে সমস্যা হয়েছে। অনুগ্রহ করে পরে আবার চেষ্টা করুন।";
+    // exit; // অথবা এরর পেইজে রিডাইরেক্ট করা
 }
 
-// হালকা সলিড কালারের উদাহরণ (আপনি এগুলো পরিবর্তন করতে পারেন)
-$solid_colors = [
-    "#e7f5ff", // খুব হালকা নীল
-    "#e0f7fa", // খুব হালকা সায়ান
-    "#e8f5e9", // খুব হালকা সবুজ
-    "#fffde7", // খুব হালকা হলুদ
-    "#fce4ec", // খুব হালকা গোলাপী
-    "#f3e5f5", // খুব হালকা পার্পল (ল্যাভেন্ডার)
-    "#fff8e1", // খুব হালকা কমলা (ক্রিম)
-    "#f1f8e9", // আরও একটি হালকা সবুজ
-    "#e3f2fd", // আরও একটি হালকা নীল
-    "#ffebee", // খুব হালকা লাল/গোলাপী
-    "#fafafa", // প্রায় সাদা (হালকা ধূসর)
-    "#e0e0e0", // খুব হালকা ধূসর
-];
-$num_colors = count($solid_colors);
-
 $page_specific_styles = "
-    .home-category-card { /* categories.php তেও একই ক্লাস ব্যবহার করছি */
+    .home-category-card { 
         background-color: var(--bs-tertiary-bg);
         border: 1px solid var(--bs-border-color);
         border-radius: 0.75rem;
@@ -60,20 +48,20 @@ $page_specific_styles = "
         box-shadow: 0 0.5rem 1rem rgba(0,0,0,0.1);
     }
     .home-category-icon {
-        width: 60px; /* আইকন বৃত্তের আকার */
+        width: 60px; 
         height: 60px;
         border-radius: 50%;
-        background-color: var(--bs-primary); /* আইকন বৃত্তের ব্যাকগ্রাউন্ড */
-        color: white; /* অক্ষরের রঙ */
+        background-color: var(--bs-primary); 
+        color: white; 
         display: flex;
         align-items: center;
         justify-content: center;
-        font-size: 1.75rem; /* প্রথম অক্ষরের ফন্ট সাইজ */
+        font-size: 1.75rem; 
         font-weight: bold;
         margin: 0 auto 1rem auto;
         line-height: 1; 
     }
-    .home-category-card .card-title { /* categories.php এর জন্য card-title ক্লাস */
+    .home-category-card .card-title { 
         font-size: 1.15rem;
         font-weight: 600;
         color: var(--bs-emphasis-color);
@@ -84,7 +72,7 @@ $page_specific_styles = "
         color: var(--bs-secondary-color);
         margin-bottom: 1rem;
     }
-    .home-category-card .btn { /* categories.php এর জন্য বাটন স্টাইল */
+    .home-category-card .btn { 
         font-size: 0.9rem;
     }
 
@@ -125,7 +113,6 @@ $page_specific_styles = "
         font-size: 1.1rem;
     }
     
-    /* মোবাইলের জন্য স্টাইল */
     @media (max-width: 575.98px) { 
         .home-category-card {
             padding: 1rem;
@@ -168,18 +155,20 @@ require_once 'includes/header.php';
     <?php display_flash_message(); ?>
 
     <?php if (!empty($categories)): ?>
-        <div class="row row-cols-2 row-cols-sm-2 row-cols-md-3 row-cols-lg-4 g-4"> {/* গ্রিড লেআউট: মোবাইল=২, sm=২, md=3, lg=4 */}
+        <div class="row row-cols-2 row-cols-sm-2 row-cols-md-3 row-cols-lg-4 g-4">
             <?php foreach ($categories as $index => $category): 
-                // সলিড কালার নির্ধারণ
-                $current_solid_color = $solid_colors[$index % $num_colors];
                 // নামের প্রথম অক্ষর
                 $category_initial = mb_substr(trim($category['name']), 0, 1, "UTF-8");
                 if (empty($category_initial) || !preg_match('/\p{L}/u', $category_initial)) {
-                    $category_initial = "?"; // একটি প্রশ্নবোধক চিহ্ন যদি অক্ষর না হয়
+                    $category_initial = "?";
                 }
+                // ডাইনামিক সলিড কালার (যদি ব্যবহার করতে চান)
+                // $solid_colors অ্যারেটি (যা আগের উত্তরে ছিল) এখানে আবার যোগ করতে পারেন 
+                // এবং $current_solid_color = $solid_colors[$index % count($solid_colors)]; ব্যবহার করতে পারেন
+                // <div class="home-category-card" style="background-color: <?php echo $current_solid_color; ?>;">
             ?>
                 <div class="col">
-                    <div class="home-category-card" style="background-color: <?php echo $current_solid_color; ?>;"> 
+                    <div class="home-category-card"> 
                         <div class="home-category-icon">
                             <?php echo htmlspecialchars(strtoupper($category_initial)); ?>
                         </div>
