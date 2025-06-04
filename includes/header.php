@@ -119,6 +119,9 @@ $og_image_to_display = isset($page_og_image) ? htmlspecialchars($page_og_image) 
                         <a class="nav-link" href="<?php echo $base_url; ?>quizzes.php">সকল কুইজ</a>
                     </li>
                     <li class="nav-item">
+    <a class="nav-link <?php echo (basename($_SERVER['PHP_SELF']) == 'categories.php' || basename($_SERVER['PHP_SELF']) == 'practice_quiz.php') ? 'active' : ''; ?>" href="<?php echo $base_url; ?>categories.php">অনুশীলন</a>
+</li>
+                    <li class="nav-item">
                         <a class="nav-link" href="<?php echo $base_url; ?>study_materials.php">স্টাডি ম্যাটেরিয়ালস</a>
                     </li>
                     <?php if (isset($_SESSION["loggedin"]) && $_SESSION["loggedin"] === true): ?>
