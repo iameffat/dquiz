@@ -1,4 +1,5 @@
 <?php
+// quiz_page.php
 // $page_title is set after fetching quiz details
 $base_url = ''; // Root directory
 require_once 'includes/db_connect.php';
@@ -224,7 +225,7 @@ if (!isset($_SESSION["loggedin"]) || $_SESSION["loggedin"] !== true) {
     }
 
     $questions = [];
-    $sql_questions = "SELECT id, question_text, image_url FROM questions WHERE quiz_id = ? ORDER BY order_number ASC, id ASC";
+    $sql_questions = "SELECT id, question_text, image_url FROM questions WHERE quiz_id = ? ORDER BY order_number ASC, id ASC"; // আপনি চাইলে এখানে ORDER BY RAND() ব্যবহার করতে পারেন
     $stmt_questions = $conn->prepare($sql_questions);
     $stmt_questions->bind_param("i", $quiz_id);
     $stmt_questions->execute();
@@ -245,6 +246,8 @@ if (!isset($_SESSION["loggedin"]) || $_SESSION["loggedin"] !== true) {
         $questions[] = $q_row;
     }
     $stmt_questions->close();
+    // আপনি যদি প্রশ্নগুলোও এলোমেলো করতে চান, তাহলে এখানে $questions অ্যারে shuffle করতে পারেন:
+    // shuffle($questions);
 
     $total_questions = count($questions);
     if ($total_questions === 0 && $user_role !== 'admin' && $quiz['status'] !== 'archived') {
@@ -258,7 +261,12 @@ if (!isset($_SESSION["loggedin"]) || $_SESSION["loggedin"] !== true) {
     // Create a new attempt record
     $attempt_id = null;
     $start_time = date('Y-m-d H:i:s');
-    $sql_start_attempt = "INSERT INTO quiz_attempts (user_id, quiz_id, start_time) VALUES (?, ?, ?)";
+    // === আইপি অ্যাড্রেস সংরক্ষণ শুরু ===
+    $user_ip_address = $_SERVER['REMOTE_ADDR'];
+    // === আইপি অ্যাড্রেস সংরক্ষণ শেষ ===
+
+    // SQL কোয়েরি পরিবর্তন করে ip_address কলাম এবং বাইন্ডিং প্যারামিটার যোগ করুন
+    $sql_start_attempt = "INSERT INTO quiz_attempts (user_id, quiz_id, start_time, ip_address) VALUES (?, ?, ?, ?)"; // <--- পরিবর্তন: ip_address কলাম যোগ করা হয়েছে
     $stmt_start_attempt = $conn->prepare($sql_start_attempt);
 
     if (!$stmt_start_attempt) {
@@ -268,7 +276,8 @@ if (!isset($_SESSION["loggedin"]) || $_SESSION["loggedin"] !== true) {
         header("Location: quizzes.php");
         exit;
     }
-    $stmt_start_attempt->bind_param("iis", $user_id, $quiz_id, $start_time);
+    // bind_param এ নতুন 's' (string) টাইপ যোগ করুন আইপি অ্যাড্রেসের জন্য
+    $stmt_start_attempt->bind_param("iiss", $user_id, $quiz_id, $start_time, $user_ip_address); // <--- পরিবর্তন: $user_ip_address যোগ করা হয়েছে
     if ($stmt_start_attempt->execute()) {
         $attempt_id = $stmt_start_attempt->insert_id;
     } else {
@@ -298,7 +307,7 @@ if (!isset($_SESSION["loggedin"]) || $_SESSION["loggedin"] !== true) {
                             <li>এই কুইজের জন্য আপনার হাতে মোট <strong><?php echo $quiz['duration_minutes']; ?> মিনিট</strong> সময় থাকবে।</li>
                             <li>প্রতিটি প্রশ্নের জন্য চারটি অপশন থাকবে, যার মধ্যে একটি সঠিক উত্তর।</li>
                             <li>একবার উত্তর নির্বাচন করার পর তা পরিবর্তন করা যাবে না।</li>
-<li>কোনো প্রকার অসাধু উপায় (যেমন: অন্যের সাহায্য নেওয়া, ইন্টারনেট সার্চ করা, কপি-পেস্ট করা) অবলম্বন করলে সাক্ষী হিসেবে আল্লাহ তায়ালাই যথেষ্ট।</li>
+                            <li>কোনো প্রকার অসাধু উপায় (যেমন: অন্যের সাহায্য নেওয়া, ইন্টারনেট সার্চ করা, কপি-পেস্ট করা) অবলম্বন করলে সাক্ষী হিসেবে আল্লাহ তায়ালাই যথেষ্ট।</li>
                             <li>সময় শেষ হওয়ার সাথে সাথে আপনার পরীক্ষা স্বয়ংক্রিয়ভাবে সাবমিট হয়ে যাবে।</li>
                             <li>প্রতি ভুল উত্তরের জন্য ০.২০ নম্বর কাটা যাবে।</li>
                         </ul>
@@ -390,7 +399,7 @@ if (!isset($_SESSION["loggedin"]) || $_SESSION["loggedin"] !== true) {
         const timerProgressBar = document.querySelector('.timer-progress-bar');
 
         let quizLogicInitialized = false;
-        let quizCanStart = !warningModalElement; 
+        let quizCanStart = !warningModalElement;
 
         function applyBlurToBackground(shouldBlur) {
             if (mainQuizContainer) mainQuizContainer.classList.toggle('blur-background', shouldBlur);
@@ -401,16 +410,16 @@ if (!isset($_SESSION["loggedin"]) || $_SESSION["loggedin"] !== true) {
             if (quizLogicInitialized || !quizForm) return;
             quizLogicInitialized = true;
 
-            applyBlurToBackground(false); 
+            applyBlurToBackground(false);
 
             // Anti-cheating: Disable copy-paste, context menu, and text selection
-            const bodyElement = document.body; // Apply to whole body or a specific quiz wrapper
-            bodyElement.classList.add('disable-text-selection'); // Add class for CSS text selection disabling
+            const bodyElement = document.body;
+            bodyElement.classList.add('disable-text-selection');
 
-            bodyElement.addEventListener('copy', function(e) { e.preventDefault(); });
-            bodyElement.addEventListener('paste', function(e) { e.preventDefault(); });
-            bodyElement.addEventListener('cut', function(e) { e.preventDefault(); });
-            bodyElement.addEventListener('contextmenu', function(e) { e.preventDefault(); });
+            bodyElement.addEventListener('copy', function(e) { e.preventDefault(); /* alert('কপি করা অনুমোদিত নয়।'); */ });
+            bodyElement.addEventListener('paste', function(e) { e.preventDefault(); /* alert('পেস্ট করা অনুমোদিত নয়।'); */ });
+            bodyElement.addEventListener('cut', function(e) { e.preventDefault(); /* alert('কাট করা অনুমোদিত নয়।'); */ });
+            bodyElement.addEventListener('contextmenu', function(e) { e.preventDefault(); /* alert('রাইট-ক্লিক অনুমোদিত নয়।'); */ });
 
 
             const timerDisplay = document.getElementById('timer');
@@ -441,7 +450,7 @@ if (!isset($_SESSION["loggedin"]) || $_SESSION["loggedin"] !== true) {
             }
 
             if (totalQuestionsJS > 0) {
-                updateTimerDisplay(); 
+                updateTimerDisplay();
                 timerInterval = setInterval(updateTimerDisplay, 1000);
             } else {
                 if(timerDisplay) timerDisplay.textContent = "কোনো প্রশ্ন নেই";
@@ -499,14 +508,14 @@ if (!isset($_SESSION["loggedin"]) || $_SESSION["loggedin"] !== true) {
             if (window.history.replaceState) {
                 window.history.replaceState(null, null, window.location.href);
             }
-        } 
+        }
 
         const quizShouldShowModal = <?php echo (isset($quiz_is_startable_for_modal) && $quiz_is_startable_for_modal) ? 'true' : 'false'; ?>;
 
         if (warningModalElement && agreeAndStartButton && quizShouldShowModal) {
             const warningModal = new bootstrap.Modal(warningModalElement);
             warningModal.show();
-            applyBlurToBackground(true); 
+            applyBlurToBackground(true);
 
             agreeAndStartButton.addEventListener('click', function() {
                 initializeQuizFunctionalities();
@@ -514,14 +523,23 @@ if (!isset($_SESSION["loggedin"]) || $_SESSION["loggedin"] !== true) {
 
             warningModalElement.addEventListener('hidden.bs.modal', function () {
                 applyBlurToBackground(false);
-                if (!quizLogicInitialized) { // If modal was closed without agreeing (e.g. by other means if possible)
-                    // Potentially redirect or handle as "not agreed"
-                    // window.location.href = 'quizzes.php'; // Example: redirect if not agreed
-                }
+                // if (!quizLogicInitialized) { // User might have closed modal using ESC or backdrop click
+                //     // window.location.href = 'quizzes.php'; // Redirect if they don't agree
+                // }
             });
         } else {
-            if (quizForm) {
+             // If no modal (e.g., no questions), still initialize if form exists, but some features might be disabled
+            if (quizForm && totalQuestionsJS > 0) { // Only initialize fully if there are questions
                 initializeQuizFunctionalities();
+            } else if (quizForm) { // For quizzes with no questions, just basic setup
+                 applyBlurToBackground(false);
+                 const bodyElement = document.body;
+                 bodyElement.classList.add('disable-text-selection');
+                 bodyElement.addEventListener('contextmenu', function(e) { e.preventDefault(); });
+                 if (document.getElementById('timer')) document.getElementById('timer').textContent = "কোনো প্রশ্ন নেই";
+                 if (document.getElementById('progress_indicator')) document.getElementById('progress_indicator').textContent = "উত্তর: 0/0";
+                 const submitButton = quizForm.querySelector('button[type="submit"]');
+                 if(submitButton) submitButton.style.display = 'none'; // Hide submit button if no questions
             }
         }
     });
