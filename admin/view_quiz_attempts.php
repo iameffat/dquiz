@@ -20,6 +20,7 @@ $quiz_info = null;
 $sql_quiz_info = "SELECT id, title FROM quizzes WHERE id = ?";
 $stmt_quiz_info = $conn->prepare($sql_quiz_info);
 if (!$stmt_quiz_info) {
+    // Handle error, e.g., log it and show a generic message or redirect
     error_log("Quiz info prepare failed: " . $conn->error);
     $_SESSION['flash_message'] = "একটি অপ্রত্যাশিত ত্রুটি ঘটেছে।";
     $_SESSION['flash_message_type'] = "danger";
@@ -31,7 +32,7 @@ $stmt_quiz_info->execute();
 $result_quiz_info = $stmt_quiz_info->get_result();
 if ($result_quiz_info->num_rows === 1) {
     $quiz_info = $result_quiz_info->fetch_assoc();
-    $page_title = "ফলাফল: " . htmlspecialchars($quiz_info['title']);
+    $page_title = "ফলাফল: " . htmlspecialchars($quiz_info['title']); // This will be used by header.php for the <title> tag
 } else {
     $_SESSION['flash_message'] = "কুইজ (ID: {$quiz_id}) খুঁজে পাওয়া যায়নি।";
     $_SESSION['flash_message_type'] = "danger";
@@ -44,9 +45,10 @@ $stmt_quiz_info->close();
 if (isset($_GET['action']) && isset($_GET['attempt_id'])) {
     $action = $_GET['action'];
     $attempt_id_to_manage = intval($_GET['attempt_id']);
-    $admin_user_id = $_SESSION['user_id']; 
+    $admin_user_id = $_SESSION['user_id']; // Assuming admin's user_id is stored in session
 
     if ($action == 'cancel_attempt') {
+        // Set is_cancelled = 1 and score = NULL
         $sql_cancel = "UPDATE quiz_attempts SET is_cancelled = 1, score = NULL, cancelled_by = ? WHERE id = ? AND quiz_id = ?";
         $stmt_cancel = $conn->prepare($sql_cancel);
         if ($stmt_cancel) {
@@ -64,6 +66,8 @@ if (isset($_GET['action']) && isset($_GET['attempt_id'])) {
             $_SESSION['flash_message_type'] = "danger";
         }
     } elseif ($action == 'reinstate_attempt') {
+        // Set is_cancelled = 0. Score could be recalculated or an admin might need to adjust.
+        // For simplicity, score remains NULL upon reinstatement here.
         $sql_reinstate = "UPDATE quiz_attempts SET is_cancelled = 0, cancelled_by = NULL WHERE id = ? AND quiz_id = ?";
         $stmt_reinstate = $conn->prepare($sql_reinstate);
         if ($stmt_reinstate) {
@@ -93,15 +97,13 @@ $sql_attempts = "
         qa.id as attempt_id,
         qa.user_id,
         u.name as user_name,
-        u.email as user_email, /* Added for potential display or logging */
         qa.score,
         qa.time_taken_seconds,
         qa.submitted_at,
-        qa.is_cancelled,
-        qa.attempt_ip  -- আইপি অ্যাড্রেস যুক্ত করা হয়েছে
+        qa.is_cancelled
     FROM quiz_attempts qa
     JOIN users u ON qa.user_id = u.id
-    WHERE qa.quiz_id = ? AND qa.end_time IS NOT NULL 
+    WHERE qa.quiz_id = ? AND qa.end_time IS NOT NULL /* Only completed attempts */
     ORDER BY qa.is_cancelled ASC, qa.score DESC, qa.time_taken_seconds ASC, qa.submitted_at ASC
 ";
 $stmt_attempts = $conn->prepare($sql_attempts);
@@ -114,7 +116,9 @@ if ($stmt_attempts) {
     }
     $stmt_attempts->close();
 } else {
+    // Handle error
     error_log("Attempts fetch prepare failed: " . $conn->error);
+    // Optionally set a flash message or display an error on the page
 }
 
 
@@ -133,7 +137,7 @@ if (!empty($attempts_data)) {
 }
 
 
-require_once 'includes/header.php';
+require_once 'includes/header.php'; // header.php uses $page_title
 ?>
 
 <style>
@@ -149,45 +153,46 @@ require_once 'includes/header.php';
             left: 0;
             top: 0;
             width: 100%;
-            padding: 20px; 
+            padding: 20px; /* Add some padding for print */
         }
+        /* Hide elements not meant for printing */
         .admin-sidebar, .admin-header, .admin-footer, .no-print, .page-actions-header, .alert:not(.print-this-alert) {
             display: none !important;
         }
         .card {
-            border: 1px solid #ccc !important; 
+            border: 1px solid #ccc !important; /* Lighter border for print */
             box-shadow: none !important;
-            margin-bottom: 15px !important;
+            margin-bottom: 15px !important; /* Space between cards if any */
         }
         .table {
-            font-size: 10pt; 
+            font-size: 10pt; /* Adjust as needed */
             width: 100%;
         }
         .table th, .table td {
-            border: 1px solid #ddd !important; 
-            padding: 5px 8px;
+            border: 1px solid #ddd !important; /* Consistent table borders */
+            padding: 5px 8px; /* Adjust padding */
         }
         .table thead th {
-            background-color: #f0f0f0 !important; 
+            background-color: #f0f0f0 !important; /* Light grey for table header */
             color: #000 !important;
         }
         .badge {
             border: 1px solid #ccc !important;
             padding: 0.2em 0.4em !important;
             font-size: 0.8em !important;
-            background-color: transparent !important; 
-            color: #000 !important; 
+            background-color: transparent !important; /* Remove background color */
+            color: #000 !important; /* Ensure text is black */
             font-weight: normal !important;
         }
-        .print-title { 
-            visibility: visible !important; 
-            display: block !important; 
+        .print-title { /* For the H1 title that appears only on print */
+            visibility: visible !important; /* Ensure it's visible */
+            display: block !important; /* Make sure it takes up space */
             text-align: center;
-            font-size: 18pt; 
+            font-size: 18pt; /* Or your preferred size */
             margin-bottom: 20px;
-            color: #000; 
+            color: #000; /* Black color for print */
         }
-        a[href]:after { 
+        a[href]:after { /* Avoid showing URLs in print for action links */
             content: none !important;
         }
     }
@@ -232,7 +237,6 @@ require_once 'includes/header.php';
                                 <th>স্কোর</th>
                                 <th>সময় লেগেছে</th>
                                 <th>সাবমিটের সময়</th>
-                                <th>অ্যাটেম্পট IP</th>
                                 <th class="no-print">স্ট্যাটাস</th>
                                 <th class="no-print">একশন</th>
                             </tr>
@@ -253,7 +257,7 @@ require_once 'includes/header.php';
                                     $last_time = $attempt['time_taken_seconds'];
                                 }
                                 $row_class = '';
-                                $status_text_for_print = ''; 
+                                $status_text_for_print = ''; // For print version
 
                                 if ($attempt['is_cancelled']) {
                                     $row_class = 'table-danger opacity-75';
@@ -261,7 +265,7 @@ require_once 'includes/header.php';
                                     $status_text_for_print = 'বাতিলকৃত';
                                     $action_button = '<a href="view_quiz_attempts.php?quiz_id='.$quiz_id.'&action=reinstate_attempt&attempt_id='.$attempt['attempt_id'].'" class="btn btn-sm btn-warning mb-1 no-print" onclick="return confirm(\'আপনি কি নিশ্চিতভাবে এই অংশগ্রহণটি পুনঃবিবেচনা করতে চান?\');">পুনঃবিবেচনা করুন</a>';
                                 } else {
-                                    if ($attempt['score'] !== null && $highest_score !== null && $attempt['score'] == $highest_score && $attempt['score'] > 0) { 
+                                    if ($attempt['score'] !== null && $highest_score !== null && $attempt['score'] == $highest_score && $attempt['score'] > 0) { // Ensure highest score is positive
                                         $row_class = 'table-success';
                                     }
                                     $status_text = '<span class="badge bg-success">সক্রিয়</span>';
@@ -275,7 +279,6 @@ require_once 'includes/header.php';
                                 <td><?php echo $attempt['score'] !== null ? number_format($attempt['score'], 2) : 'N/A'; ?></td>
                                 <td><?php echo $attempt['time_taken_seconds'] ? format_seconds_to_hms($attempt['time_taken_seconds']) : 'N/A'; ?></td>
                                 <td><?php echo format_datetime($attempt['submitted_at']); ?></td>
-                                <td><?php echo htmlspecialchars($attempt['attempt_ip'] ?? 'N/A'); ?></td>
                                 <td class="no-print"><?php echo $status_text; ?></td>
                                 <td class="no-print">
                                     <?php echo $action_button; ?>
@@ -291,15 +294,23 @@ require_once 'includes/header.php';
                 <?php endif; ?>
             </div>
         </div>
-    </div> 
-</div>
+    </div> </div>
 <script>
     function prepareAndPrint(){
         const printTitleElement = document.querySelector('h1.print-title');
         if (printTitleElement) {
-            printTitleElement.style.display = 'block'; 
+            printTitleElement.style.display = 'block'; // Make it visible for printing
         }
         window.print();
+        // Optional: Hide it again after print dialog is likely closed.
+        // This might be tricky due to the asynchronous nature of the print dialog.
+        // For simplicity, you might leave it as display:block and rely on @media print to control its visibility for the screen.
+        // If you must hide it after print:
+        // setTimeout(() => {
+        //     if (printTitleElement) {
+        //         printTitleElement.style.display = 'none';
+        //     }
+        // }, 1000); // Delay to allow print dialog to process
     }
 </script>
 
