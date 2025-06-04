@@ -85,37 +85,19 @@ $types = "";
 $filter_status = isset($_GET['status_filter']) ? $_GET['status_filter'] : '';
 if (!empty($filter_status) && in_array($filter_status, ['draft', 'upcoming', 'live', 'archived'])) {
     if ($filter_status === 'archived') {
-        // Archived can be explicitly 'archived' or 'live' whose live_end_datetime has passed
         $where_clauses[] = "(q.status = ? OR (q.status = 'live' AND q.live_end_datetime IS NOT NULL AND q.live_end_datetime < NOW()))";
         $params[] = $filter_status;
         $types .= "s";
     } elseif ($filter_status === 'live') {
-        // Live quizzes are those with status 'live' AND within their live period (or no period defined)
         $where_clauses[] = "q.status = ? AND (q.live_start_datetime IS NULL OR q.live_start_datetime <= NOW()) AND (q.live_end_datetime IS NULL OR q.live_end_datetime >= NOW())";
         $params[] = $filter_status;
         $types .= "s";
-    } else {
+    } else { // For 'draft' and 'upcoming'
         $where_clauses[] = "q.status = ?";
         $params[] = $filter_status;
         $types .= "s";
     }
 }
-
-// Date Filter (Created At)
-$filter_date_from = isset($_GET['date_from']) ? trim($_GET['date_from']) : '';
-$filter_date_to = isset($_GET['date_to']) ? trim($_GET['date_to']) : '';
-
-if (!empty($filter_date_from)) {
-    $where_clauses[] = "DATE(q.created_at) >= ?";
-    $params[] = $filter_date_from;
-    $types .= "s";
-}
-if (!empty($filter_date_to)) {
-    $where_clauses[] = "DATE(q.created_at) <= ?";
-    $params[] = $filter_date_to;
-    $types .= "s";
-}
-
 
 // Fetch quizzes with filtering
 $quizzes = [];
@@ -166,7 +148,7 @@ if ($stmt_quizzes) {
         </div>
         <div class="card-body">
             <form action="manage_quizzes.php" method="get" class="row g-3 align-items-end">
-                <div class="col-md-4">
+                <div class="col-md-10">
                     <label for="status_filter" class="form-label">স্ট্যাটাস অনুযায়ী</label>
                     <select class="form-select" id="status_filter" name="status_filter">
                         <option value="">সকল স্ট্যাটাস</option>
@@ -175,14 +157,6 @@ if ($stmt_quizzes) {
                         <option value="live" <?php echo ($filter_status == 'live') ? 'selected' : ''; ?>>লাইভ</option>
                         <option value="archived" <?php echo ($filter_status == 'archived') ? 'selected' : ''; ?>>আর্কাইভড</option>
                     </select>
-                </div>
-                <div class="col-md-3">
-                    <label for="date_from" class="form-label">তৈরির তারিখ (শুরু)</label>
-                    <input type="date" class="form-control" id="date_from" name="date_from" value="<?php echo htmlspecialchars($filter_date_from); ?>">
-                </div>
-                <div class="col-md-3">
-                    <label for="date_to" class="form-label">তৈরির তারিখ (শেষ)</label>
-                    <input type="date" class="form-control" id="date_to" name="date_to" value="<?php echo htmlspecialchars($filter_date_to); ?>">
                 </div>
                 <div class="col-md-2">
                     <button type="submit" class="btn btn-success w-100">ফিল্টার</button>
@@ -195,7 +169,7 @@ if ($stmt_quizzes) {
 
     <div class="card">
         <div class="card-header">
-            সকল কুইজের তালিকা
+            কুইজের তালিকা
         </div>
         <div class="card-body">
             <?php if (!empty($quizzes)): ?>
@@ -232,13 +206,20 @@ if ($stmt_quizzes) {
                                         $end_time = !empty($quiz['live_end_datetime']) ? strtotime($quiz['live_end_datetime']) : null;
 
                                         if ($end_time && $now_time > $end_time) {
-                                            $display_status = 'archived'; // Effectively archived
+                                            $display_status = 'archived';
                                         } elseif ($start_time && $now_time < $start_time) {
-                                            $display_status = 'upcoming'; // Not yet started
+                                            $display_status = 'upcoming';
                                         } else {
-                                            $display_status = 'live'; // Truly live
+                                            $display_status = 'live';
                                         }
+                                    } elseif ($quiz['status'] == 'upcoming' && !empty($quiz['live_start_datetime']) && time() > strtotime($quiz['live_start_datetime'])) {
+                                        // If it was 'upcoming' but start time has passed, and not explicitly ended, it might be considered 'live' or 'archived' depending on end_time.
+                                        // For simplicity, this logic primarily relies on the `status` field and adjusts for 'live' quizzes becoming 'archived'.
+                                        // For an 'upcoming' quiz that has passed its start time, it's better to manually change its status to 'live' via admin panel.
+                                        // However, we can add a small visual cue or logic if needed.
+                                        // For now, we stick to the calculated display_status based primarily on current 'live' status logic.
                                     }
+
 
                                     if ($display_status == 'upcoming') { $status_class = 'info'; $status_text = 'আপকামিং'; }
                                     elseif ($display_status == 'live') { $status_class = 'success'; $status_text = 'লাইভ'; }
@@ -256,7 +237,7 @@ if ($stmt_quizzes) {
                             <td>
                                 <a href="edit_quiz.php?id=<?php echo $quiz['id']; ?>" class="btn btn-sm btn-info mb-1" title="এডিট করুন">এডিট</a>
                                 <a href="duplicate_quiz.php?quiz_id_to_duplicate=<?php echo $quiz['id']; ?>" class="btn btn-sm btn-warning mb-1" onclick="return confirm('আপনি কি নিশ্চিতভাবে এই কুইজটি ডুপ্লিকেট করতে চান?');" title="ডুপ্লিকেট করুন">ডুপ্লিকেট</a>
-                                <a href="manage_quizzes.php?action=delete&quiz_id=<?php echo $quiz['id']; ?>" class="btn btn-sm btn-danger mb-1" onclick="return confirm('আপনি কি নিশ্চিতভাবে এই কুইজটি এবং এর সাথে সম্পর্কিত সকল প্রশ্ন, অপশন ও উত্তর ডিলিট করতে চান?');" title="ডিলিট করুন">ডিলিট</a>
+                                <a href="manage_quizzes.php?action=delete&quiz_id=<?php echo $quiz['id']; ?>&status_filter=<?php echo urlencode($filter_status); ?>" class="btn btn-sm btn-danger mb-1" onclick="return confirm('আপনি কি নিশ্চিতভাবে এই কুইজটি এবং এর সাথে সম্পর্কিত সকল প্রশ্ন, অপশন ও উত্তর ডিলিট করতে চান?');" title="ডিলিট করুন">ডিলিট</a>
                                  <a href="view_quiz_attempts.php?quiz_id=<?php echo $quiz['id']; ?>" class="btn btn-sm btn-success mb-1" title="ফলাফল ও অংশগ্রহণকারী দেখুন">ফলাফল </a>
                                 <a href="../quiz_page.php?id=<?php echo $quiz['id']; ?>" target="_blank" class="btn btn-sm btn-outline-secondary mb-1" title="কুইজটি দেখুন">দেখুন</a>
                                 
@@ -278,8 +259,8 @@ if ($stmt_quizzes) {
             </div>
             <?php else: ?>
             <p class="text-center">
-                <?php if (!empty($filter_status) || !empty($filter_date_from) || !empty($filter_date_to)): ?>
-                    আপনার ফিল্টার অনুযায়ী কোনো কুইজ পাওয়া যায়নি। <a href="manage_quizzes.php">সকল কুইজ দেখুন</a>
+                <?php if (!empty($filter_status)): ?>
+                    "<?php echo htmlspecialchars(ucfirst($filter_status)); ?>" স্ট্যাটাসের কোনো কুইজ পাওয়া যায়নি। <a href="manage_quizzes.php">সকল কুইজ দেখুন</a>
                 <?php else: ?>
                     এখনও কোনো কুইজ তৈরি করা হয়নি।
                 <?php endif; ?>
