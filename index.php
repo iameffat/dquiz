@@ -573,7 +573,7 @@ require_once 'includes/header.php';
                          <?php if (!empty($h_category['icon_class'])): ?>
                             <div class="category-icon-home"><i class="<?php echo htmlspecialchars($h_category['icon_class']); ?>"></i></div>
                         <?php else: ?>
-                             <div class="category-icon-home"><i class="fas fa-tag"></i></div> {/* Default icon */}
+                             <div class="category-icon-home"><i class="fas fa-tag"></i></div>
                         <?php endif; ?>
                         <h5 class="card-title" style="font-size: 1.1rem;"><?php echo htmlspecialchars($h_category['name']); ?></h5>
                         <p class="small text-muted mb-2">(<?php echo $h_category['question_count']; ?> টি প্রশ্ন)</p>
