@@ -141,8 +141,7 @@ $recent_quizzes_for_display = $temp_display_quizzes;
 
 // --- Fetch Study Materials for Homepage ---
 $study_materials_home = [];
-$max_study_materials_on_home = 3; // আপনি কয়টি দেখাতে চান
-// Ensure your table uses 'google_drive_link' as per your last request
+$max_study_materials_on_home = 3; 
 $sql_study_materials_home = "SELECT id, title, description, google_drive_link 
                              FROM study_materials 
                              ORDER BY created_at DESC 
@@ -155,10 +154,9 @@ if ($result_study_materials_home && $result_study_materials_home->num_rows > 0) 
 }
 
 
-// Page-specific CSS for Minimal Hero Section, Animations, Snow, and new quiz card styles
 $page_specific_styles = "
     body {
-        /* overflow-x: hidden; Optional: if animations cause horizontal scroll */
+        /* overflow-x: hidden; */
     }
     .minimal-hero-section {
         background: linear-gradient(180deg, #f8f9fa 0%, #ffffff 100%);
@@ -272,7 +270,6 @@ $page_specific_styles = "
         top: 2px; 
     }
 
-    /* UPDATED Styles for .quiz-card-sm */
     .quiz-card-sm { 
         border: 1px solid #dee2e6;
         border-radius: 8px;
@@ -303,7 +300,7 @@ $page_specific_styles = "
         margin-bottom: 0.75rem; 
         overflow: hidden;
         display: -webkit-box;
-        -webkit-line-clamp: 3; /* Limit to 3 lines */
+        -webkit-line-clamp: 3;
         -webkit-box-orient: vertical;
         min-height: calc(1.5em * 1); 
     }
@@ -317,7 +314,6 @@ $page_specific_styles = "
         margin-bottom: 0;
     }
 
-
     .quiz-card-sm ul.list-unstyled { 
         margin-top: auto; 
         font-size: 0.8rem;
@@ -328,14 +324,11 @@ $page_specific_styles = "
     .quiz-card-sm ul.list-unstyled li {
         margin-bottom: 0.25rem;
     }
-    .quiz-card-sm .btn { /* General button style in quiz-card-sm */
-        font-size: 0.85rem;
-        padding: 0.4rem 0.8rem; 
-    }
-    .quiz-card-sm .quiz-actions-wrapper { /* Wrapper for buttons */
-        margin-top: auto; /* Pushes buttons to the bottom of the card body */
-        display: flex; /* Allows buttons to be side-by-side */
-        gap: 0.5rem; /* Adds space between buttons */
+    /* Removed .quiz-card-sm .btn custom style to rely on Bootstrap's .btn-sm */
+    .quiz-card-sm .quiz-actions-wrapper { 
+        margin-top: auto; 
+        display: flex; 
+        gap: 0.5rem; 
     }
     .quiz-card-sm .additional-info-home {
         font-size: 0.75rem;
@@ -348,7 +341,6 @@ $page_specific_styles = "
     .live-quiz-card-home .card-title { color: #155724; }
     .archived-quiz-card-home { background-color: #f8f9fa; border-left: 4px solid #6c757d; }
     .archived-quiz-card-home .card-title { color: #343a40; }
-
 
     @keyframes fadeInDown { from { opacity: 0; transform: translateY(-30px); } to { opacity: 1; transform: translateY(0); } }
     @keyframes fadeInUp { from { opacity: 0; transform: translateY(30px); } to { opacity: 1; transform: translateY(0); } }
@@ -530,7 +522,7 @@ require_once 'includes/header.php';
                             }
                             ?>
                         </div>
-                        <a href="<?php echo htmlspecialchars($material['google_drive_link']); ?>" target="_blank" class="btn btn-sm btn-outline-primary mt-auto"> <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-link-45deg me-1" viewBox="0 0 16 16">
+                        <a href="<?php echo htmlspecialchars($material['google_drive_link']); ?>" target="_blank" class="btn btn-sm btn-primary mt-auto"> <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-link-45deg me-1" viewBox="0 0 16 16">
                               <path d="M4.715 6.542 3.343 7.914a3 3 0 1 0 4.243 4.243l1.828-1.829A3 3 0 0 0 8.586 5.5L8 6.086a1 1 0 0 0-.154.199 2 2 0 0 1 .861 3.337L6.88 11.45a2 2 0 1 1-2.83-2.83l.793-.792a4 4 0 0 1-.128-1.287z"/>
                               <path d="M6.586 4.672A3 3 0 0 0 7.414 9.5l.775-.776a2 2 0 0 1-.896-3.346L9.12 3.55a2 2 0 1 1 2.83 2.83l-.793.792c.112.42.155.855.128 1.287l1.372-1.372a3 3 0 1 0-4.243-4.243z"/>
                             </svg>
