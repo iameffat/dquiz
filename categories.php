@@ -6,10 +6,11 @@ require_once 'includes/db_connect.php';
 require_once 'includes/functions.php';
 
 $categories = [];
-$sql = "SELECT c.id, c.name, c.description, c.icon_class, COUNT(q.id) as question_count 
+// icon_class কলামটি আর সিলেক্ট করার প্রয়োজন নেই, কারণ আমরা এটি ব্যবহার করছি না।
+$sql = "SELECT c.id, c.name, c.description, COUNT(q.id) as question_count 
         FROM categories c
         LEFT JOIN questions q ON c.id = q.category_id
-        GROUP BY c.id, c.name, c.description, c.icon_class
+        GROUP BY c.id, c.name, c.description 
         HAVING question_count > 0 
         ORDER BY c.name ASC";
 
@@ -24,59 +25,92 @@ if ($result) {
     error_log("Error fetching categories: " . $conn->error);
 }
 
+// হালকা সলিড কালারের উদাহরণ (আপনি এগুলো পরিবর্তন করতে পারেন)
+$solid_colors = [
+    "#e7f5ff", // খুব হালকা নীল
+    "#e0f7fa", // খুব হালকা সায়ান
+    "#e8f5e9", // খুব হালকা সবুজ
+    "#fffde7", // খুব হালকা হলুদ
+    "#fce4ec", // খুব হালকা গোলাপী
+    "#f3e5f5", // খুব হালকা পার্পল (ল্যাভেন্ডার)
+    "#fff8e1", // খুব হালকা কমলা (ক্রিম)
+    "#f1f8e9", // আরও একটি হালকা সবুজ
+    "#e3f2fd", // আরও একটি হালকা নীল
+    "#ffebee", // খুব হালকা লাল/গোলাপী
+    "#fafafa", // প্রায় সাদা (হালকা ধূসর)
+    "#e0e0e0", // খুব হালকা ধূসর
+];
+$num_colors = count($solid_colors);
+
 $page_specific_styles = "
-    .category-card {
-        border: 1px solid var(--border-color);
-        border-radius: 0.5rem;
-        transition: all 0.3s ease-in-out;
-        background-color: var(--card-bg);
+    .home-category-card { /* categories.php তেও একই ক্লাস ব্যবহার করছি */
+        background-color: var(--bs-tertiary-bg);
+        border: 1px solid var(--bs-border-color);
+        border-radius: 0.75rem;
+        padding: 1.25rem;
+        text-align: center;
+        transition: all 0.3s ease;
+        height: 100%;
         display: flex;
         flex-direction: column;
-        height: 100%;
-        text-align: center;
-        padding: 1rem; /* মোবাইলের জন্য প্যাডিং কমানো হলো */
+        justify-content: space-between;
     }
-    .category-card:hover {
-        box-shadow: 0 0.5rem 1rem rgba(0, 0, 0, 0.15);
+    .home-category-card:hover {
         transform: translateY(-5px);
+        box-shadow: 0 0.5rem 1rem rgba(0,0,0,0.1);
     }
-    body.dark-mode .category-card:hover {
-        box-shadow: 0 0.5rem 1rem rgba(255, 255, 255, 0.1);
+    .home-category-icon {
+        width: 60px; /* আইকন বৃত্তের আকার */
+        height: 60px;
+        border-radius: 50%;
+        background-color: var(--bs-primary); /* আইকন বৃত্তের ব্যাকগ্রাউন্ড */
+        color: white; /* অক্ষরের রঙ */
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 1.75rem; /* প্রথম অক্ষরের ফন্ট সাইজ */
+        font-weight: bold;
+        margin: 0 auto 1rem auto;
+        line-height: 1; 
     }
-    .category-card .card-icon {
-        font-size: 2.5rem; /* মোবাইলের জন্য আইকন সাইজ একটু কমানো */
-        margin-bottom: 0.75rem; /* মোবাইলের জন্য মার্জিন কমানো */
-        color: var(--bs-primary);
-    }
-    body.dark-mode .category-card .card-icon {
-        color: var(--bs-primary-text-emphasis);
-    }
-    .category-card .card-title {
-        font-size: 1.1rem; /* মোবাইলের জন্য টাইটেল সাইজ একটু কমানো */
+    .home-category-card .card-title { /* categories.php এর জন্য card-title ক্লাস */
+        font-size: 1.15rem;
         font-weight: 600;
-        color: var(--bs-primary-text-emphasis);
+        color: var(--bs-emphasis-color);
         margin-bottom: 0.25rem;
     }
-    .category-card .category-description-placeholder {
-        margin-bottom: 0.75rem; /* মোবাইলের জন্য মার্জিন কমানো */
-        flex-grow: 1;
-        min-height: 10px; /* মোবাইলের জন্য মিনিমাম উচ্চতা কমানো */
-        font-size: 0.85rem; /* মোবাইলের জন্য বিবরণ ফন্ট সাইজ */
-    }
-    .category-card .question-count {
-        font-size: 0.8rem; /* মোবাইলের জন্য প্রশ্ন সংখ্যা ফন্ট সাইজ */
-        color: var(--text-muted-color);
-        margin-bottom: 0.75rem;
-    }
-    .category-card .btn { /* মোবাইলের জন্য বাটন সাইজ */
+    .home-category-card .question-count {
         font-size: 0.85rem;
-        padding: 0.375rem 0.75rem;
+        color: var(--bs-secondary-color);
+        margin-bottom: 1rem;
     }
+    .home-category-card .btn { /* categories.php এর জন্য বাটন স্টাইল */
+        font-size: 0.9rem;
+    }
+
+    body.dark-mode .home-category-card {
+        background-color: var(--bs-gray-800);
+        border-color: var(--bs-gray-700);
+    }
+    body.dark-mode .home-category-card:hover {
+        box-shadow: 0 0.5rem 1rem rgba(255,255,255,0.07);
+    }
+    body.dark-mode .home-category-icon {
+        background-color: var(--bs-primary-text-emphasis);
+        color: var(--bs-dark-bg-subtle); 
+    }
+    body.dark-mode .home-category-card .card-title {
+        color: var(--bs-light-text-emphasis);
+    }
+    body.dark-mode .home-category-card .question-count {
+        color: var(--bs-secondary-text-emphasis);
+    }
+
     .page-header-custom {
         background: linear-gradient(135deg, var(--secondary-bg-color) 0%, var(--tertiary-bg-color) 100%);
-        padding: 1.5rem 1rem; /* মোবাইলের জন্য হেডার প্যাডিং */
+        padding: 2rem 1rem;
         border-radius: .75rem;
-        margin-bottom: 1.5rem; /* মোবাইলের জন্য হেডার মার্জিন */
+        margin-bottom: 2rem;
         text-align: center;
     }
     body.dark-mode .page-header-custom {
@@ -85,42 +119,39 @@ $page_specific_styles = "
     .page-header-custom h1 {
         color: var(--bs-primary-text-emphasis);
         font-weight: 700;
-        font-size: 1.75rem; /* মোবাইলের জন্য হেডার টাইটেল সাইজ */
     }
     .page-header-custom p {
         color: var(--bs-secondary-text-emphasis);
-        font-size: 1rem; /* মোবাইলের জন্য হেডার সাবটাইটেল সাইজ */
+        font-size: 1.1rem;
     }
-    @media (min-width: 576px) { /* Small devices (sm) and up */
-        .category-card {
-            padding: 1.5rem; /* বড় স্ক্রিনের জন্য প্যাডিং আগের মতো */
+    
+    /* মোবাইলের জন্য স্টাইল */
+    @media (max-width: 575.98px) { 
+        .home-category-card {
+            padding: 1rem;
         }
-        .category-card .card-icon {
-            font-size: 3rem;
-            margin-bottom: 1rem;
+        .home-category-icon {
+            width: 50px; 
+            height: 50px;
+            font-size: 1.5rem;
+            margin-bottom: 0.75rem;
         }
-        .category-card .card-title {
-            font-size: 1.25rem;
+        .home-category-card .card-title {
+            font-size: 1.05rem; 
         }
-        .category-card .category-description-placeholder {
-             min-height: 20px;
-        }
-        .category-card .question-count {
+        .home-category-card .btn {
             font-size: 0.85rem;
-        }
-         .category-card .btn {
-            font-size: 0.9rem; /* Ensure button size is appropriate for larger screens */
-            padding: 0.5rem 1rem;
+            padding: 0.4rem 0.8rem;
         }
         .page-header-custom {
-            padding: 2rem 1rem;
-            margin-bottom: 2rem;
+            padding: 1.5rem 1rem;
+            margin-bottom: 1.5rem;
         }
         .page-header-custom h1 {
-            font-size: 2.25rem; 
+            font-size: 1.75rem;
         }
         .page-header-custom p {
-            font-size: 1.1rem;
+            font-size: 1rem;
         }
     }
 ";
@@ -137,22 +168,26 @@ require_once 'includes/header.php';
     <?php display_flash_message(); ?>
 
     <?php if (!empty($categories)): ?>
-        <?php // পরিবর্তন এখানে: row-cols-2 mobiles (default), row-cols-sm-2 for sm, row-cols-md-3 for md, row-cols-lg-4 for lg and up ?>
-        <div class="row row-cols-2 row-cols-sm-2 row-cols-md-3 row-cols-lg-4 g-3">
-            <?php foreach ($categories as $category): ?>
+        <div class="row row-cols-2 row-cols-sm-2 row-cols-md-3 row-cols-lg-4 g-4"> {/* গ্রিড লেআউট: মোবাইল=২, sm=২, md=3, lg=4 */}
+            <?php foreach ($categories as $index => $category): 
+                // সলিড কালার নির্ধারণ
+                $current_solid_color = $solid_colors[$index % $num_colors];
+                // নামের প্রথম অক্ষর
+                $category_initial = mb_substr(trim($category['name']), 0, 1, "UTF-8");
+                if (empty($category_initial) || !preg_match('/\p{L}/u', $category_initial)) {
+                    $category_initial = "?"; // একটি প্রশ্নবোধক চিহ্ন যদি অক্ষর না হয়
+                }
+            ?>
                 <div class="col">
-                    <div class="category-card">
-                        <?php if (!empty($category['icon_class'])): ?>
-                            <div class="card-icon"><i class="<?php echo htmlspecialchars($category['icon_class']); ?>"></i></div>
-                        <?php else: ?>
-                             <div class="card-icon"><i class="fas fa-tags"></i></div>
-                        <?php endif; ?>
-                        <h5 class="card-title"><?php echo htmlspecialchars($category['name']); ?></h5>
-                        
-                        <div class="category-description-placeholder"></div>
-
-                        <p class="question-count">(<?php echo $category['question_count']; ?> টি প্রশ্ন)</p>
-                        <a href="practice_quiz.php?category_id=<?php echo $category['id']; ?>" class="btn btn-primary mt-auto">অনুশীলন শুরু করুন</a>
+                    <div class="home-category-card" style="background-color: <?php echo $current_solid_color; ?>;"> 
+                        <div class="home-category-icon">
+                            <?php echo htmlspecialchars(strtoupper($category_initial)); ?>
+                        </div>
+                        <div> 
+                            <h5 class="card-title"><?php echo htmlspecialchars($category['name']); ?></h5>
+                            <p class="question-count">(<?php echo $category['question_count']; ?> টি প্রশ্ন)</p>
+                        </div>
+                        <a href="practice_quiz.php?category_id=<?php echo $category['id']; ?>" class="btn btn-primary btn-sm mt-auto">অনুশীলন করুন</a>
                     </div>
                 </div>
             <?php endforeach; ?>
