@@ -1,103 +1,17 @@
 <?php
-$page_title = "সাইট সেটিংস"; // Updated page title for broader scope
-$admin_base_url = ''; // Current directory is admin/
-require_once '../includes/db_connect.php'; // CLOUDFLARE_* constants should be available now
+$page_title = "সাইট সেটিংস";
+$admin_base_url = '';
+require_once '../includes/db_connect.php';
 require_once 'includes/auth_check.php';
 require_once '../includes/functions.php';
 
 $feedback_message = "";
 $message_type = "";
 
-// Function to purge Cloudflare Cache
-// This function can also be moved to includes/functions.php if you prefer
-if (!function_exists('purge_cloudflare_cache')) {
-    function purge_cloudflare_cache() {
-        if (!defined('CLOUDFLARE_ZONE_ID') || 
-            (defined('CLOUDFLARE_USE_API_TOKEN') && CLOUDFLARE_USE_API_TOKEN && !defined('CLOUDFLARE_API_TOKEN')) ||
-            (defined('CLOUDFLARE_USE_API_TOKEN') && !CLOUDFLARE_USE_API_TOKEN && (!defined('CLOUDFLARE_EMAIL') || !defined('CLOUDFLARE_GLOBAL_API_KEY')))
-        ) {
-            return ['success' => false, 'message' => 'Cloudflare API credentials সঠিকভাবে কনফিগার করা হয়নি (db_connect.php চেক করুন)।'];
-        }
-
-        $zone_id = CLOUDFLARE_ZONE_ID;
-        $use_api_token = CLOUDFLARE_USE_API_TOKEN;
-
-        if (empty($zone_id) || $zone_id === 'আপনার_জোনের_আইডি') {
-             return ['success' => false, 'message' => 'Cloudflare Zone ID কনফিগার করা হয়নি।'];
-        }
-
-        if ($use_api_token) {
-            $api_token = CLOUDFLARE_API_TOKEN;
-            if (empty($api_token) || $api_token === 'আপনার_এপিআই_টোকেন') {
-                return ['success' => false, 'message' => 'Cloudflare API Token সঠিকভাবে কনফিগার করা হয়নি।'];
-            }
-            $headers = [
-                "Authorization: Bearer " . $api_token,
-                "Content-Type: application/json"
-            ];
-        } else {
-            $auth_email = CLOUDFLARE_EMAIL;
-            $auth_key = CLOUDFLARE_GLOBAL_API_KEY;
-            if (empty($auth_email) || empty($auth_key) || $auth_email === 'আপনার_ক্লাউডফ্লেয়ার_ইমেইল' || $auth_key === 'আপনার_গ্লোবাল_এপিআই_কী') {
-                return ['success' => false, 'message' => 'Cloudflare Email এবং Global API Key সঠিকভাবে কনফিগার করা হয়নি।'];
-            }
-            $headers = [
-                "X-Auth-Email: " . $auth_email,
-                "X-Auth-Key: " . $auth_key,
-                "Content-Type: application/json"
-            ];
-        }
-
-        $url = "https://api.cloudflare.com/client/v4/zones/{$zone_id}/purge_cache";
-        $data = ["purge_everything" => true];
-
-        if (!function_exists('curl_init')) {
-             return ['success' => false, 'message' => "সার্ভারে cURL পিএইচপি এক্সটেনশন সক্রিয় নেই। ক্যাশ পরিষ্কার করা যাবে না।"];
-        }
-
-        $ch = curl_init();
-        curl_setopt($ch, CURLOPT_URL, $url);
-        curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
-        curl_setopt($ch, CURLOPT_POST, true); // Changed from CUSTOMREQUEST
-        curl_setopt($ch, CURLOPT_POSTFIELDS, json_encode($data));
-        curl_setopt($ch, CURLOPT_HTTPHEADER, $headers);
-        curl_setopt($ch, CURLOPT_TIMEOUT, 30); // 30 seconds timeout
-
-        $response = curl_exec($ch);
-        $http_code = curl_getinfo($ch, CURLINFO_HTTP_CODE);
-        $curl_error = curl_error($ch);
-        curl_close($ch);
-
-        if ($curl_error) {
-            error_log("Cloudflare Purge cURL Error: " . $curl_error);
-            return ['success' => false, 'message' => "Cloudflare API তে সংযোগ করতে সমস্যা হয়েছে (cURL Error): " . $curl_error];
-        }
-
-        $response_data = json_decode($response, true);
-
-        if ($http_code == 200 && isset($response_data['success']) && $response_data['success'] === true) {
-            return ['success' => true, 'message' => "Cloudflare ক্যাশ সফলভাবে ক্লিন করার জন্য অনুরোধ পাঠানো হয়েছে।"];
-        } else {
-            $error_message_detail = "Cloudflare ক্যাশ ক্লিন করতে সমস্যা হয়েছে।";
-            if (isset($response_data['errors']) && !empty($response_data['errors'])) {
-                $error_details_cf = [];
-                foreach ($response_data['errors'] as $error) {
-                    $error_details_cf[] = "Error " . (isset($error['code']) ? $error['code'] : 'N/A') . ": " . (isset($error['message']) ? $error['message'] : 'Unknown Cloudflare error');
-                }
-                $error_message_detail .= " Details: " . implode(", ", $error_details_cf);
-            } elseif ($response) {
-                $error_message_detail .= " Response: " . htmlentities(substr($response, 0, 200)); // Show part of response
-            }
-            error_log("Cloudflare Purge API Error (HTTP {$http_code}): " . $response);
-            return ['success' => false, 'message' => $error_message_detail . " (HTTP Code: {$http_code})"];
-        }
-    }
-}
-
-
-// Fetch current homepage settings (existing code)
+// Fetch current settings
 $current_settings = [];
-$sql_fetch = "SELECT setting_key, setting_value FROM site_settings WHERE setting_key IN ('upcoming_quiz_enabled', 'upcoming_quiz_title', 'upcoming_quiz_end_date')";
+$sql_fetch_keys = "'upcoming_quiz_enabled', 'upcoming_quiz_title', 'upcoming_quiz_end_date', 'homepage_category_practice_enabled'"; // নতুন কী যোগ করা হলো
+$sql_fetch = "SELECT setting_key, setting_value FROM site_settings WHERE setting_key IN ({$sql_fetch_keys})";
 $result_fetch = $conn->query($sql_fetch);
 if ($result_fetch && $result_fetch->num_rows > 0) {
     while ($row = $result_fetch->fetch_assoc()) {
@@ -108,16 +22,21 @@ if ($result_fetch && $result_fetch->num_rows > 0) {
 $upcoming_quiz_enabled = isset($current_settings['upcoming_quiz_enabled']) ? (bool)$current_settings['upcoming_quiz_enabled'] : false;
 $upcoming_quiz_title = isset($current_settings['upcoming_quiz_title']) ? $current_settings['upcoming_quiz_title'] : '';
 $upcoming_quiz_end_date = isset($current_settings['upcoming_quiz_end_date']) ? $current_settings['upcoming_quiz_end_date'] : '';
+// নতুন সেটিংস ভ্যারিয়েবল
+$homepage_category_practice_enabled = isset($current_settings['homepage_category_practice_enabled']) ? (bool)$current_settings['homepage_category_practice_enabled'] : true; // ডিফল্ট true
 
 // Handle Form Submissions
 if ($_SERVER["REQUEST_METHOD"] == "POST") {
-    if (isset($_POST['save_homepage_settings'])) { // Existing settings form
+    if (isset($_POST['save_homepage_settings'])) {
         $posted_enabled = isset($_POST['upcoming_quiz_enabled']) ? '1' : '0';
         $posted_title = trim($_POST['upcoming_quiz_title']);
         $posted_end_date = trim($_POST['upcoming_quiz_end_date']);
+        // নতুন সেটিংস পোস্ট থেকে নেওয়া
+        $posted_category_practice_enabled = isset($_POST['homepage_category_practice_enabled']) ? '1' : '0';
+
 
         $errors_homepage = [];
-        if (empty($posted_title) && $posted_enabled === '1') { // Title required only if enabled
+        if (empty($posted_title) && $posted_enabled === '1') {
             $errors_homepage[] = "আপকামিং কুইজের শিরোনাম খালি রাখা যাবে না যখন সেকশনটি সক্রিয় থাকবে।";
         }
         if ($posted_enabled === '1' && empty($posted_end_date)) {
@@ -130,7 +49,8 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
             $settings_to_update = [
                 'upcoming_quiz_enabled' => $posted_enabled,
                 'upcoming_quiz_title' => $posted_title,
-                'upcoming_quiz_end_date' => $posted_end_date
+                'upcoming_quiz_end_date' => $posted_end_date,
+                'homepage_category_practice_enabled' => $posted_category_practice_enabled // নতুন সেটিংস অ্যারেতে যোগ
             ];
 
             $all_successful = true;
@@ -157,6 +77,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
                 $upcoming_quiz_enabled = (bool)$posted_enabled;
                 $upcoming_quiz_title = $posted_title;
                 $upcoming_quiz_end_date = $posted_end_date;
+                $homepage_category_practice_enabled = (bool)$posted_category_practice_enabled; // আপডেট করা মান রি-ফেচ
             } else {
                 $feedback_message = "হোমপেজ সেটিংস আপডেটে ত্রুটি: <br>" . implode("<br>", $errors_homepage);
                 $message_type = "danger";
@@ -165,7 +86,92 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
             $feedback_message = "হোমপেজ সেটিংস আপডেটে ত্রুটি: <br>" . implode("<br>", $errors_homepage);
             $message_type = "danger";
         }
-    } elseif (isset($_POST['purge_cloudflare_cache_submit'])) { // Cloudflare purge form
+    } elseif (isset($_POST['purge_cloudflare_cache_submit'])) {
+        // ... (Cloudflare purge logic অপরিবর্তিত থাকবে) ...
+        // Function to purge Cloudflare Cache
+        if (!function_exists('purge_cloudflare_cache')) {
+            function purge_cloudflare_cache() {
+                if (!defined('CLOUDFLARE_ZONE_ID') || 
+                    (defined('CLOUDFLARE_USE_API_TOKEN') && CLOUDFLARE_USE_API_TOKEN && !defined('CLOUDFLARE_API_TOKEN')) ||
+                    (defined('CLOUDFLARE_USE_API_TOKEN') && !CLOUDFLARE_USE_API_TOKEN && (!defined('CLOUDFLARE_EMAIL') || !defined('CLOUDFLARE_GLOBAL_API_KEY')))
+                ) {
+                    return ['success' => false, 'message' => 'Cloudflare API credentials সঠিকভাবে কনফিগার করা হয়নি (db_connect.php চেক করুন)।'];
+                }
+
+                $zone_id = CLOUDFLARE_ZONE_ID;
+                $use_api_token = CLOUDFLARE_USE_API_TOKEN;
+
+                if (empty($zone_id) || $zone_id === 'আপনার_জোনের_আইডি') {
+                     return ['success' => false, 'message' => 'Cloudflare Zone ID কনফিগার করা হয়নি।'];
+                }
+
+                if ($use_api_token) {
+                    $api_token = CLOUDFLARE_API_TOKEN;
+                    if (empty($api_token) || $api_token === 'আপনার_এপিআই_টোকেন') {
+                        return ['success' => false, 'message' => 'Cloudflare API Token সঠিকভাবে কনফিগার করা হয়নি।'];
+                    }
+                    $headers = [
+                        "Authorization: Bearer " . $api_token,
+                        "Content-Type: application/json"
+                    ];
+                } else {
+                    $auth_email = CLOUDFLARE_EMAIL;
+                    $auth_key = CLOUDFLARE_GLOBAL_API_KEY;
+                    if (empty($auth_email) || empty($auth_key) || $auth_email === 'আপনার_ক্লাউডফ্লেয়ার_ইমেইল' || $auth_key === 'আপনার_গ্লোবাল_এপিআই_কী') {
+                        return ['success' => false, 'message' => 'Cloudflare Email এবং Global API Key সঠিকভাবে কনফিগার করা হয়নি।'];
+                    }
+                    $headers = [
+                        "X-Auth-Email: " . $auth_email,
+                        "X-Auth-Key: " . $auth_key,
+                        "Content-Type: application/json"
+                    ];
+                }
+
+                $url = "https://api.cloudflare.com/client/v4/zones/{$zone_id}/purge_cache";
+                $data = ["purge_everything" => true];
+
+                if (!function_exists('curl_init')) {
+                     return ['success' => false, 'message' => "সার্ভারে cURL পিএইচপি এক্সটেনশন সক্রিয় নেই। ক্যাশ পরিষ্কার করা যাবে না।"];
+                }
+
+                $ch = curl_init();
+                curl_setopt($ch, CURLOPT_URL, $url);
+                curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+                curl_setopt($ch, CURLOPT_POST, true); 
+                curl_setopt($ch, CURLOPT_POSTFIELDS, json_encode($data));
+                curl_setopt($ch, CURLOPT_HTTPHEADER, $headers);
+                curl_setopt($ch, CURLOPT_TIMEOUT, 30); 
+
+                $response = curl_exec($ch);
+                $http_code = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+                $curl_error = curl_error($ch);
+                curl_close($ch);
+
+                if ($curl_error) {
+                    error_log("Cloudflare Purge cURL Error: " . $curl_error);
+                    return ['success' => false, 'message' => "Cloudflare API তে সংযোগ করতে সমস্যা হয়েছে (cURL Error): " . $curl_error];
+                }
+
+                $response_data = json_decode($response, true);
+
+                if ($http_code == 200 && isset($response_data['success']) && $response_data['success'] === true) {
+                    return ['success' => true, 'message' => "Cloudflare ক্যাশ সফলভাবে ক্লিন করার জন্য অনুরোধ পাঠানো হয়েছে।"];
+                } else {
+                    $error_message_detail = "Cloudflare ক্যাশ ক্লিন করতে সমস্যা হয়েছে।";
+                    if (isset($response_data['errors']) && !empty($response_data['errors'])) {
+                        $error_details_cf = [];
+                        foreach ($response_data['errors'] as $error) {
+                            $error_details_cf[] = "Error " . (isset($error['code']) ? $error['code'] : 'N/A') . ": " . (isset($error['message']) ? $error['message'] : 'Unknown Cloudflare error');
+                        }
+                        $error_message_detail .= " Details: " . implode(", ", $error_details_cf);
+                    } elseif ($response) {
+                        $error_message_detail .= " Response: " . htmlentities(substr($response, 0, 200)); 
+                    }
+                    error_log("Cloudflare Purge API Error (HTTP {$http_code}): " . $response);
+                    return ['success' => false, 'message' => $error_message_detail . " (HTTP Code: {$http_code})"];
+                }
+            }
+        }
         $purge_result = purge_cloudflare_cache();
         $feedback_message = $purge_result['message'];
         $message_type = $purge_result['success'] ? "success" : "danger";
@@ -187,25 +193,38 @@ require_once 'includes/header.php';
 
     <div class="card mt-4">
         <div class="card-header">
-            হোমপেজ আপকামিং কুইজ সেকশন
+            হোমপেজ সেটিংস
         </div>
         <div class="card-body">
-            <p>এখান থেকে আপনি হোমপেজে প্রদর্শিত আপকামিং কুইজ সেকশনটি নিয়ন্ত্রণ করতে পারবেন।</p>
             <form action="<?php echo htmlspecialchars($_SERVER["PHP_SELF"]); ?>" method="post">
-                <div class="mb-3 form-check">
-                    <input type="checkbox" class="form-check-input" id="upcoming_quiz_enabled" name="upcoming_quiz_enabled" value="1" <?php echo $upcoming_quiz_enabled ? 'checked' : ''; ?>>
-                    <label class="form-check-label" for="upcoming_quiz_enabled">আপকামিং কুইজ সেকশনটি হোমপেজে দেখান</label>
-                </div>
-                <div class="mb-3">
-                    <label for="upcoming_quiz_title" class="form-label">আপকামিং কুইজের শিরোনাম</label>
-                    <input type="text" class="form-control" id="upcoming_quiz_title" name="upcoming_quiz_title" value="<?php echo htmlspecialchars($upcoming_quiz_title); ?>">
-                     <small class="form-text text-muted">এই শিরোনামটি হোমপেজে দেখানো হবে যদি উপরের অপশনটি সক্রিয় থাকে।</small>
-                </div>
-                <div class="mb-3">
-                    <label for="upcoming_quiz_end_date" class="form-label">কুইজের শেষ তারিখ (দিন গণনা এই তারিখ পর্যন্ত হবে)</label>
-                    <input type="date" class="form-control" id="upcoming_quiz_end_date" name="upcoming_quiz_end_date" value="<?php echo htmlspecialchars($upcoming_quiz_end_date); ?>" placeholder="YYYY-MM-DD">
-                    <small class="form-text text-muted">ফরম্যাট: YYYY-MM-DD. যেমন: <?php echo date("Y-m-d", strtotime("+7 days")); ?>। এই তারিখটি কাউন্টডাউনের জন্য ব্যবহৃত হবে।</small>
-                </div>
+                <fieldset>
+                    <legend class="h5">আপকামিং কুইজ সেকশন</legend>
+                    <p class="text-muted small">এখান থেকে আপনি হোমপেজে প্রদর্শিত আপকামিং কুইজ সেকশনটি নিয়ন্ত্রণ করতে পারবেন।</p>
+                    <div class="mb-3 form-check">
+                        <input type="checkbox" class="form-check-input" id="upcoming_quiz_enabled" name="upcoming_quiz_enabled" value="1" <?php echo $upcoming_quiz_enabled ? 'checked' : ''; ?>>
+                        <label class="form-check-label" for="upcoming_quiz_enabled">আপকামিং কুইজ সেকশনটি হোমপেজে দেখান</label>
+                    </div>
+                    <div class="mb-3">
+                        <label for="upcoming_quiz_title" class="form-label">আপকামিং কুইজের শিরোনাম</label>
+                        <input type="text" class="form-control" id="upcoming_quiz_title" name="upcoming_quiz_title" value="<?php echo htmlspecialchars($upcoming_quiz_title); ?>">
+                         <small class="form-text text-muted">এই শিরোনামটি হোমপেজে দেখানো হবে যদি উপরের অপশনটি সক্রিয় থাকে।</small>
+                    </div>
+                    <div class="mb-3">
+                        <label for="upcoming_quiz_end_date" class="form-label">কুইজের শেষ তারিখ (দিন গণনা এই তারিখ পর্যন্ত হবে)</label>
+                        <input type="date" class="form-control" id="upcoming_quiz_end_date" name="upcoming_quiz_end_date" value="<?php echo htmlspecialchars($upcoming_quiz_end_date); ?>" placeholder="YYYY-MM-DD">
+                        <small class="form-text text-muted">ফরম্যাট: YYYY-MM-DD. যেমন: <?php echo date("Y-m-d", strtotime("+7 days")); ?>। এই তারিখটি কাউন্টডাউনের জন্য ব্যবহৃত হবে।</small>
+                    </div>
+                </fieldset>
+                <hr>
+                <fieldset>
+                    <legend class="h5">ক্যাটাগরি ভিত্তিক অনুশীলন সেকশন</legend>
+                    <p class="text-muted small">হোমপেজে "ক্যাটাগরি ভিত্তিক অনুশীলন" সেকশনটি দেখানো হবে কিনা তা এখান থেকে নিয়ন্ত্রণ করুন।</p>
+                    <div class="mb-3 form-check">
+                        <input type="checkbox" class="form-check-input" id="homepage_category_practice_enabled" name="homepage_category_practice_enabled" value="1" <?php echo $homepage_category_practice_enabled ? 'checked' : ''; ?>>
+                        <label class="form-check-label" for="homepage_category_practice_enabled">হোমপেজে "ক্যাটাগরি ভিত্তিক অনুশীলন" সেকশন দেখান</label>
+                    </div>
+                </fieldset>
+                <hr>
                 <button type="submit" name="save_homepage_settings" class="btn btn-primary">হোমপেজ সেটিংস সংরক্ষণ করুন</button>
             </form>
         </div>
