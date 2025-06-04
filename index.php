@@ -155,6 +155,7 @@ if ($result_home_cat && $result_home_cat->num_rows > 0) {
     }
 }
 
+$show_category_practice_section = get_site_setting('homepage_category_practice_enabled', '1'); // ডিফল্ট '1' (অন)
 
 $page_specific_styles = "
     body {}
@@ -439,15 +440,15 @@ require_once 'includes/header.php';
     <?php endif; ?>
 
 
+    <?php if ($show_category_practice_section === '1'): // সেটিংস 'অন' থাকলে তবেই এই সেকশন দেখাবে ?>
     <?php if (!empty($home_categories)): ?>
     <div class="category-practice-section content-section mt-4">
         <h2 class="section-title">ক্যাটাগরি ভিত্তিক অনুশীলন</h2>
         <div class="row row-cols-2 row-cols-sm-2 row-cols-md-3 row-cols-lg-4 g-4">
             <?php foreach ($home_categories as $h_category): 
-                // নামের প্রথম অক্ষর বা ডিফল্ট আইকন
                 $category_initial = mb_substr(trim($h_category['name']), 0, 1, "UTF-8");
-                if (empty($category_initial) || !preg_match('/\p{L}/u', $category_initial)) { // যদি প্রথম অক্ষর না পাওয়া যায় বা অক্ষর না হয়
-                    $category_initial = "?"; // একটি প্রশ্নবোধক চিহ্ন
+                if (empty($category_initial) || !preg_match('/\p{L}/u', $category_initial)) {
+                    $category_initial = "?";
                 }
             ?>
             <div class="col">
@@ -466,8 +467,8 @@ require_once 'includes/header.php';
             <a href="categories.php" class="btn btn-secondary">সকল ক্যাটাগরি দেখুন</a>
         </div>
     </div>
-    <?php endif; ?>
-
+    <?php endif; // end if !empty($home_categories) ?>
+<?php endif; // end if $show_category_practice_section ?>
 
     <?php if (!empty($study_materials_home)): ?>
     <div class="recent-study-materials-section content-section"> <h2 class="section-title">প্রয়োজনীয় স্টাডি ম্যাটেরিয়ালস</h2>
