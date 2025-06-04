@@ -73,7 +73,7 @@ if (isset($_GET['action']) && isset($_GET['attempt_id'])) {
         if ($stmt_reinstate) {
             $stmt_reinstate->bind_param("ii", $attempt_id_to_manage, $quiz_id);
             if ($stmt_reinstate->execute()) {
-                $_SESSION['flash_message'] = "অংশগ্রহণটি (ID: {$attempt_id_to_manage}) সফলভাবে पुनर्स्थापित করা হয়েছে। অনুগ্রহ করে স্কোর অ্যাডজাস্ট করুন যদি প্রয়োজন হয়।";
+                $_SESSION['flash_message'] = "অংশগ্রহণটি (ID: {$attempt_id_to_manage}) সফলভাবে পুনরুদ্ধার করা হয়েছে। অনুগ্রহ করে স্কোর অ্যাডজাস্ট করুন যদি প্রয়োজন হয়।";
                 $_SESSION['flash_message_type'] = "info";
             } else {
                 $_SESSION['flash_message'] = "অংশগ্রহণটি পুনঃবিবেচনা করতে সমস্যা হয়েছে: " . $stmt_reinstate->error;
