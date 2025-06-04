@@ -20,17 +20,25 @@ if (!isset($_SESSION["loggedin"]) || $_SESSION["loggedin"] !== true) {
 $user_id = $_SESSION['user_id']; // User ID from session
 $quiz_id = 0;
 $attempt_id = 0;
-$total_score = 0; // এটি চূড়ান্ত স্কোর সংরক্ষণ করবে
+$total_score = 0; 
 $total_questions_in_quiz = 0;
 $time_taken_seconds = null;
 $feedback_message = "";
 $feedback_class = "";
 $quiz_info_result = null;
 $review_questions = [];
-$page_title = "কুইজের ফলাফল"; // Default page title
+$page_title = "কুইজের ফলাফল"; 
+
+// New variables for chart data
+$correct_answers_count_for_chart = 0;
+$incorrect_answers_count_for_chart = 0;
+$unanswered_questions_count_for_chart = 0;
+
 
 // Function to fetch and prepare result display data
 function prepare_results_data($conn, $current_attempt_id, $current_quiz_id, $current_user_id) {
+    global $correct_answers_count_for_chart, $incorrect_answers_count_for_chart, $unanswered_questions_count_for_chart; // Make global to set them
+
     $display_data = [
         'success' => false,
         'quiz_id' => $current_quiz_id,
@@ -42,7 +50,10 @@ function prepare_results_data($conn, $current_attempt_id, $current_quiz_id, $cur
         'feedback_class' => '',
         'quiz_info_result' => null,
         'review_questions' => [],
-        'page_title' => "কুইজের ফলাফল"
+        'page_title' => "কুইজের ফলাফল",
+        'correct_answers_count' => 0, // For chart
+        'incorrect_answers_count_raw' => 0, // For chart
+        'unanswered_questions_count' => 0 // For chart
     ];
 
     // Fetch attempt details
@@ -60,25 +71,18 @@ function prepare_results_data($conn, $current_attempt_id, $current_quiz_id, $cur
     if ($result_attempt->num_rows === 1) {
         $attempt_data = $result_attempt->fetch_assoc();
 
-        // Verify user ID - ALLOW ADMINS TO VIEW ANYONE'S RESULTS
-        // The $current_user_id is the ID of the logged-in user (viewer)
-        // $attempt_data['user_id'] is the ID of the user who took the quiz attempt
         if (isset($_SESSION['role']) && $_SESSION['role'] === 'admin') {
-            // Admin can view any result, so bypass the user ID check.
+            // Admin can view any result
         } elseif ($attempt_data['user_id'] != $current_user_id) {
             $_SESSION['flash_message'] = "আপনি এই কুইজের ফলাফল দেখার জন্য অনুমোদিত নন।";
             $_SESSION['flash_message_type'] = "warning";
-            // Redirect to prevent further data loading for non-admin, non-owner
             header("Location: quizzes.php");
             exit;
-            // return $display_data; // Or alternatively, just return and let the calling script handle redirect
         }
 
-
-        $display_data['total_score'] = $attempt_data['score']; // This will be the final score with negative marking
+        $display_data['total_score'] = $attempt_data['score'];
         $display_data['time_taken_seconds'] = $attempt_data['time_taken_seconds'];
 
-        // Fetch quiz info (title, total questions)
         $quiz_info_sql = "SELECT q.title, q.status, q.live_end_datetime, COUNT(qs.id) as total_questions
                           FROM quizzes q
                           LEFT JOIN questions qs ON q.id = qs.quiz_id
@@ -105,13 +109,44 @@ function prepare_results_data($conn, $current_attempt_id, $current_quiz_id, $cur
             return $display_data;
         }
 
+        // Fetch answer stats for chart
+        $sql_answer_stats = "SELECT
+                                SUM(CASE WHEN is_correct = 1 THEN 1 ELSE 0 END) as correct_count,
+                                SUM(CASE WHEN is_correct = 0 AND selected_option_id IS NOT NULL THEN 1 ELSE 0 END) as incorrect_count,
+                                SUM(CASE WHEN selected_option_id IS NULL THEN 1 ELSE 0 END) as unanswered_count
+                             FROM user_answers
+                             WHERE attempt_id = ?";
+        $stmt_answer_stats = $conn->prepare($sql_answer_stats);
+        if ($stmt_answer_stats) {
+            $stmt_answer_stats->bind_param("i", $current_attempt_id);
+            $stmt_answer_stats->execute();
+            $result_answer_stats = $stmt_answer_stats->get_result()->fetch_assoc();
+            $stmt_answer_stats->close();
 
-        // Feedback message based on score
+            $display_data['correct_answers_count'] = intval($result_answer_stats['correct_count'] ?? 0);
+            $display_data['incorrect_answers_count_raw'] = intval($result_answer_stats['incorrect_count'] ?? 0);
+            
+            // Ensure total consistency for unanswered
+            $answered_count = $display_data['correct_answers_count'] + $display_data['incorrect_answers_count_raw'];
+            $display_data['unanswered_questions_count'] = $display_data['total_questions_in_quiz'] - $answered_count;
+            if ($display_data['unanswered_questions_count'] < 0) {
+                $display_data['unanswered_questions_count'] = 0; // Safety check
+            }
+
+            // Set global variables for chart (needed for cases where extract might not cover them before script)
+            $correct_answers_count_for_chart = $display_data['correct_answers_count'];
+            $incorrect_answers_count_for_chart = $display_data['incorrect_answers_count_raw'];
+            $unanswered_questions_count_for_chart = $display_data['unanswered_questions_count'];
+
+        } else {
+            // Error preparing statement, initialize to 0 or handle
+            $display_data['correct_answers_count'] = 0;
+            $display_data['incorrect_answers_count_raw'] = 0;
+            $display_data['unanswered_questions_count'] = $display_data['total_questions_in_quiz'];
+        }
+
+
         if ($display_data['total_questions_in_quiz'] > 0) {
-            // Calculate percentage based on correct answers before negative marking for feedback categories if desired
-            // Or, base it on the final score. Let's use final score for now.
-            // If max possible score is total_questions (e.g., 1 per correct, 0 for wrong/unanswered before penalty)
-            // Then percentage would be (final_score / total_questions) * 100
             $percentage_score = ($display_data['total_score'] / $display_data['total_questions_in_quiz']) * 100;
             if ($percentage_score >= 80) {
                 $display_data['feedback_message'] = "খুব ভালো!"; $display_data['feedback_class'] = "very-good";
@@ -124,8 +159,6 @@ function prepare_results_data($conn, $current_attempt_id, $current_quiz_id, $cur
             }
         }
 
-
-        // Fetch questions and user's answers for review
         $sql_review = "
             SELECT
                 q.id AS question_id, q.question_text, q.image_url, q.explanation,
@@ -159,14 +192,14 @@ function prepare_results_data($conn, $current_attempt_id, $current_quiz_id, $cur
                     ];
                 }
             }
-            $row['options_list'] = $options_array; // Add parsed options to the row
+            $row['options_list'] = $options_array;
             $display_data['review_questions'][] = $row;
         }
         $stmt_review->close();
-        $display_data['success'] = true; // Mark data preparation as successful
+        $display_data['success'] = true;
 
     } else {
-        $_SESSION['flash_message'] = "কুইজের প্রচেষ্টা খুঁজে পাওয়া যায়নি ।"; // Removed "অথবা এটি আপনার নয়" as admin can view others
+        $_SESSION['flash_message'] = "কুইজের প্রচেষ্টা খুঁজে পাওয়া যায়নি ।";
         $_SESSION['flash_message_type'] = "warning";
     }
     $stmt_attempt->close();
@@ -174,19 +207,17 @@ function prepare_results_data($conn, $current_attempt_id, $current_quiz_id, $cur
 }
 
 
-// Handles quiz submission (manual or auto by timer)
+// Handles quiz submission
 if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['quiz_id']) && isset($_POST['attempt_id'])) {
     $quiz_id = intval($_POST['quiz_id']);
     $attempt_id = intval($_POST['attempt_id']);
-    $submitted_answers = isset($_POST['answers']) ? $_POST['answers'] : [];
-    // $user_id is already set from session at the top
-
-    if ($quiz_id <= 0 || $attempt_id <= 0) {
-        $_SESSION['flash_message'] = "ফলাফল দেখাতে সমস্যা হয়েছে। (অবৈধ IDs)";
-        $_SESSION['flash_message_type'] = "danger";
-        header("Location: quizzes.php");
-        exit;
-    }
+    // ... (rest of your POST handling code remains largely the same) ...
+    // Ensure that after successful commit and before redirect/display:
+    // $results_display_data = prepare_results_data($conn, $attempt_id, $quiz_id, $user_id);
+    // if ($results_display_data['success']) {
+    //     extract($results_display_data); // This will make $correct_answers_count etc. available
+    // }
+    // ...
 
     // Calculate time taken
     $end_time_dt = new DateTime();
@@ -205,23 +236,20 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['quiz_id']) && isset($_
     }
     $stmt_get_start_time->close();
 
-    // Initialize scoring variables
-    $questions_answered_correctly = 0;
-    $incorrect_answers_count = 0; // <--- নতুন সংযোজন: ভুল উত্তরের সংখ্যা
+    $questions_answered_correctly_post = 0;
+    $incorrect_answers_count_post = 0;
 
-    // Get total questions in the quiz (for display consistency)
     $sql_all_q_count = "SELECT COUNT(id) as total_q FROM questions WHERE quiz_id = ?";
     $stmt_all_q_count = $conn->prepare($sql_all_q_count);
     $stmt_all_q_count->bind_param("i", $quiz_id);
     $stmt_all_q_count->execute();
     $total_questions_in_quiz_from_db = $stmt_all_q_count->get_result()->fetch_assoc()['total_q'];
     $stmt_all_q_count->close();
-    $total_questions_in_quiz = $total_questions_in_quiz_from_db; // prepare_results_data তেও ব্যবহৃত হয়
+    $total_questions_in_quiz = $total_questions_in_quiz_from_db;
 
 
     $conn->begin_transaction();
     try {
-        // Fetch all questions and their correct options for the quiz
         $sql_questions_options = "SELECT q.id as question_id, o.id as option_id, o.is_correct
                                   FROM questions q
                                   JOIN options o ON q.id = o.question_id
@@ -230,39 +258,36 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['quiz_id']) && isset($_
         $stmt_qo->bind_param("i", $quiz_id);
         $stmt_qo->execute();
         $qo_results = $stmt_qo->get_result();
-        $correct_options_map = []; // Map [question_id => correct_option_id]
-        $all_questions_map = [];   // Map [question_id => true] to iterate all questions
+        $correct_options_map = []; 
+        $all_questions_map = [];   
         while($qo_row = $qo_results->fetch_assoc()){
-            $all_questions_map[$qo_row['question_id']] = true; // Mark question as existing
+            $all_questions_map[$qo_row['question_id']] = true; 
             if($qo_row['is_correct'] == 1){
                 $correct_options_map[$qo_row['question_id']] = $qo_row['option_id'];
             }
         }
         $stmt_qo->close();
 
-        // Process each question
+        $submitted_answers = isset($_POST['answers']) ? $_POST['answers'] : [];
         foreach ($all_questions_map as $question_id_loop => $val) {
             $selected_option_id = isset($submitted_answers[$question_id_loop]) ? intval($submitted_answers[$question_id_loop]) : null;
-            $is_correct_answer_for_db = 0; // For user_answers table
+            $is_correct_answer_for_db = 0; 
 
-            if ($selected_option_id !== null) { // User answered this question
+            if ($selected_option_id !== null) { 
                 if (isset($correct_options_map[$question_id_loop]) && $correct_options_map[$question_id_loop] == $selected_option_id) {
-                    $questions_answered_correctly++;
+                    $questions_answered_correctly_post++;
                     $is_correct_answer_for_db = 1;
                 } else {
-                    $incorrect_answers_count++; // <--- ভুল উত্তর গণনা করুন
+                    $incorrect_answers_count_post++; 
                     $is_correct_answer_for_db = 0;
                 }
-            } else {
-                // User did not answer this question, no penalty, is_correct_answer_for_db remains 0
             }
-
-            // Save user's answer (or lack thereof)
-            if ($selected_option_id === null) { // If not answered
+            
+            if ($selected_option_id === null) { 
                  $stmt_insert_answer_final = $conn->prepare("INSERT INTO user_answers (attempt_id, question_id, selected_option_id, is_correct) VALUES (?, ?, NULL, ?)");
-                 if(!$stmt_insert_answer_final) throw new Exception("ব্যবহারকারীর উত্তর সংরক্ষণ स्टेटमेंट প্রস্তুত করতে সমস্যা হয়েছে (NULLสำหรับ): " . $conn->error);
+                 if(!$stmt_insert_answer_final) throw new Exception("ব্যবহারকারীর উত্তর সংরক্ষণ स्टेटमेंट প্রস্তুত করতে সমস্যা হয়েছে (NULL): " . $conn->error);
                  $stmt_insert_answer_final->bind_param("iii", $attempt_id, $question_id_loop, $is_correct_answer_for_db);
-            } else { // If answered
+            } else { 
                  $stmt_insert_answer_final = $conn->prepare("INSERT INTO user_answers (attempt_id, question_id, selected_option_id, is_correct) VALUES (?, ?, ?, ?)");
                  if(!$stmt_insert_answer_final) throw new Exception("ব্যবহারকারীর উত্তর সংরক্ষণ स्टेटमेंट প্রস্তুত করতে সমস্যা হয়েছে: " . $conn->error);
                  $stmt_insert_answer_final->bind_param("iiii", $attempt_id, $question_id_loop, $selected_option_id, $is_correct_answer_for_db);
@@ -273,15 +298,12 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['quiz_id']) && isset($_
             $stmt_insert_answer_final->close();
         }
 
-        // Calculate final score with negative marking
-        $penalty = $incorrect_answers_count * 0.20; // <--- পেনাল্টি হিসাব করুন
-        $final_raw_score = $questions_answered_correctly - $penalty; // <--- পেনাল্টি বাদ দিন
-        $total_score = max(0, $final_raw_score); // <--- স্কোর যেন ০ এর নিচে না যায়
+        $penalty = $incorrect_answers_count_post * 0.20; 
+        $final_raw_score = $questions_answered_correctly_post - $penalty; 
+        $total_score = max(0, $final_raw_score); 
 
-        // Update quiz_attempts table
         $sql_update_attempt = "UPDATE quiz_attempts SET score = ?, end_time = ?, time_taken_seconds = ?, submitted_at = NOW() WHERE id = ? AND user_id = ?";
         $stmt_update_attempt = $conn->prepare($sql_update_attempt);
-        // Use 'd' for double since score can be decimal now
         $stmt_update_attempt->bind_param("dsiii", $total_score, $end_time, $time_taken_seconds, $attempt_id, $user_id);
         if (!$stmt_update_attempt->execute()) {
              throw new Exception("কুইজের চেষ্টা আপডেট করতে সমস্যা হয়েছে: " . $stmt_update_attempt->error);
@@ -290,12 +312,16 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['quiz_id']) && isset($_
 
         $conn->commit();
 
-        // Prepare data for display using the common function
+        // After commit, fetch all data for display using the common function
         $results_display_data = prepare_results_data($conn, $attempt_id, $quiz_id, $user_id);
         if ($results_display_data['success']) {
-            extract($results_display_data); // Extracts variables for the view
+            extract($results_display_data); 
+            // Set global chart variables explicitly after extract for POST case
+            $correct_answers_count_for_chart = $results_display_data['correct_answers_count'];
+            $incorrect_answers_count_for_chart = $results_display_data['incorrect_answers_count_raw'];
+            $unanswered_questions_count_for_chart = $results_display_data['unanswered_questions_count'];
+
         } else {
-            // If prepare_results_data fails (e.g., flash message already set by it)
             header("Location: quizzes.php");
             exit;
         }
@@ -321,17 +347,13 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['quiz_id']) && isset($_
         exit;
     }
 
-    // Prepare data for display using the common function
     $results_display_data = prepare_results_data($conn, $attempt_id, $quiz_id, $user_id);
 
     if ($results_display_data['success']) {
-        extract($results_display_data); // Extracts variables like $page_title, $total_score etc.
+        extract($results_display_data);
+        // Global chart variables are already set inside prepare_results_data
     } else {
-        // If prepare_results_data fails (e.g., flash message already set by it)
-        // The prepare_results_data function itself handles redirection if not admin and not owner.
-        // If it returns success=false for other reasons, we might redirect generally or show an error here.
-        // For now, assuming the redirect inside prepare_results_data covers the main auth failure case.
-        if (!isset($_SESSION['flash_message'])) { // If no specific flash message was set by the function
+        if (!isset($_SESSION['flash_message'])) {
              $_SESSION['flash_message'] = "ফলাফল দেখাতে একটি সমস্যা হয়েছে।";
              $_SESSION['flash_message_type'] = "danger";
         }
@@ -347,13 +369,14 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['quiz_id']) && isset($_
 }
 
 // header.php must be included AFTER $page_title is set
-require_once 'includes/header.php'; //
+require_once 'includes/header.php';
 ?>
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script> <?php // Chart.js CDN ?>
 
 <style>
-/* Print specific styles */
+/* Print specific styles - unchanged */
 @media print {
-    /* ... (আপনার বর্তমান প্রিন্ট স্টাইল অপরিবর্তিত থাকবে) ... */
+    /* ... your existing print styles ... */
     body * {
         visibility: hidden;
     }
@@ -382,90 +405,83 @@ require_once 'includes/header.php'; //
      .badge.bg-success-subtle, .badge.bg-danger-subtle, .badge.bg-warning-subtle {
         border: 1px solid #ccc !important; /* Consistent border */
     }
-    /* Ensure text colors for badges are distinguishable in print if needed */
     .text-success-emphasis { color: #0f5132 !important; }
     .text-danger-emphasis { color: #581c24 !important; }
     .text-warning-emphasis { color: #664d03 !important; }
 
-
-    /* Hide non-essential elements for print */
     .btn, .alert:not(.print-header-message), .timer-progress-bar, footer, header, .navbar, .footer,
-    .feedback-message, /* Hide the colorful feedback message */
-    .text-center.mb-4:has(h3), /* Hide the main score display */
-    .text-center.mb-4:has(a.btn-info), /* Hide ranking button container */
+    .feedback-message, 
+    .text-center.mb-4:has(h3), 
+    .text-center.mb-4:has(a.btn-info), 
     hr,
-    .card.shadow-sm > .card-header.bg-light, /* Hide the main card header */
-    .card.shadow-sm > .card-body.p-4 > hr, /* Hide hr in main card body */
-    .card.shadow-sm > .card-body.p-4 > .text-center.mt-4 /* Hide bottom buttons container */
+    .card.shadow-sm > .card-header.bg-light, 
+    .card.shadow-sm > .card-body.p-4 > hr, 
+    .card.shadow-sm > .card-body.p-4 > .text-center.mt-4,
+    #quizResultChartContainer /* Hide chart container in print */
      {
         display: none !important;
     }
 
-    .print-header { /* Header for print */
+    .print-header {
         visibility: visible;
         text-align: center;
         margin-bottom: 20px;
-        font-size: 1.4rem; /* Adjust as needed */
+        font-size: 1.4rem; 
         font-weight: bold;
         width: 100%;
     }
-    .print-header-message { /* For messages like "আপনি এই প্রশ্নের উত্তর দেননি।" */
+    .print-header-message {
         visibility: visible;
-        display: block !important; /* Ensure it's displayed */
+        display: block !important; 
     }
-
-    /* Layout for answer review in print */
     .answer-review {
         column-count: 2;
         column-gap: 20px;
-        font-size: 10pt; /* Smaller font for print */
+        font-size: 10pt; 
     }
-    .question-image-review { /* Style for images in print review */
-        max-height: 120px; /* Adjust as needed for print layout */
+    .question-image-review {
+        max-height: 120px; 
         margin-bottom: 5px;
     }
-
     .answer-review .card {
         page-break-inside: avoid;
         break-inside: avoid-column;
-        width: 100%; /* Ensure full width within column */
-        margin-bottom: 15px !important; /* Space between cards in print */
-        font-size: inherit; /* Inherit from .answer-review */
-        border: 1px solid #ddd !important; /* Add a light border to cards in print */
+        width: 100%; 
+        margin-bottom: 15px !important;
+        font-size: inherit; 
+        border: 1px solid #ddd !important; 
     }
     .answer-review .card-header, .answer-review .card-body {
         padding: 0.5rem !important;
         font-size: inherit;
-        border: none !important; /* Remove internal borders of card parts for cleaner print */
+        border: none !important; 
     }
     .answer-review .list-group-item {
         padding: 0.3rem 0.5rem !important;
-        font-size: 0.9em; /* Slightly smaller options text */
-        border: 1px solid #eee !important; /* Border for options in print */
+        font-size: 0.9em; 
+        border: 1px solid #eee !important; 
     }
     .answer-review .card-header strong {
-        font-size: 1.1em; /* Slightly larger question number */
+        font-size: 1.1em;
     }
-    .answer-review .mt-3.p-2.bg-light.border.rounded { /* Explanation box */
+    .answer-review .mt-3.p-2.bg-light.border.rounded { 
         padding: 0.3rem !important;
         font-size: 0.9em;
         margin-top: 0.5rem !important;
-        background-color: #f8f9fa !important; /* Light background for explanation */
+        background-color: #f8f9fa !important;
         border: 1px solid #ddd !important;
     }
-    /* Hide the on-screen "উত্তর পর্যালোচনা" heading for print as we have .print-header */
-    #printableArea > h3.mt-4.mb-3 { /* Specifically target the H3 for review section title */
+    #printableArea > h3.mt-4.mb-3 { 
         display: none !important;
     }
-    /* Ensure "Print" and "Back to Quizzes" buttons are hidden in print */
-    .container.mt-5 > .card.shadow-sm > .card-body.p-4 > .text-center.my-3:has(button) { /* Target the specific div holding the print button */
+    .container.mt-5 > .card.shadow-sm > .card-body.p-4 > .text-center.my-3:has(button) { 
         display: none !important;
     }
 }
-.question-image-review { /* General style for images in review on screen */
+.question-image-review { 
     max-width: 100%;
     height: auto;
-    max-height: 200px; /* Adjust for screen */
+    max-height: 200px;
     margin-bottom: 10px;
     border-radius: 4px;
     display: block;
@@ -473,6 +489,12 @@ require_once 'includes/header.php'; //
     margin-right: auto;
     border: 1px solid #eee;
     padding: 3px;
+}
+/* Style for chart container */
+#quizResultChartContainer {
+    max-width: 450px; /* Adjust as needed */
+    height: 300px;    /* Adjust as needed */
+    margin: 20px auto;
 }
 </style>
 
@@ -484,43 +506,37 @@ require_once 'includes/header.php'; //
         </div>
         <div class="card-body p-4">
             <div class="text-center mb-4">
-                <h3>আপনি পেয়েছেন: <strong class="text-primary"><?php echo number_format($total_score, 2); // দশমিক সহ স্কোর দেখান ?> / <?php echo $total_questions_in_quiz; ?></strong></h3>
+                <h3>আপনি পেয়েছেন: <strong class="text-primary"><?php echo number_format($total_score, 2); ?> / <?php echo $total_questions_in_quiz; ?></strong></h3>
                 <p class="feedback-message <?php echo $feedback_class; ?>">এই পরীক্ষায় আপনার প্রস্তুতি ছিল: <?php echo $feedback_message; ?></p>
                 <?php if ($time_taken_seconds !== null): ?>
                 <p class="text-muted">সময় লেগেছে: <?php echo format_seconds_to_hms($time_taken_seconds); ?> (ঘন্টা:মিনিট:সেকেন্ড)</p>
                 <?php endif; ?>
             </div>
 
+            <div id="quizResultChartContainer" class="mb-4">
+                <canvas id="quizResultChart"></canvas>
+            </div>
             <div class="text-center mb-4">
                 <?php
-                // Determine if ranking should be shown immediately
                 $show_ranking_now = true;
-                $ranking_button_text = "আপনার র‍্যাংকিং দেখুন"; // Default text
+                $ranking_button_text = "আপনার র‍্যাংকিং দেখুন"; 
 
-                // If quiz_info_result is available and the quiz is live
                 if ($quiz_info_result && $quiz_info_result['status'] == 'live') {
-                    // If there's a specific live end time
                     if (!empty($quiz_info_result['live_end_datetime'])) {
                         try {
                             $live_end = new DateTime($quiz_info_result['live_end_datetime']);
                             $now = new DateTime();
                             if ($now < $live_end) {
-                                // If current time is before live end time, ranking is not final
                                 $show_ranking_now = false;
-                                // $ranking_button_text = "র‍্যাংকিং দেখুন (লাইভ চলছে)"; // Optional: change text
                             }
                         } catch (Exception $e) {
-                            // Invalid date format, assume ranking can be shown
+                            // Invalid date format
                         }
                     } else {
-                        // If live quiz has no end time (e.g., ongoing indefinitely until manually archived)
-                        // Ranking can be shown but it's not "final" in the sense of a timed competition
-                         $show_ranking_now = true; // Or set to false if you want to delay for such quizzes too
-                         // $ranking_button_text = "বর্তমান র‍্যাংকিং দেখুন";
+                         $show_ranking_now = true; 
                     }
                 }
-                // For archived, upcoming, draft quizzes, ranking (if available) can be shown.
-
+                
                 if ($show_ranking_now) {
                     echo '<a href="ranking.php?quiz_id=' . $quiz_id . '&attempt_id=' . $attempt_id . '" class="btn btn-info">' . $ranking_button_text . '</a>';
                 } else {
@@ -553,14 +569,12 @@ require_once 'includes/header.php'; //
                                     <?php
                                     $user_correct_for_this_q = false;
                                     $correct_option_id_for_this_q = null;
-                                    // Determine the correct option ID for this question
                                     foreach ($question['options_list'] as $option) {
                                         if ($option['is_correct'] == 1) {
                                             $correct_option_id_for_this_q = $option['id'];
                                             break;
                                         }
                                     }
-                                    // Check if user's selected option (if any) was the correct one
                                     if ($question['user_selected_option_id'] !== null && $question['user_selected_option_id'] == $correct_option_id_for_this_q) {
                                         $user_correct_for_this_q = true;
                                     }
@@ -569,17 +583,15 @@ require_once 'includes/header.php'; //
                                         <?php
                                         $option_class = 'list-group-item';
                                         $option_label = '';
-                                        // Check if this option was selected by the user
                                         if ($option['id'] == $question['user_selected_option_id']) {
                                             if ($option['is_correct'] == 1) {
-                                                $option_class .= ' correct-user-answer'; // User selected the correct answer
+                                                $option_class .= ' correct-user-answer'; 
                                                 $option_label = ' <span class="badge bg-success-subtle text-success-emphasis rounded-pill">আপনার সঠিক উত্তর</span>';
                                             } else {
-                                                $option_class .= ' incorrect-user-answer'; // User selected an incorrect answer
+                                                $option_class .= ' incorrect-user-answer';
                                                 $option_label = ' <span class="badge bg-danger-subtle text-danger-emphasis rounded-pill">আপনার ভুল উত্তর</span>';
                                             }
                                         } elseif ($option['is_correct'] == 1) {
-                                            // This is the correct answer, but user didn't select it (or selected something else)
                                             $option_class .= ' actual-correct-answer';
                                             $option_label = ' <span class="badge bg-warning-subtle text-warning-emphasis rounded-pill">সঠিক উত্তর</span>';
                                         }
@@ -590,7 +602,7 @@ require_once 'includes/header.php'; //
                                     </li>
                                     <?php endforeach; ?>
                                 </ul>
-                                <?php if ($question['user_selected_option_id'] === null && !$user_correct_for_this_q) : // User did not answer and it was not correct (implicitly) ?>
+                                <?php if ($question['user_selected_option_id'] === null && !$user_correct_for_this_q) : ?>
                                      <p class="mt-2 mb-0 text-warning print-header-message">আপনি এই প্রশ্নের উত্তর দেননি।</p>
                                 <?php endif; ?>
 
@@ -606,10 +618,11 @@ require_once 'includes/header.php'; //
                         <p class="alert alert-info print-header-message">এই ফলাফলের জন্য উত্তর পর্যালোচনা উপলব্ধ নয় অথবা কোনো প্রশ্ন পাওয়া যায়নি।</p>
                     <?php endif; ?>
                 </div>
-            </div> <div class="text-center mt-4">
+            </div> 
+            <div class="text-center mt-4">
                 <button onclick="printAnswerSheet()" class="btn btn-outline-primary">উত্তরপত্র প্রিন্ট করুন</button>
                 <a href="quizzes.php" class="btn btn-secondary">সকল কুইজে ফিরে যান</a>
-                 <a href="profile.php" class="btn btn-outline-primary">আমার প্রোফাইল</a>
+                <a href="profile.php" class="btn btn-outline-primary">আমার প্রোফাইল</a>
             </div>
         </div>
     </div>
@@ -619,11 +632,105 @@ require_once 'includes/header.php'; //
 function printAnswerSheet() {
     window.print();
 }
+
+document.addEventListener('DOMContentLoaded', function() {
+    const ctx = document.getElementById('quizResultChart');
+    if (ctx) {
+        const correctAnswers = <?php echo $correct_answers_count_for_chart; ?>;
+        const incorrectAnswers = <?php echo $incorrect_answers_count_for_chart; ?>;
+        const unansweredQuestions = <?php echo $unanswered_questions_count_for_chart; ?>;
+        const totalQuestionsForChart = <?php echo $total_questions_in_quiz; ?>;
+
+        let finalUnanswered = unansweredQuestions;
+         // Ensure sum of parts equals total for chart display
+        if (totalQuestionsForChart > 0 && (correctAnswers + incorrectAnswers + unansweredQuestions) !== totalQuestionsForChart) {
+            finalUnanswered = totalQuestionsForChart - (correctAnswers + incorrectAnswers);
+            if (finalUnanswered < 0) finalUnanswered = 0;
+        }
+        
+        // Ensure chart is only rendered if there are questions
+        if (totalQuestionsForChart > 0) {
+            new Chart(ctx, {
+                type: 'pie', // আপনি 'bar' ও ব্যবহার করতে পারেন
+                data: {
+                    labels: ['সঠিক উত্তর', 'ভুল উত্তর', 'উত্তর দেননি'],
+                    datasets: [{
+                        label: 'ফলাফলের পরিসংখ্যান',
+                        data: [correctAnswers, incorrectAnswers, finalUnanswered],
+                        backgroundColor: [
+                            'rgba(75, 192, 192, 0.7)',  // সবুজ (সঠিক)
+                            'rgba(255, 99, 132, 0.7)',   // লাল (ভুল)
+                            'rgba(201, 203, 207, 0.7)'   // ধূসর (উত্তর দেননি)
+                        ],
+                        borderColor: [
+                            'rgba(75, 192, 192, 1)',
+                            'rgba(255, 99, 132, 1)',
+                            'rgba(201, 203, 207, 1)'
+                        ],
+                        borderWidth: 1
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            position: 'top',
+                             labels: {
+                                font: {
+                                    family: 'SolaimanLipi, Noto Sans Bengali, sans-serif'
+                                }
+                            }
+                        },
+                        title: {
+                            display: true,
+                            text: 'কুইজের পরিসংখ্যান',
+                            font: {
+                                size: 16,
+                                family: 'SolaimanLipi, Noto Sans Bengali, sans-serif'
+                            }
+                        },
+                        tooltip: {
+                            callbacks: {
+                                label: function(context) {
+                                    let label = context.label || '';
+                                    if (label) {
+                                        label += ': ';
+                                    }
+                                    if (context.parsed !== null) {
+                                        label += context.parsed;
+                                        if (totalQuestionsForChart > 0) {
+                                            const percentage = ((context.parsed / totalQuestionsForChart) * 100).toFixed(1);
+                                            label += ` (${percentage}%)`;
+                                        }
+                                    }
+                                    return label;
+                                }
+                            },
+                             bodyFont: {
+                                family: 'SolaimanLipi, Noto Sans Bengali, sans-serif'
+                            },
+                            titleFont: {
+                                 family: 'SolaimanLipi, Noto Sans Bengali, sans-serif'
+                            }
+                        }
+                    }
+                }
+            });
+        } else {
+            // যদি কোনো প্রশ্ন না থাকে, তাহলে চার্ট কন্টেইনার বা ক্যানভাস হাইড করুন
+            const chartContainer = document.getElementById('quizResultChartContainer');
+            if(chartContainer) {
+                chartContainer.innerHTML = '<p class="text-muted text-center">ফলাফল পরিসংখ্যান দেখানোর জন্য কোনো প্রশ্ন ছিল না।</p>';
+            }
+        }
+    }
+});
 </script>
 
 <?php
 if ($conn) {
     $conn->close();
 }
-require_once 'includes/footer.php'; //
+require_once 'includes/footer.php';
 ?>
