@@ -27,10 +27,11 @@ document.addEventListener('DOMContentLoaded', function() {
         try {
             if (navigator.share) {
                 await navigator.share(shareData);
-                // You could add a brief "Shared!" message if desired, though system UI usually handles this.
+                // console.log('Quiz shared successfully');
             } else {
                 // Fallback: Copy to clipboard
                 await navigator.clipboard.writeText(url);
+                // console.log('Link copied to clipboard');
                 
                 buttonElement.innerHTML = `
                     <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-check-lg me-1" viewBox="0 0 16 16">
@@ -38,20 +39,19 @@ document.addEventListener('DOMContentLoaded', function() {
                     </svg>
                     কপি হয়েছে!`;
                 
-                // Change button style to indicate success
-                buttonElement.className = originalButtonClasses.replace(/btn-outline-\w+-?\w*/g, '').replace(/btn-\w+-?\w*/g, ''); // Remove existing btn classes
+                buttonElement.className = originalButtonClasses.replace(/btn-outline-\w+-?\w*/g, '').replace(/btn-\w+-?\w*/g, ''); 
                 buttonElement.classList.add('btn', successClass);
 
 
                 setTimeout(() => {
                     buttonElement.innerHTML = originalButtonInnerHTML;
-                    buttonElement.className = originalButtonClasses; // Restore all original classes
+                    buttonElement.className = originalButtonClasses; 
                 }, 2500);
             }
         } catch (err) {
-            console.error('Error sharing quiz:', err);
-            // Fallback for older browsers or if user denies permission
-            alert(`কুইজটি শেয়ার করতে এই লিংকটি কপি করুন: ${url}`);
+            console.error('Error sharing quiz or copying link:', err);
+            // Fallback alert removed as per user request
+            // alert(`কুইজটি শেয়ার করতে এই লিংকটি কপি করুন: ${url}`); 
         }
     }
 });
