@@ -177,7 +177,7 @@ require_once 'includes/header.php';
     <?php display_flash_message(); ?>
 
     <?php if (!empty($categories)): ?>
-        <div class="row row-cols-2 row-cols-sm-2 row-cols-md-3 row-cols-lg-4 g-4"> {/* মোবাইলে ২টি, sm-এ ২টি, md-এ ৩টি, lg-এ ৪টি */}
+        <div class="row row-cols-2 row-cols-sm-2 row-cols-md-3 row-cols-lg-4 g-4">
             <?php foreach ($categories as $index => $category): 
                 // গ্র্যাডিয়েন্ট কালার নির্ধারণ
                 $current_gradient = $gradient_colors[$index % $num_colors];
@@ -187,8 +187,7 @@ require_once 'includes/header.php';
                         <?php if (!empty($category['icon_class'])): ?>
                             <div class="card-icon"><i class="<?php echo htmlspecialchars($category['icon_class']); ?>"></i></div>
                         <?php else: ?>
-                             <div class="card-icon"><i class="fas fa-tags"></i></div> {/* Font Awesome আইকন */ }
-                        <?php endif; ?>
+                             <div class="card-icon"><i class="fas fa-tags"></i></div> 
                         <h5 class="card-title"><?php echo htmlspecialchars($category['name']); ?></h5>
                         
                         <div class="category-description-placeholder">
