@@ -12,7 +12,7 @@ $total_questions_in_category = 0;
 
 // ডিফল্ট মান
 $default_num_questions = 10;
-$default_duration_minutes = 0; // ০ মানে কোনো সময়সীমা নেই
+$default_duration_minutes = 5; // ০ মানে কোনো সময়সীমা নেই
 
 // প্রথমে POST থেকে মান নেওয়ার চেষ্টা করুন, না পেলে GET, সবশেষে ডিফল্ট
 if (isset($_POST['num_questions'])) {
