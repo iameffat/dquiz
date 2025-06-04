@@ -165,7 +165,7 @@ require_once 'includes/header.php';
                 // ডাইনামিক সলিড কালার (যদি ব্যবহার করতে চান)
                 // $solid_colors অ্যারেটি (যা আগের উত্তরে ছিল) এখানে আবার যোগ করতে পারেন 
                 // এবং $current_solid_color = $solid_colors[$index % count($solid_colors)]; ব্যবহার করতে পারেন
-                // <div class="home-category-card" style="background-color: <?php echo $current_solid_color; ?>;">
+                // <div class="home-category-card" style="background-color: <?php echo $current_solid_color; ?>
             ?>
                 <div class="col">
                     <div class="home-category-card"> 
