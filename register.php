@@ -74,12 +74,8 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
         if (isset($_POST['cf-turnstile-response']) && !empty($_POST['cf-turnstile-response'])) {
             $turnstile_token = $_POST['cf-turnstile-response'];
             // গুরুত্বপূর্ণ: আপনার আসল Secret Key এখানে ব্যবহার করুন
-            $secret_key = get_site_setting('cloudflare_turnstile_secret_key', 'YOUR_FALLBACK_SECRET_KEY'); // فال بیک کے طور پر آپ کی خفیہ کلید
-            if ($secret_key === 'YOUR_FALLBACK_SECRET_KEY' || empty($secret_key)) {
-                 error_log("Cloudflare Turnstile Secret Key is not configured in site_settings.");
-                 // আপনি চাইলে এখানে একটি সাধারণ এরর দেখাতে পারেন অথবা ডিফল্ট behaviour এ ফিরে যেতে পারেন
-            }
-
+            $secret_key = '0x4AAAAAABfuh_4bXftQJeiM0UhI6HVZ8GM'; 
+            
             $verification_result = verify_cloudflare_turnstile($turnstile_token, $secret_key);
 
             if (!$verification_result['success']) {
@@ -111,7 +107,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
         }
 
         // Check if email already exists (moved here)
-        if (empty($errors['email']) && empty($errors['mobile'])) { // Only check if email format was valid and mobile not already errored
+        if (empty($errors['email'])) { // Only check if email format was valid
             $sql_check_email = "SELECT id FROM users WHERE email = ?";
             if ($stmt_check_email = $conn->prepare($sql_check_email)) {
                 $stmt_check_email->bind_param("s", $param_email);
@@ -135,25 +131,23 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
     // If still no errors, proceed to insert into database
     if (empty($errors)) {
         $hashed_password = password_hash($password, PASSWORD_DEFAULT);
-        $registration_ip = get_user_ip(); // আইপি অ্যাড্রেস পান
 
-        $sql_insert_user = "INSERT INTO users (name, mobile_number, email, address, password, registration_ip) VALUES (?, ?, ?, ?, ?, ?)";
+        $sql_insert_user = "INSERT INTO users (name, mobile_number, email, address, password) VALUES (?, ?, ?, ?, ?)";
         
         if ($stmt_insert = $conn->prepare($sql_insert_user)) {
-            $stmt_insert->bind_param("ssssss", $param_name, $param_mobile, $param_email, $param_district_name, $param_password, $param_reg_ip);
+            $stmt_insert->bind_param("sssss", $param_name, $param_mobile, $param_email, $param_district_name, $param_password);
             
             $param_name = $name;
             $param_mobile = $mobile_number;
             $param_email = $email;
-            $param_district_name = $district_name; // This is 'address' column in DB
+            $param_district_name = $district_name;
             $param_password = $hashed_password;
-            $param_reg_ip = $registration_ip;
             
             if ($stmt_insert->execute()) {
                 $_SESSION['flash_message'] = "রেজিস্ট্রেশন সফল হয়েছে! অনুগ্রহ করে লগইন করুন।";
                 $_SESSION['flash_message_type'] = "success";
 
-                // $login_redirect_param = ''; // Unused variable
+                $login_redirect_param = '';
                 if (isset($_SESSION['redirect_url_on_register_init'])) {
                     $_SESSION['redirect_url_user'] = $_SESSION['redirect_url_on_register_init'];
                     unset($_SESSION['redirect_url_on_register_init']); 
@@ -177,7 +171,7 @@ require_once 'includes/header.php';
 <div class="auth-form">
     <h2 class="text-center mb-4">নতুন একাউন্ট তৈরি করুন</h2>
 
-    <?php display_flash_message(); // This will display any general flash messages like 'Registration successful' ?>
+    <?php display_flash_message(); ?>
 
     <?php if (!empty($errors['db'])): ?>
         <div class="alert alert-danger"><?php echo $errors['db']; ?></div>
@@ -221,14 +215,7 @@ require_once 'includes/header.php';
         </div>
 
         <div class="mb-3">
-            <?php 
-            $turnstile_site_key = get_site_setting('cloudflare_turnstile_site_key', 'YOUR_FALLBACK_SITE_KEY'); 
-            if ($turnstile_site_key === 'YOUR_FALLBACK_SITE_KEY' || empty($turnstile_site_key)) {
-                error_log("Cloudflare Turnstile Site Key is not configured in site_settings.");
-                 // আপনি চাইলে এখানে একটি ইউজার-ফেসিং বার্তা দেখাতে পারেন যে ক্যাপচা লোড হয়নি
-            }
-            ?>
-            <div class="cf-turnstile" data-sitekey="<?php echo htmlspecialchars($turnstile_site_key); ?>" data-theme="auto"></div>
+            <div class="cf-turnstile" data-sitekey="0x4AAAAAABfuh1aGZng_WR9b" data-theme="auto"></div>
             <?php if (!empty($errors['captcha'])): ?><div class="text-danger small mt-1"><?php echo $errors['captcha']; ?></div><?php endif; ?>
         </div>
 

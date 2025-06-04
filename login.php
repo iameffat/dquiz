@@ -41,11 +41,8 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
     if (empty($errors)) { // Only proceed if identifier and password are not empty
         if (isset($_POST['cf-turnstile-response']) && !empty($_POST['cf-turnstile-response'])) {
             $turnstile_token = $_POST['cf-turnstile-response'];
-            
-            $secret_key = get_site_setting('cloudflare_turnstile_secret_key', 'YOUR_FALLBACK_SECRET_KEY'); 
-            if ($secret_key === 'YOUR_FALLBACK_SECRET_KEY' || empty($secret_key)) {
-                 error_log("Cloudflare Turnstile Secret Key is not configured in site_settings.");
-            }
+            // গুরুত্বপূর্ণ: আপনার আসল Secret Key এখানে ব্যবহার করুন
+            $secret_key = '0x4AAAAAABfuh_4bXftQJeiM0UhI6HVZ8GM'; 
             
             $verification_result = verify_cloudflare_turnstile($turnstile_token, $secret_key);
 
@@ -79,20 +76,6 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
                             $_SESSION["email"] = $db_email; 
                             $_SESSION["mobile_number"] = $db_mobile; 
                             $_SESSION["role"] = $role;
-
-                            // সর্বশেষ লগইন আইপি এবং সময় আপডেট করুন
-                            $last_login_ip = get_user_ip();
-                            $current_time = date('Y-m-d H:i:s'); // যদি ডাটাবেসে last_login_time কলাম থাকে
-
-                            // Assuming you have a 'last_login_time' column too, if not, remove it from SQL
-                            $sql_update_login_info = "UPDATE users SET last_login_ip = ?, last_login_time = NOW() WHERE id = ?";
-                            if ($stmt_update_ip = $conn->prepare($sql_update_login_info)) {
-                                $stmt_update_ip->bind_param("si", $last_login_ip, $id);
-                                $stmt_update_ip->execute();
-                                $stmt_update_ip->close();
-                            } else {
-                                error_log("Failed to update last_login_ip/time: " . $conn->error);
-                            }
                             
                             if (isset($_SESSION['redirect_url_user'])) {
                                 $redirect_url = $_SESSION['redirect_url_user'];
@@ -118,7 +101,9 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
              $errors['login'] = "ডাটাবেস সমস্যা: " . $conn->error;
         }
     }
-    // Connection will be closed in footer.php, so no $conn->close() here unless it's the end of script without including footer
+    if ($conn) { 
+       // $conn->close(); // Connection will be closed in footer
+    }
 }
 
 require_once 'includes/header.php';
@@ -150,16 +135,10 @@ require_once 'includes/header.php';
         </div>
         
         <div class="mb-3">
-            <?php 
-            $turnstile_site_key_login = get_site_setting('cloudflare_turnstile_site_key', 'YOUR_FALLBACK_SITE_KEY'); 
-            if ($turnstile_site_key_login === 'YOUR_FALLBACK_SITE_KEY' || empty($turnstile_site_key_login)) {
-                error_log("Cloudflare Turnstile Site Key is not configured in site_settings for login page.");
-            }
-            ?>
-            <div class="cf-turnstile" data-sitekey="<?php echo htmlspecialchars($turnstile_site_key_login); ?>" data-theme="auto"></div>
-            <?php if (!empty($errors['captcha']) && !empty($errors['login_identifier'].$errors['password']) ): ?>
-                <?php // Specific captcha error display handled above if only captcha fails ?>
-            <?php endif; ?>
+            <div class="cf-turnstile" data-sitekey="0x4AAAAAABfuh1aGZng_WR9b" data-theme="auto"></div>
+
+            <?php if (!empty($errors['captcha']) && !empty($errors['login_identifier'].$errors['password']) ): // Show captcha specific error only if other fields might be valid, or it was already handled by general $errors['login'] ?>
+                <?php endif; ?>
         </div>
 
         <div class="mb-3">
@@ -176,6 +155,8 @@ require_once 'includes/header.php';
     echo $redirect_param_for_register_link;
 ?>">রেজিস্টার করুন</a></p>
 <?php 
-// No $conn->close() here because footer.php handles it.
+if ($conn && $conn->ping()) { 
+    // $conn->close(); 
+}
 include 'includes/footer.php'; 
 ?>
