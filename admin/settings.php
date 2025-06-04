@@ -1,14 +1,15 @@
 <?php
-$page_title = "সাইট সেটিংস";
+$page_title = "সাইট সেটিংস"; // Updated page title for broader scope
 $admin_base_url = ''; // Current directory is admin/
-require_once '../includes/db_connect.php';
-require_once 'includes/auth_check.php'; //
+require_once '../includes/db_connect.php'; // CLOUDFLARE_* constants should be available now
+require_once 'includes/auth_check.php';
 require_once '../includes/functions.php';
 
 $feedback_message = "";
 $message_type = "";
 
-// Function to purge Cloudflare Cache (existing code)
+// Function to purge Cloudflare Cache
+// This function can also be moved to includes/functions.php if you prefer
 if (!function_exists('purge_cloudflare_cache')) {
     function purge_cloudflare_cache() {
         if (!defined('CLOUDFLARE_ZONE_ID') || 
@@ -57,10 +58,10 @@ if (!function_exists('purge_cloudflare_cache')) {
         $ch = curl_init();
         curl_setopt($ch, CURLOPT_URL, $url);
         curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
-        curl_setopt($ch, CURLOPT_POST, true);
+        curl_setopt($ch, CURLOPT_POST, true); // Changed from CUSTOMREQUEST
         curl_setopt($ch, CURLOPT_POSTFIELDS, json_encode($data));
         curl_setopt($ch, CURLOPT_HTTPHEADER, $headers);
-        curl_setopt($ch, CURLOPT_TIMEOUT, 30); 
+        curl_setopt($ch, CURLOPT_TIMEOUT, 30); // 30 seconds timeout
 
         $response = curl_exec($ch);
         $http_code = curl_getinfo($ch, CURLINFO_HTTP_CODE);
@@ -85,41 +86,11 @@ if (!function_exists('purge_cloudflare_cache')) {
                 }
                 $error_message_detail .= " Details: " . implode(", ", $error_details_cf);
             } elseif ($response) {
-                $error_message_detail .= " Response: " . htmlentities(substr($response, 0, 200));
+                $error_message_detail .= " Response: " . htmlentities(substr($response, 0, 200)); // Show part of response
             }
             error_log("Cloudflare Purge API Error (HTTP {$http_code}): " . $response);
             return ['success' => false, 'message' => $error_message_detail . " (HTTP Code: {$http_code})"];
         }
-    }
-} //
-
-// Function to Optimize Database Tables
-if (!function_exists('optimize_database_tables')) {
-    function optimize_database_tables($conn) {
-        $tables_to_optimize = ['quizzes', 'questions', 'options', 'users', 'quiz_attempts', 'study_materials', 'site_settings']; // আপনার প্রধান টেবিলগুলোর নাম
-        $results = [];
-        $all_successful = true;
-
-        foreach ($tables_to_optimize as $table) {
-            $sql = "OPTIMIZE TABLE `{$table}`";
-            if ($conn->query($sql)) {
-                // OPTIMIZE TABLE এর আউটপুট সাধারণত একটু জটিল হয়, তাই সাধারণ সাফল্যের বার্তা দেখানো হচ্ছে
-                $result_msg_query = $conn->query("SELECT TABLE_NAME, STATUS FROM information_schema.TABLES WHERE TABLE_NAME = '{$table}'");
-                $status_row = $result_msg_query->fetch_assoc();
-                $op_status = ($status_row && isset($status_row['STATUS'])) ? $status_row['STATUS'] : 'OK (assumed)';
-                 if (strpos(strtolower($op_status), 'error') !== false) {
-                    $results[] = "টেবিল `{$table}` অপটিমাইজেশনে সমস্যা হয়েছে।";
-                    $all_successful = false;
-                 } else {
-                    $results[] = "টেবিল `{$table}` সফলভাবে অপটিমাইজ করা হয়েছে।";
-                 }
-
-            } else {
-                $results[] = "টেবিল `{$table}` অপটিমাইজ করতে সমস্যা হয়েছে: " . $conn->error;
-                $all_successful = false;
-            }
-        }
-        return ['success' => $all_successful, 'message' => "ডাটাবেস অপটিমাইজেশন প্রক্রিয়া সম্পন্ন হয়েছে।<br>" . implode("<br>", $results)];
     }
 }
 
@@ -140,14 +111,13 @@ $upcoming_quiz_end_date = isset($current_settings['upcoming_quiz_end_date']) ? $
 
 // Handle Form Submissions
 if ($_SERVER["REQUEST_METHOD"] == "POST") {
-    if (isset($_POST['save_homepage_settings'])) {
-        // ... (existing homepage settings logic - unchanged) ...
+    if (isset($_POST['save_homepage_settings'])) { // Existing settings form
         $posted_enabled = isset($_POST['upcoming_quiz_enabled']) ? '1' : '0';
         $posted_title = trim($_POST['upcoming_quiz_title']);
         $posted_end_date = trim($_POST['upcoming_quiz_end_date']);
 
         $errors_homepage = [];
-        if (empty($posted_title) && $posted_enabled === '1') {
+        if (empty($posted_title) && $posted_enabled === '1') { // Title required only if enabled
             $errors_homepage[] = "আপকামিং কুইজের শিরোনাম খালি রাখা যাবে না যখন সেকশনটি সক্রিয় থাকবে।";
         }
         if ($posted_enabled === '1' && empty($posted_end_date)) {
@@ -163,26 +133,27 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
                 'upcoming_quiz_end_date' => $posted_end_date
             ];
 
-            $all_successful_hp = true;
+            $all_successful = true;
             foreach ($settings_to_update as $key => $value) {
                 $sql_update = "INSERT INTO site_settings (setting_key, setting_value) VALUES (?, ?) ON DUPLICATE KEY UPDATE setting_value = ?";
                 if ($stmt = $conn->prepare($sql_update)) {
                     $stmt->bind_param("sss", $key, $value, $value);
                     if (!$stmt->execute()) {
-                        $all_successful_hp = false;
+                        $all_successful = false;
                         $errors_homepage[] = "Setting '{$key}' সংরক্ষণ করতে সমস্যা হয়েছে: " . $stmt->error;
                     }
                     $stmt->close();
                 } else {
-                    $all_successful_hp = false;
+                    $all_successful = false;
                     $errors_homepage[] = "ডাটাবেস সমস্যা (prepare): " . $conn->error;
                     break;
                 }
             }
 
-            if ($all_successful_hp) {
+            if ($all_successful) {
                 $feedback_message = "হোমপেজ সেটিংস সফলভাবে আপডেট করা হয়েছে।";
                 $message_type = "success";
+                // Re-fetch settings to display updated values
                 $upcoming_quiz_enabled = (bool)$posted_enabled;
                 $upcoming_quiz_title = $posted_title;
                 $upcoming_quiz_end_date = $posted_end_date;
@@ -194,15 +165,10 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
             $feedback_message = "হোমপেজ সেটিংস আপডেটে ত্রুটি: <br>" . implode("<br>", $errors_homepage);
             $message_type = "danger";
         }
-
-    } elseif (isset($_POST['purge_cloudflare_cache_submit'])) {
+    } elseif (isset($_POST['purge_cloudflare_cache_submit'])) { // Cloudflare purge form
         $purge_result = purge_cloudflare_cache();
         $feedback_message = $purge_result['message'];
         $message_type = $purge_result['success'] ? "success" : "danger";
-    } elseif (isset($_POST['optimize_database_submit'])) { // New: Handle Database Optimization
-        $optimize_result = optimize_database_tables($conn); //
-        $feedback_message = $optimize_result['message'];
-        $message_type = $optimize_result['success'] ? "success" : "info"; // Using info for mixed results
     }
 }
 
@@ -213,7 +179,7 @@ require_once 'includes/header.php';
     <h1 class="mt-4"><?php echo $page_title; ?></h1>
     
     <?php if ($feedback_message): ?>
-    <div class="alert alert-<?php echo $message_type; ?> alert-dismissible fade show mt-3" role="alert">
+    <div class="alert alert-<?php echo $message_type === "success" ? "success" : "danger"; ?> alert-dismissible fade show mt-3" role="alert">
         <?php echo $feedback_message; ?>
         <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
     </div>
@@ -276,28 +242,11 @@ require_once 'includes/header.php';
         </div>
     </div>
 
-    <div class="card mt-4">
-        <div class="card-header">
-            ডাটাবেস অপটিমাইজেশন
-        </div>
-        <div class="card-body">
-            <p>ডাটাবেসের প্রধান টেবিলগুলো অপটিমাইজ করে সাইটের পারফরম্যান্স উন্নত করতে সাহায্য করতে পারে। এই কাজটি ডাটাবেসের ফ্র্যাগমেন্টেশন কমায় এবং অব্যবহৃত স্থান পুনরুদ্ধার করে।</p>
-            <form action="<?php echo htmlspecialchars($_SERVER["PHP_SELF"]); ?>" method="post" onsubmit="return confirm('আপনি কি নিশ্চিতভাবে ডাটাবেস টেবিলগুলো অপটিমাইজ করতে চান? এই প্রক্রিয়াটি কিছু সময় নিতে পারে এবং চলার সময় সাইটের পারফরম্যান্সে সামান্য প্রভাব ফেলতে পারে। এটি কম ব্যবহারকারীর সময়ে করার পরামর্শ দেওয়া হচ্ছে।');">
-                <button type="submit" name="optimize_database_submit" class="btn btn-warning">
-                    ডাটাবেস টেবিলগুলো অপটিমাইজ করুন
-                </button>
-            </form>
-            <small class="form-text text-muted mt-2 d-block">
-                <strong>সতর্কতা:</strong> এই বাটন চাপলে আপনার ডাটাবেসের নির্দিষ্ট কিছু টেবিল (`quizzes`, `questions`, `options`, `users`, `quiz_attempts`, `study_materials`, `site_settings`) অপটিমাইজ করা হবে। এটি সাধারণত নিরাপদ, তবে প্রক্রিয়া চলাকালীন ডাটাবেসের উপর কিছুটা অতিরিক্ত চাপ পড়তে পারে। নিয়মিত ব্যাকআপ রাখার পরামর্শ দেওয়া হচ্ছে।
-            </small>
-        </div>
-    </div>
-
 </div>
 
 <?php
 if ($conn) {
-    $conn->close(); //
+    $conn->close();
 }
 require_once 'includes/footer.php';
 ?>
