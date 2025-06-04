@@ -337,7 +337,7 @@ require_once 'includes/header.php';
                                         <li><i>📅</i><small>শেষ হবে: <?php echo format_datetime($quiz['live_end_datetime']); ?></small></li>
                                     <?php endif; ?>
                                 </ul>
-                                <div class="btn-action-group"> {/* Wrapper for buttons */}
+                                <div class="btn-action-group">
                                     <?php if (isset($_SESSION["loggedin"]) && $_SESSION["loggedin"] === true): ?>
                                         <?php if ($attempted_live): ?>
                                             <a href="results.php?attempt_id=<?php echo $attempt_id_live; ?>&quiz_id=<?php echo $quiz['id']; ?>" class="btn btn-action btn-outline-info-custom">ফলাফল দেখুন</a>

@@ -490,7 +490,7 @@ require_once 'includes/header.php';
                             <li><strong>সময়:</strong> <?php echo $quiz['duration_minutes']; ?> মিনিট</li>
                             <li><strong>প্রশ্ন:</strong> <?php echo $quiz['question_count']; ?> টি</li>
                         </ul>
-                        <div class="card-actions-home mt-2"> {/* Wrapper for buttons */}
+                        <div class="card-actions-home mt-2">
                             <?php if ($is_disabled_button): ?>
                                 <button class="btn btn-sm <?php echo $button_class_home; ?>" disabled><?php echo $button_text_home; ?></button>
                             <?php else: ?>
