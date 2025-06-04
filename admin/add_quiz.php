@@ -6,13 +6,11 @@ require_once 'includes/auth_check.php';
 require_once '../includes/functions.php';
 
 $errors = [];
-// $success_message = ""; // success_message is less useful if we redirect immediately
 
 // Define the upload path for question images
 define('QUESTION_IMAGE_UPLOAD_DIR', '../uploads/question_images/');
 if (!is_dir(QUESTION_IMAGE_UPLOAD_DIR)) {
     if (!mkdir(QUESTION_IMAGE_UPLOAD_DIR, 0777, true) && !is_dir(QUESTION_IMAGE_UPLOAD_DIR)) {
-        //mkdir throws an error if it fails, so this check might be redundant or could be logged
         $errors[] = "ছবি আপলোডের জন্য ডিরেক্টরি তৈরি করা যায়নি: " . QUESTION_IMAGE_UPLOAD_DIR;
     }
 }
@@ -24,58 +22,42 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['prepare_questions_from
     $bulk_text = trim($_POST['bulk_questions_text_import']);
     if (!empty($bulk_text)) {
         $lines = array_map('trim', explode("\n", $bulk_text));
-        // Do not filter empty lines here, as they might be intentional separators or part of explanation.
-        // We will filter or trim individual lines as needed.
-
+        
         $current_q_data = null;
 
         foreach ($lines as $line_number => $line) {
             $trimmed_line = trim($line);
-            if (empty($trimmed_line) && $current_q_data === null) continue; // Skip leading empty lines before any question
+            if (empty($trimmed_line) && $current_q_data === null) continue; 
 
-            // প্রশ্ন শনাক্তকরণ (সংখ্যা. দিয়ে শুরু)
             if (preg_match('/^\s*(\d+)\.\s*(.+)/', $trimmed_line, $matches_q)) {
-                // যদি আগের প্রশ্নের ডেটা থাকে, তবে সেটা $imported_questions এ যোগ করুন
                 if ($current_q_data !== null && !empty($current_q_data['text']) && count($current_q_data['options']) >= 1) {
                     $imported_questions[] = $current_q_data;
                 }
-                // নতুন প্রশ্নের জন্য ডেটা রিসেট করুন
                 $current_q_data = [
                     'text' => trim($matches_q[2]),
                     'options' => [],
-                    'explanation' => '', // Initialize explanation for the new question
+                    'explanation' => '', 
                     'image_url' => null,
-                    'correct_option' => 0 // ডিফল্ট প্রথম অপশন
+                    'correct_option' => 0 
                 ];
             }
-            // অপশন শনাক্তকরণ ( ঐচ্ছিক * প্রথমে, তারপর অক্ষর. দিয়ে শুরু - বাংলা অক্ষরসহ)
             elseif ($current_q_data !== null && preg_match('/^\s*(\*?)\s*([a-zA-Z\p{Bengali}][\p{Bengali}]*|[iIvVxX]+|[A-Za-z])\.\s*(.+)/u', $trimmed_line, $matches_o)) {
-                if (count($current_q_data['options']) < 4) { // সর্বোচ্চ ৪টি অপশন
-                    $is_correct_option_from_bulk = (trim($matches_o[1]) === '*'); // Capture group 1 for asterisk
-                    $option_marker = trim($matches_o[2]); // Capture group 2 for option marker (a, b, ক, খ etc.)
-                    $option_text = trim($matches_o[3]);   // Capture group 3 for option text
+                if (count($current_q_data['options']) < 4) { 
+                    $is_correct_option_from_bulk = (trim($matches_o[1]) === '*'); 
+                    $option_text = trim($matches_o[3]);   
                     
                     $current_q_data['options'][] = $option_text;
 
                     if ($is_correct_option_from_bulk) {
-                        // Set correct_option to the index of the current option being added
                         $current_q_data['correct_option'] = count($current_q_data['options']) - 1;
                     }
                 }
             }
-            // ব্যাখ্যা শনাক্তকরণ (= চিহ্ন দিয়ে শুরু)
             elseif ($current_q_data !== null && preg_match('/^\s*=\s*(.+)/', $trimmed_line, $matches_exp)) {
-                // Append to explanation if already exists, otherwise set.
-                // Or, if you want each = line to overwrite, just assign.
-                // For simplicity, let's assume the last = line for a question is its explanation.
                 $current_q_data['explanation'] = trim($matches_exp[1]);
             }
-             // If line doesn't match question, option, or explanation, and we are in a question context,
-             // it could be a continuation of a multi-line explanation or question text.
-             // This part can be complex. For now, we are sticking to single-line explanations via '='.
         }
 
-        // লুপ শেষে সর্বশেষ প্রশ্নটি যোগ করুন (যদি থাকে এবং ভ্যালিড হয়)
         if ($current_q_data !== null && !empty($current_q_data['text']) && count($current_q_data['options']) >= 1) {
             $imported_questions[] = $current_q_data;
         }
@@ -94,6 +76,7 @@ elseif ($_SERVER["REQUEST_METHOD"] == "POST" && !isset($_POST['prepare_questions
     $quiz_description = trim($_POST['quiz_description']);
     $quiz_duration = intval($_POST['quiz_duration']);
     $quiz_status = trim($_POST['quiz_status']);
+    $quiz_category_id = !empty($_POST['quiz_category_id']) ? intval($_POST['quiz_category_id']) : NULL; // Added Category ID
     $quiz_live_start = !empty($_POST['quiz_live_start']) ? trim($_POST['quiz_live_start']) : NULL;
     $quiz_live_end = !empty($_POST['quiz_live_end']) ? trim($_POST['quiz_live_end']) : NULL;
 
@@ -152,12 +135,14 @@ elseif ($_SERVER["REQUEST_METHOD"] == "POST" && !isset($_POST['prepare_questions
     if (empty($errors)) {
         $conn->begin_transaction();
         try {
-            $sql_quiz = "INSERT INTO quizzes (title, description, duration_minutes, status, live_start_datetime, live_end_datetime, created_by) VALUES (?, ?, ?, ?, ?, ?, ?)";
+            // Modified SQL and bind_param to include category_id
+            $sql_quiz = "INSERT INTO quizzes (title, description, duration_minutes, status, category_id, live_start_datetime, live_end_datetime, created_by) VALUES (?, ?, ?, ?, ?, ?, ?, ?)";
             $stmt_quiz = $conn->prepare($sql_quiz);
             if (!$stmt_quiz) throw new Exception("কুইজ স্টেটমেন্ট প্রস্তুত করতে সমস্যা: " . $conn->error);
             
             $created_by_user_id = $_SESSION['user_id'];
-            $stmt_quiz->bind_param("ssisssi", $quiz_title, $quiz_description, $quiz_duration, $quiz_status, $quiz_live_start, $quiz_live_end, $created_by_user_id);
+            // Added 'i' for category_id
+            $stmt_quiz->bind_param("ssisissi", $quiz_title, $quiz_description, $quiz_duration, $quiz_status, $quiz_category_id, $quiz_live_start, $quiz_live_end, $created_by_user_id);
             
             if (!$stmt_quiz->execute()) {
                 throw new Exception("কুইজ সংরক্ষণ করতে সমস্যা হয়েছে: " . $stmt_quiz->error);
@@ -266,7 +251,7 @@ elseif ($_SERVER["REQUEST_METHOD"] == "POST" && !isset($_POST['prepare_questions
 require_once 'includes/header.php';
 ?>
 <style>
-/* Styles for suggestion box */
+/* Styles for suggestion box - (from previous response) */
 .suggestions-container {
     border: 1px solid var(--bs-border-color); 
     border-top: none; 
@@ -275,7 +260,7 @@ require_once 'includes/header.php';
     background-color: var(--bs-body-bg); 
     position: absolute; 
     z-index: 1050; 
-    width: 100%; 
+    width: 100%; /* Should be adjusted by JS if in input-group */
     box-shadow: 0 0.125rem 0.25rem rgba(0, 0, 0, 0.075); 
     display: none; 
     border-radius: 0 0 var(--bs-border-radius); 
@@ -289,22 +274,23 @@ require_once 'includes/header.php';
 .suggestion-item:hover {
     background-color: var(--bs-tertiary-bg); 
 }
+/* Wrapper for positioning suggestions correctly, especially within input-groups */
 .form-control-wrapper {
-    position: relative; 
+    position: relative; /* For absolute positioning of suggestions-container */
 }
 .input-group .form-control-wrapper {
-    display: flex;
-    flex-direction: column;
-    flex-grow: 1; 
+    display: flex; /* Take up available space in input-group */
+    flex-direction: column; /* Stack input and suggestions */
+    flex-grow: 1; /* Allow it to grow */
 }
 .input-group .form-control-wrapper .suggestions-container {
-     width: 100%; 
+     width: 100%; /* Make suggestions full width of the wrapper */
 }
 
 </style>
 
 <div class="container-fluid">
-    <h1 class="mt-4 mb-3">নতুন কুইজ যোগ করুন</h1>
+    <h1 class="mt-4 mb-3"><?php echo $page_title; ?></h1>
 
     <?php if (!empty($errors)): ?>
     <div class="alert alert-danger alert-dismissible fade show" role="alert">
@@ -335,11 +321,11 @@ require_once 'includes/header.php';
                     <input type="hidden" name="quiz_description" id="quiz_description_hidden">
                 </div>
                 <div class="row">
-                    <div class="col-md-4 mb-3">
+                    <div class="col-md-3 mb-3">
                         <label for="quiz_duration" class="form-label">সময় (মিনিট) <span class="text-danger">*</span></label>
                         <input type="number" class="form-control" id="quiz_duration" name="quiz_duration" value="<?php echo isset($_POST['quiz_duration']) ? htmlspecialchars($_POST['quiz_duration']) : '10'; ?>" min="1" required>
                     </div>
-                    <div class="col-md-4 mb-3">
+                    <div class="col-md-3 mb-3">
                         <label for="quiz_status" class="form-label">স্ট্যাটাস <span class="text-danger">*</span></label>
                         <select class="form-select" id="quiz_status" name="quiz_status" required>
                             <option value="draft" <?php echo (!isset($_POST['quiz_status']) || (isset($_POST['quiz_status']) && $_POST['quiz_status'] == 'draft')) ? 'selected' : ''; ?>>ড্রাফট</option>
@@ -348,13 +334,35 @@ require_once 'includes/header.php';
                             <option value="archived" <?php echo (isset($_POST['quiz_status']) && $_POST['quiz_status'] == 'archived') ? 'selected' : ''; ?>>আর্কাইভড</option>
                         </select>
                     </div>
-                     <div class="col-md-4 mb-3">
+                    <?php
+                    // Fetch categories for dropdown
+                    $categories_for_select = [];
+                    $sql_cats = "SELECT id, name FROM categories ORDER BY name ASC";
+                    $result_cats = $conn->query($sql_cats);
+                    if ($result_cats && $result_cats->num_rows > 0) {
+                        while($cat_row = $result_cats->fetch_assoc()) {
+                            $categories_for_select[] = $cat_row;
+                        }
+                    }
+                    ?>
+                    <div class="col-md-3 mb-3">
+                        <label for="quiz_category_id" class="form-label">ক্যাটাগরি</label>
+                        <select class="form-select" id="quiz_category_id" name="quiz_category_id">
+                            <option value="">-- ক্যাটাগরি নির্বাচন করুন --</option>
+                            <?php foreach ($categories_for_select as $category): ?>
+                                <option value="<?php echo $category['id']; ?>" <?php echo (isset($_POST['quiz_category_id']) && $_POST['quiz_category_id'] == $category['id']) ? 'selected' : ''; ?>>
+                                    <?php echo htmlspecialchars($category['name']); ?>
+                                </option>
+                            <?php endforeach; ?>
+                        </select>
+                    </div>
+                     <div class="col-md-3 mb-3">
                         <label for="quiz_live_start" class="form-label">লাইভ শুরু (ঐচ্ছিক)</label>
                         <input type="datetime-local" class="form-control" id="quiz_live_start" name="quiz_live_start" value="<?php echo isset($_POST['quiz_live_start']) ? htmlspecialchars($_POST['quiz_live_start']) : ''; ?>">
                     </div>
                 </div>
                  <div class="row">
-                    <div class="col-md-4 mb-3">
+                    <div class="col-md-4 mb-3"> {}
                         <label for="quiz_live_end" class="form-label">লাইভ শেষ (ঐচ্ছিক)</label>
                         <input type="datetime-local" class="form-control" id="quiz_live_end" name="quiz_live_end" value="<?php echo isset($_POST['quiz_live_end']) ? htmlspecialchars($_POST['quiz_live_end']) : ''; ?>">
                     </div>
@@ -363,20 +371,29 @@ require_once 'includes/header.php';
         </div>
 
         <div id="questions_container">
-            <div class="card question-block mb-3" data-question-index="0">
+            <?php
+            $num_initial_questions = count($imported_questions) > 0 ? count($imported_questions) : 1;
+            if (isset($_POST['questions']) && count($_POST['questions']) > $num_initial_questions) {
+                $num_initial_questions = count($_POST['questions']);
+            }
+
+            for ($q_idx_loop = 0; $q_idx_loop < $num_initial_questions; $q_idx_loop++):
+                $q_data_loop = $imported_questions[$q_idx_loop] ?? (isset($_POST['questions'][$q_idx_loop]) ? $_POST['questions'][$q_idx_loop] : null);
+            ?>
+            <div class="card question-block mb-3" data-question-index="<?php echo $q_idx_loop; ?>">
                  <div class="card-header d-flex justify-content-between align-items-center">
-                    <span>প্রশ্ন #<span class="question-number">1</span></span>
-                    <button type="button" class="btn btn-sm btn-danger remove-question" style="display:none;">প্রশ্ন সরান</button>
+                    <span>প্রশ্ন #<span class="question-number"><?php echo $q_idx_loop + 1; ?></span></span>
+                    <button type="button" class="btn btn-sm btn-danger remove-question" style="<?php echo ($q_idx_loop == 0 && $num_initial_questions <=1) ? 'display:none;' : ''; ?>">প্রশ্ন সরান</button>
                 </div>
                 <div class="card-body">
                     <div class="mb-3 form-control-wrapper">
-                        <label for="question_text_0" class="form-label">প্রশ্নের লেখা <span class="text-danger">*</span></label>
-                        <textarea class="form-control question-input-suggest" id="question_text_0" name="questions[0][text]" rows="2" required><?php echo isset($imported_questions[0]['text']) ? htmlspecialchars($imported_questions[0]['text']) : (isset($_POST['questions'][0]['text']) ? htmlspecialchars($_POST['questions'][0]['text']) : ''); ?></textarea>
-                        <div class="suggestions-container" id="suggestions_q_0"></div>
+                        <label for="question_text_<?php echo $q_idx_loop; ?>" class="form-label">প্রশ্নের লেখা <span class="text-danger">*</span></label>
+                        <textarea class="form-control question-input-suggest" id="question_text_<?php echo $q_idx_loop; ?>" name="questions[<?php echo $q_idx_loop; ?>][text]" rows="2" required><?php echo isset($q_data_loop['text']) ? htmlspecialchars($q_data_loop['text']) : ''; ?></textarea>
+                        <div class="suggestions-container" id="suggestions_q_<?php echo $q_idx_loop; ?>"></div>
                     </div>
                     <div class="mb-3">
-                        <label for="question_image_0" class="form-label">প্রশ্ন সম্পর্কিত ছবি (ঐচ্ছিক)</label>
-                        <input type="file" class="form-control" id="question_image_0" name="questions[0][image_url]" accept="image/jpeg,image/png,image/gif,image/webp">
+                        <label for="question_image_<?php echo $q_idx_loop; ?>" class="form-label">প্রশ্ন সম্পর্কিত ছবি (ঐচ্ছিক)</label>
+                        <input type="file" class="form-control" id="question_image_<?php echo $q_idx_loop; ?>" name="questions[<?php echo $q_idx_loop; ?>][image_url]" accept="image/jpeg,image/png,image/gif,image/webp">
                         <small class="form-text text-muted">অনুমোদিত ছবির ধরণ: JPG, PNG, GIF, WEBP. সর্বোচ্চ সাইজ: 5MB.</small>
                     </div>
                     <div class="options-container mb-3">
@@ -384,34 +401,31 @@ require_once 'includes/header.php';
                         <?php for ($i = 0; $i < 4; $i++): ?>
                         <div class="input-group mb-2">
                             <div class="input-group-text">
-                                <input class="form-check-input mt-0" type="radio" name="questions[0][correct_option]" value="<?php echo $i; ?>" aria-label="সঠিক উত্তর <?php echo $i + 1; ?>" required 
+                                <input class="form-check-input mt-0" type="radio" name="questions[<?php echo $q_idx_loop; ?>][correct_option]" value="<?php echo $i; ?>" aria-label="সঠিক উত্তর <?php echo $i + 1; ?>" required 
                                 <?php 
-                                    $is_checked = false;
-                                    if (isset($_POST['questions'][0]['correct_option']) && $_POST['questions'][0]['correct_option'] == $i) {
-                                        $is_checked = true;
-                                    } elseif (isset($imported_questions[0]['correct_option']) && $imported_questions[0]['correct_option'] == $i) {
-                                        // This will check the radio if 'correct_option' was set by PHP for the first imported question
-                                        $is_checked = true;
-                                    } elseif (!isset($_POST['questions'][0]['correct_option']) && !isset($imported_questions[0]['correct_option']) && $i == 0) {
-                                        // Default to first option checked ONLY if no POST data and no imported correct option explicitly set.
-                                        $is_checked = true; 
+                                    $is_checked_loop = false;
+                                    if (isset($q_data_loop['correct_option']) && $q_data_loop['correct_option'] == $i) {
+                                        $is_checked_loop = true;
+                                    } elseif (!isset($q_data_loop['correct_option']) && $i == 0) {
+                                        $is_checked_loop = true; 
                                     }
-                                    if ($is_checked) echo 'checked';
+                                    if ($is_checked_loop) echo 'checked';
                                 ?>>
                             </div>
                             <div class="form-control-wrapper flex-grow-1">
-                                <input type="text" class="form-control option-input-suggest" name="questions[0][options][<?php echo $i; ?>]" placeholder="অপশন <?php echo $i + 1; ?>" id="option_text_0_<?php echo $i; ?>" required value="<?php echo isset($imported_questions[0]['options'][$i]) ? htmlspecialchars($imported_questions[0]['options'][$i]) : (isset($_POST['questions'][0]['options'][$i]) ? htmlspecialchars($_POST['questions'][0]['options'][$i]) : ''); ?>">
-                                <div class="suggestions-container" id="suggestions_q_0_opt_<?php echo $i; ?>"></div>
+                                <input type="text" class="form-control option-input-suggest" name="questions[<?php echo $q_idx_loop; ?>][options][<?php echo $i; ?>]" placeholder="অপশন <?php echo $i + 1; ?>" id="option_text_<?php echo $q_idx_loop; ?>_<?php echo $i; ?>" required value="<?php echo isset($q_data_loop['options'][$i]) ? htmlspecialchars($q_data_loop['options'][$i]) : ''; ?>">
+                                <div class="suggestions-container" id="suggestions_q_<?php echo $q_idx_loop; ?>_opt_<?php echo $i; ?>"></div>
                             </div>
                         </div>
                         <?php endfor; ?>
                     </div>
                     <div class="mb-3">
-                        <label for="question_explanation_0" class="form-label">ব্যাখ্যা (ঐচ্ছিক)</label>
-                        <textarea class="form-control" id="question_explanation_0" name="questions[0][explanation]" rows="2"><?php echo isset($imported_questions[0]['explanation']) ? htmlspecialchars($imported_questions[0]['explanation']) : (isset($_POST['questions'][0]['explanation']) ? htmlspecialchars($_POST['questions'][0]['explanation']) : ''); ?></textarea>
+                        <label for="question_explanation_<?php echo $q_idx_loop; ?>" class="form-label">ব্যাখ্যা (ঐচ্ছিক)</label>
+                        <textarea class="form-control" id="question_explanation_<?php echo $q_idx_loop; ?>" name="questions[<?php echo $q_idx_loop; ?>][explanation]" rows="2"><?php echo isset($q_data_loop['explanation']) ? htmlspecialchars($q_data_loop['explanation']) : ''; ?></textarea>
                     </div>
                 </div>
             </div>
+            <?php endfor; ?>
         </div>
 
         <button type="button" class="btn btn-secondary mb-3" id="add_question_btn">আরও প্রশ্ন যোগ করুন (+)</button>
@@ -421,6 +435,7 @@ require_once 'includes/header.php';
 </div>
 
 <script>
+// Script from previous response for adding/removing questions and suggestions
 document.addEventListener('DOMContentLoaded', function () {
     const questionsContainer = document.getElementById('questions_container');
     const addQuestionBtn = document.getElementById('add_question_btn');
@@ -470,8 +485,8 @@ document.addEventListener('DOMContentLoaded', function () {
                 const item = document.createElement('div');
                 item.classList.add('suggestion-item');
                 item.textContent = suggestionText;
-                item.addEventListener('mousedown', function (e) {
-                    e.preventDefault();
+                item.addEventListener('mousedown', function (e) { // Use mousedown to fire before blur
+                    e.preventDefault(); // Prevent input from losing focus
                     inputFieldEl.value = suggestionText;
                     containerEl.innerHTML = '';
                     containerEl.style.display = 'none';
@@ -491,8 +506,9 @@ document.addEventListener('DOMContentLoaded', function () {
         const suggestionsContainerQuestion = questionBlock.querySelector(`#suggestions_q_${qIndex}`);
         if (questionTextarea && suggestionsContainerQuestion) {
             questionTextarea.addEventListener('input', function () { fetchSuggestions(this.value, 'question', suggestionsContainerQuestion, this); });
-            questionTextarea.addEventListener('blur', function () { setTimeout(() => { suggestionsContainerQuestion.style.display = 'none'; }, 150); });
+            questionTextarea.addEventListener('blur', function () { setTimeout(() => { suggestionsContainerQuestion.style.display = 'none'; }, 150); }); // Delay hide
             questionTextarea.addEventListener('focus', function () { if(this.value.length >=2) fetchSuggestions(this.value, 'question', suggestionsContainerQuestion, this); });
+
         }
 
         const optionInputs = questionBlock.querySelectorAll('.option-input-suggest');
@@ -502,7 +518,7 @@ document.addEventListener('DOMContentLoaded', function () {
             const suggestionsContainerOption = questionBlock.querySelector(`#suggestions_q_${qIndex}_opt_${optIndexSpecific}`);
             if (suggestionsContainerOption) {
                 optInput.addEventListener('input', function () { fetchSuggestions(this.value, 'option', suggestionsContainerOption, this); });
-                optInput.addEventListener('blur', function () { setTimeout(() => { suggestionsContainerOption.style.display = 'none'; }, 150); });
+                optInput.addEventListener('blur', function () { setTimeout(() => { suggestionsContainerOption.style.display = 'none'; }, 150); }); // Delay hide
                 optInput.addEventListener('focus', function () { if(this.value.length >=2) fetchSuggestions(this.value, 'option', suggestionsContainerOption, this);});
             }
         });
@@ -514,32 +530,34 @@ document.addEventListener('DOMContentLoaded', function () {
             block.dataset.questionIndex = index; 
             block.querySelector('.question-number').textContent = index + 1;
 
-            const qTextarea = block.querySelector('textarea[id^="question_text_"]');
+            const qTextarea = block.querySelector('textarea[name^="questions["][name$="[text]"]');
             if(qTextarea) { 
                 qTextarea.name = `questions[${index}][text]`;
                 qTextarea.id = `question_text_${index}`;
-                const labelForQText = block.querySelector(`label[for^="question_text_"]`);
+                 const labelForQText = block.querySelector(`label[for^="question_text_"]`);
                 if(labelForQText) labelForQText.setAttribute('for', `question_text_${index}`);
+
                 const suggestionsContainerQ = block.querySelector('.suggestions-container[id^="suggestions_q_"]');
-                 if (suggestionsContainerQ && !suggestionsContainerQ.id.startsWith(`suggestions_q_${index}_opt_`)) { 
+                 if (suggestionsContainerQ && !suggestionsContainerQ.id.includes('_opt_')) { // Ensure it's not an option suggestion box
                     suggestionsContainerQ.id = `suggestions_q_${index}`;
                  }
             }
             
-            const qImage = block.querySelector('input[type="file"][id^="question_image_"]');
+            const qImage = block.querySelector('input[type="file"][name^="questions["][name$="[image_url]"]');
              if(qImage) {
                 qImage.name = `questions[${index}][image_url]`;
                 qImage.id = `question_image_${index}`;
-                const labelForQImage = block.querySelector(`label[for^="question_image_"]`);
+                 const labelForQImage = block.querySelector(`label[for^="question_image_"]`);
                 if(labelForQImage) labelForQImage.setAttribute('for', `question_image_${index}`);
             }
 
-            const qExplanation = block.querySelector('textarea[id^="question_explanation_"]');
+            const qExplanation = block.querySelector('textarea[name^="questions["][name$="[explanation]"]');
              if(qExplanation){
                 qExplanation.name = `questions[${index}][explanation]`;
                 qExplanation.id = `question_explanation_${index}`;
                 const labelForQExp = block.querySelector(`label[for^="question_explanation_"]`);
                 if(labelForQExp) labelForQExp.setAttribute('for', `question_explanation_${index}`);
+
             }
             
             block.querySelectorAll('.options-container .input-group').forEach((optGroup, optIdx) => {
@@ -554,6 +572,7 @@ document.addEventListener('DOMContentLoaded', function () {
                     textInput.name = `questions[${index}][options][${optIdx}]`;
                     textInput.id = `option_text_${index}_${optIdx}`;
                     textInput.placeholder = `অপশন ${optIdx + 1}`;
+                    // Update suggestion container ID for options
                     const optSuggestionContainer = optGroup.querySelector('.suggestions-container[id^="suggestions_q_"]');
                     if(optSuggestionContainer) optSuggestionContainer.id = `suggestions_q_${index}_opt_${optIdx}`;
                 }
@@ -563,6 +582,7 @@ document.addEventListener('DOMContentLoaded', function () {
             if (removeBtn) {
                 removeBtn.style.display = questionBlocks.length > 1 ? 'inline-block' : 'none';
             }
+            // Re-setup listeners for the possibly re-indexed block
             setupSuggestionListenersForBlock(block);
         });
     }
@@ -579,18 +599,20 @@ document.addEventListener('DOMContentLoaded', function () {
         const newQuestionBlock = firstQuestionBlock.cloneNode(true);
         newQuestionBlock.dataset.questionIndex = nextIndex; 
 
+        // Clear input values for the new block
         newQuestionBlock.querySelectorAll('textarea, input[type="text"], input[type="file"]').forEach(input => input.value = '');
         const radios = newQuestionBlock.querySelectorAll('input[type="radio"]');
         radios.forEach(radio => radio.checked = false);
-        if(radios.length > 0) radios[0].checked = true;
+        if(radios.length > 0) radios[0].checked = true; // Default check first radio
 
+        // Clear suggestion containers in the new block
         newQuestionBlock.querySelectorAll('.suggestions-container').forEach(sc => {
             sc.innerHTML = '';
             sc.style.display = 'none';
         });
         
         questionsContainer.appendChild(newQuestionBlock);
-        updateQuestionBlocks(); 
+        updateQuestionBlocks(); // Update all blocks after adding
     });
 
     questionsContainer.addEventListener('click', function(event) {
@@ -604,6 +626,7 @@ document.addEventListener('DOMContentLoaded', function () {
         }
     });
 
+    // Quill editor for quiz description
     if (document.getElementById('quiz_description_editor')) {
         const quillDescription = new Quill('#quiz_description_editor', {
             theme: 'snow',
@@ -624,133 +647,26 @@ document.addEventListener('DOMContentLoaded', function () {
                 const descriptionHiddenInput = document.getElementById('quiz_description_hidden');
                 if (descriptionHiddenInput) {
                     descriptionHiddenInput.value = quillDescription.root.innerHTML;
+                     // If editor is empty or only contains <p><br></p>, set hidden input to empty string
                      if (quillDescription.getText().trim().length === 0 && quillDescription.root.innerHTML === '<p><br></p>') {
                          descriptionHiddenInput.value = ''; 
                     }
                 }
             });
         }
+        // Preserve content if form reloads with an error and description was posted
         <?php if (isset($_POST['quiz_description']) && !empty($errors)): ?>
-        // The content is already set in the div's HTML by PHP for Quill.
+        if(quillDescription) {
+            quillDescription.root.innerHTML = <?php echo json_encode($_POST['quiz_description']); ?>;
+        }
         <?php endif; ?>
     }
     
-    function populateImportedQuestions(importedQs) {
-        if (!importedQs || importedQs.length === 0) {
-            return;
-        }
-
-        const firstQuestionBlock = questionsContainer.querySelector('.question-block[data-question-index="0"]');
-        let firstBlockData = null; // Store data for the first block if it's used
-
-        if (firstQuestionBlock) {
-            const firstQTextarea = firstQuestionBlock.querySelector('textarea[name="questions[0][text]"]');
-            let firstQOptionsEmpty = true;
-            firstQuestionBlock.querySelectorAll('input[type="text"][name^="questions[0][options]"]').forEach(optInp => {
-                if (optInp.value.trim() !== '') firstQOptionsEmpty = false;
-            });
-
-            if (firstQTextarea && firstQTextarea.value.trim() === '' && firstQOptionsEmpty && importedQs.length > 0) {
-                firstBlockData = importedQs[0]; // Assign data for the first block
-                
-                let currentQuestionBlockIndexAttr = 0; 
-
-                const qTextarea = firstQuestionBlock.querySelector(`textarea[name="questions[${currentQuestionBlockIndexAttr}][text]"]`);
-                if(qTextarea) qTextarea.value = firstBlockData.text || '';
-
-                const optionInputs = firstQuestionBlock.querySelectorAll(`input[type="text"][name^="questions[${currentQuestionBlockIndexAttr}][options]"]`);
-                if (firstBlockData.options && Array.isArray(firstBlockData.options)) {
-                    optionInputs.forEach((optInput, optIdx) => {
-                        optInput.value = firstBlockData.options[optIdx] || '';
-                    });
-                } else {
-                     optionInputs.forEach(optInput => optInput.value = '');
-                }
-
-                const explanationTextarea = firstQuestionBlock.querySelector(`textarea[name="questions[${currentQuestionBlockIndexAttr}][explanation]"]`);
-                if(explanationTextarea) explanationTextarea.value = firstBlockData.explanation || '';
-                
-                const correctOptionRadios = firstQuestionBlock.querySelectorAll(`input[type="radio"][name="questions[${currentQuestionBlockIndexAttr}][correct_option]"]`);
-                if (correctOptionRadios.length > 0) {
-                    let correctIndex = parseInt(firstBlockData.correct_option, 10);
-                    if (isNaN(correctIndex) || correctIndex < 0 || correctIndex >= correctOptionRadios.length) {
-                        correctIndex = 0; 
-                    }
-                    // Uncheck all first
-                    correctOptionRadios.forEach(radio => radio.checked = false);
-                    if (correctOptionRadios[correctIndex]) {
-                       correctOptionRadios[correctIndex].checked = true;
-                    } else if (correctOptionRadios.length > 0) { // Fallback if index is out of bounds but radios exist
-                        correctOptionRadios[0].checked = true;
-                    }
-                }
-            }
-        }
-        
-        const questionsToLoop = firstBlockData ? importedQs.slice(1) : importedQs;
-
-        questionsToLoop.forEach((qData) => { 
-            addQuestionBtn.click(); 
-            const allBlocks = questionsContainer.querySelectorAll('.question-block');
-            const currentBlock = allBlocks[allBlocks.length - 1]; 
-            const currentQuestionBlockIndexAttr = currentBlock.dataset.questionIndex; 
-            
-            const qTextarea = currentBlock.querySelector(`textarea[name="questions[${currentQuestionBlockIndexAttr}][text]"]`);
-            if(qTextarea) qTextarea.value = qData.text || '';
-
-            const optionInputs = currentBlock.querySelectorAll(`input[type="text"][name^="questions[${currentQuestionBlockIndexAttr}][options]"]`);
-            if (qData.options && Array.isArray(qData.options)) {
-                optionInputs.forEach((optInput, optIdx) => {
-                    optInput.value = qData.options[optIdx] || '';
-                });
-            } else {
-                 optionInputs.forEach(optInput => optInput.value = '');
-            }
-
-            const explanationTextarea = currentBlock.querySelector(`textarea[name="questions[${currentQuestionBlockIndexAttr}][explanation]"]`);
-            if(explanationTextarea) explanationTextarea.value = qData.explanation || '';
-            
-            const correctOptionRadios = currentBlock.querySelectorAll(`input[type="radio"][name="questions[${currentQuestionBlockIndexAttr}][correct_option]"]`);
-            if (correctOptionRadios.length > 0) {
-                let correctIndex = parseInt(qData.correct_option, 10);
-                if (isNaN(correctIndex) || correctIndex < 0 || correctIndex >= correctOptionRadios.length) {
-                    correctIndex = 0; 
-                }
-                 // Uncheck all first
-                correctOptionRadios.forEach(radio => radio.checked = false);
-                if (correctOptionRadios[correctIndex]) {
-                   correctOptionRadios[correctIndex].checked = true;
-                } else if (correctOptionRadios.length > 0) { // Fallback
-                    correctOptionRadios[0].checked = true;
-                }
-            }
-        });
-        updateQuestionBlocks(); 
-    }
-
-    const importedQuestionsData = <?php echo json_encode($imported_questions); ?>;
-    if (Array.isArray(importedQuestionsData) && importedQuestionsData.length > 0) {
-        populateImportedQuestions(importedQuestionsData);
-        const allCurrentBlocks = questionsContainer.querySelectorAll('.question-block');
-        // Check if the first block was actually populated by imported data
-        let firstBlockWasPopulatedByImport = false;
-        if (allCurrentBlocks.length > 0 && importedQuestionsData.length > 0) {
-            const firstBlockTextarea = allCurrentBlocks[0].querySelector('textarea[name="questions[0][text]"]');
-            if (firstBlockTextarea && firstBlockTextarea.value === importedQuestionsData[0].text) {
-                 // A simple check; might need to be more robust if questions can be identical
-                firstBlockWasPopulatedByImport = true;
-            }
-        }
-
-        if (allCurrentBlocks.length === 1 && firstBlockWasPopulatedByImport) { 
-             const firstRemoveBtn = allCurrentBlocks[0].querySelector('.remove-question');
-             if (firstRemoveBtn) firstRemoveBtn.style.display = 'none';
-        }
-    }
-    
+    // Initial setup for suggestion listeners for any pre-rendered blocks (e.g., from import or POST error)
     document.querySelectorAll('.question-block').forEach(block => {
         setupSuggestionListenersForBlock(block);
     });
+    // Update blocks in case of pre-filled data from POST or import
     updateQuestionBlocks(); 
 });
 </script>

@@ -54,9 +54,10 @@ $max_recent_quizzes_on_home = 3;
 
 // 1. Fetch Upcoming Quizzes for homepage
 $upcoming_quizzes_home = [];
-$sql_upcoming_home = "SELECT q.id, q.title, q.description, q.duration_minutes, q.status, q.live_start_datetime,
+$sql_upcoming_home = "SELECT q.id, q.title, q.description, q.duration_minutes, q.status, q.live_start_datetime, q.category_id, c.name as category_name,
                     (SELECT COUNT(qs.id) FROM questions qs WHERE qs.quiz_id = q.id) as question_count
                     FROM quizzes q
+                    LEFT JOIN categories c ON q.category_id = c.id
                     WHERE q.status = 'upcoming'
                     ORDER BY q.live_start_datetime ASC, q.id DESC
                     LIMIT " . $max_recent_quizzes_on_home; 
@@ -72,9 +73,10 @@ $recent_live_quizzes_home = [];
 $needed_live_or_archived = $max_recent_quizzes_on_home - count($upcoming_quizzes_home);
 
 if ($needed_live_or_archived > 0) {
-    $sql_recent_live_home = "SELECT q.id, q.title, q.description, q.duration_minutes, q.status, q.live_start_datetime, q.live_end_datetime,
+    $sql_recent_live_home = "SELECT q.id, q.title, q.description, q.duration_minutes, q.status, q.live_start_datetime, q.live_end_datetime, q.category_id, c.name as category_name,
                         (SELECT COUNT(qs.id) FROM questions qs WHERE qs.quiz_id = q.id) as question_count
                         FROM quizzes q
+                        LEFT JOIN categories c ON q.category_id = c.id
                         WHERE q.status = 'live'
                         AND (q.live_start_datetime IS NULL OR q.live_start_datetime <= NOW())
                         AND (q.live_end_datetime IS NULL OR q.live_end_datetime >= NOW())
@@ -96,9 +98,10 @@ $needed_archived_home = $max_recent_quizzes_on_home - count($recent_quizzes_for_
 $recent_archived_quizzes_home = [];
 
 if ($needed_archived_home > 0) {
-    $sql_recent_archived_home = "SELECT q.id, q.title, q.description, q.duration_minutes, q.status, q.live_start_datetime, q.live_end_datetime,
+    $sql_recent_archived_home = "SELECT q.id, q.title, q.description, q.duration_minutes, q.status, q.live_start_datetime, q.live_end_datetime, q.category_id, c.name as category_name,
                             (SELECT COUNT(qs.id) FROM questions qs WHERE qs.quiz_id = q.id) as question_count
                             FROM quizzes q
+                            LEFT JOIN categories c ON q.category_id = c.id
                             WHERE q.status = 'archived'
                             OR (q.status = 'live' AND q.live_end_datetime IS NOT NULL AND q.live_end_datetime < NOW())
                             ORDER BY q.created_at DESC, q.id DESC
@@ -143,7 +146,6 @@ $recent_quizzes_for_display = $temp_display_quizzes;
 // --- Fetch Study Materials for Homepage ---
 $study_materials_home = [];
 $max_study_materials_on_home = 3; // আপনি কয়টি দেখাতে চান
-// Ensure your table uses 'google_drive_link' as per your last request
 $sql_study_materials_home = "SELECT id, title, description, google_drive_link 
                              FROM study_materials 
                              ORDER BY created_at DESC 
@@ -152,6 +154,38 @@ $result_study_materials_home = $conn->query($sql_study_materials_home);
 if ($result_study_materials_home && $result_study_materials_home->num_rows > 0) {
     while ($row_sm = $result_study_materials_home->fetch_assoc()) {
         $study_materials_home[] = $row_sm;
+    }
+}
+
+// --- Fetch Categories for Homepage Display ---
+$categories_for_homepage = [];
+$max_categories_on_home = 6; 
+$total_categories_count = 0; // For "See all categories" button logic
+
+// First, get total count of categories that have quizzes
+$sql_total_cats_count = "SELECT COUNT(DISTINCT c.id) as total_active_categories
+                         FROM categories c
+                         JOIN quizzes q ON c.id = q.category_id
+                         WHERE q.status IN ('live', 'archived', 'upcoming')"; // Consider upcoming quizzes too for category visibility
+$result_total_cats_count = $conn->query($sql_total_cats_count);
+if ($result_total_cats_count && $cat_count_row = $result_total_cats_count->fetch_assoc()) {
+    $total_categories_count = $cat_count_row['total_active_categories'];
+}
+
+
+$sql_categories_home = "SELECT c.id, c.name, c.description, COUNT(q.id) as quiz_count
+                        FROM categories c
+                        JOIN quizzes q ON c.id = q.category_id
+                        WHERE q.status IN ('live', 'archived', 'upcoming') 
+                        GROUP BY c.id, c.name, c.description
+                        HAVING COUNT(q.id) > 0
+                        ORDER BY c.name ASC
+                        LIMIT " . $max_categories_on_home;
+
+$result_categories_home = $conn->query($sql_categories_home);
+if ($result_categories_home && $result_categories_home->num_rows > 0) {
+    while ($row_cat_home = $result_categories_home->fetch_assoc()) {
+        $categories_for_homepage[] = $row_cat_home;
     }
 }
 
@@ -235,7 +269,7 @@ $page_specific_styles = "
         padding: 3rem 0;
         animation: fadeIn 1.5s ease-out;
     }
-    .quiz-rules-minimal, .how-to-participate, .recent-quizzes-section, .recent-study-materials-section {
+    .quiz-rules-minimal, .how-to-participate, .recent-quizzes-section, .recent-study-materials-section, .categories-section {
         background-color: #ffffff; 
         border: 1px solid #e9ecef; 
         border-radius: 12px; 
@@ -274,7 +308,7 @@ $page_specific_styles = "
     }
 
     /* UPDATED Styles for .quiz-card-sm */
-    .quiz-card-sm { 
+    .quiz-card-sm, .category-card-home { 
         border: 1px solid #dee2e6;
         border-radius: 8px;
         transition: transform 0.2s ease-in-out, box-shadow 0.2s ease-in-out;
@@ -282,17 +316,17 @@ $page_specific_styles = "
         flex-direction: column; 
         height: 100%; 
     }
-    .quiz-card-sm:hover {
+    .quiz-card-sm:hover, .category-card-home:hover {
         transform: translateY(-4px);
         box-shadow: 0 5px 15px rgba(0,0,0,0.1);
     }
-    .quiz-card-sm .card-body {
+    .quiz-card-sm .card-body, .category-card-home .card-body {
         display: flex;
         flex-direction: column;
         flex-grow: 1; 
         padding: 1rem; 
     }
-    .quiz-card-sm .card-title {
+    .quiz-card-sm .card-title, .category-card-home .card-title {
         font-size: 1.1rem;
         font-weight: 600;
         margin-bottom: 0.5rem; 
@@ -311,14 +345,12 @@ $page_specific_styles = "
     .quiz-card-sm .quiz-description-display.no-real-description {
         min-height: auto; 
     }
-    .quiz-card-sm .quiz-description-display.no-real-description p {
+    .quiz-card-sm .quiz-description-display.no-real-description p { 
         margin-bottom: 0 !important; 
     }
     .quiz-card-sm .quiz-description-display p { 
         margin-bottom: 0;
     }
-
-
     .quiz-card-sm ul.list-unstyled { 
         margin-top: auto; 
         font-size: 0.8rem;
@@ -329,16 +361,18 @@ $page_specific_styles = "
     .quiz-card-sm ul.list-unstyled li {
         margin-bottom: 0.25rem;
     }
-    .quiz-card-sm .btn { /* This style is for all buttons within .quiz-card-sm */
+    .quiz-card-sm .btn, .category-card-home .btn { /* This style is for all buttons within .quiz-card-sm */
         font-size: 0.85rem;
         padding: 0.4rem 0.8rem; 
-        align-self: flex-start; /* Added this line */
+        align-self: flex-start; 
     }
+     .category-card-home .btn {
+        align-self: center; /* Center button in category card */
+     }
     .quiz-card-sm .additional-info-home {
         font-size: 0.75rem;
         margin-top: 0.5rem;
     }
-    
     .quiz-card-sm .card-actions-home {
         display: flex;
         flex-wrap: wrap; 
@@ -353,6 +387,11 @@ $page_specific_styles = "
     .archived-quiz-card-home { background-color: #f8f9fa; border-left: 4px solid #6c757d; }
     .archived-quiz-card-home .card-title { color: #343a40; }
 
+    /* Category Card Specific */
+    .category-card-home .card-title {
+        color: var(--bs-primary); /* Using Bootstrap primary color for title */
+    }
+
 
     @keyframes fadeInDown { from { opacity: 0; transform: translateY(-30px); } to { opacity: 1; transform: translateY(0); } }
     @keyframes fadeInUp { from { opacity: 0; transform: translateY(30px); } to { opacity: 1; transform: translateY(0); } }
@@ -365,7 +404,53 @@ $page_specific_styles = "
         .minimal-hero-section .upcoming-quiz-info h3 { font-size: 1.3rem; }
         .minimal-hero-section .upcoming-quiz-info p { font-size: 1rem; }
         .section-title { font-size: 1.5rem; }
-        .quiz-rules-minimal, .how-to-participate, .recent-quizzes-section, .recent-study-materials-section { padding: 1.5rem; }
+        .quiz-rules-minimal, .how-to-participate, .recent-quizzes-section, .recent-study-materials-section, .categories-section { padding: 1.5rem; }
+    }
+    body.dark-mode .minimal-hero-section {
+        background: linear-gradient(180deg, #2b3035 0%, #212529 100%);
+        color: #dee2e6;
+        border-bottom-color: #495057;
+    }
+    body.dark-mode .minimal-hero-section p.lead { color: #adb5bd; }
+    body.dark-mode .minimal-hero-section .upcoming-quiz-info h3 { color: #6ea8fe; }
+    body.dark-mode .minimal-hero-section .btn-custom-primary {
+        background-color: #6ea8fe; border-color: #6ea8fe; color: #212529;
+    }
+    body.dark-mode .minimal-hero-section .btn-custom-primary:hover {
+        background-color: #8bb9fe; border-color: #8bb9fe; box-shadow: 0 4px 15px rgba(110, 168, 254, 0.2);
+    }
+    body.dark-mode .quiz-rules-minimal, 
+    body.dark-mode .how-to-participate, 
+    body.dark-mode .recent-quizzes-section,
+    body.dark-mode .recent-study-materials-section,
+    body.dark-mode .categories-section { /* Added .categories-section here */
+        background-color: var(--bs-tertiary-bg); /* Use variable for consistency */
+        border-color: var(--bs-border-color);
+        box-shadow: 0 6px 18px rgba(0,0,0,0.25);
+    }
+    body.dark-mode .section-title { color: #f8f9fa; }
+    body.dark-mode .quiz-rules-minimal p, 
+    body.dark-mode .how-to-participate ul li { color: #adb5bd; }
+    body.dark-mode .how-to-participate ul li::before { color: #20c997; }
+
+    body.dark-mode .quiz-card-sm, 
+    body.dark-mode .category-card-home { /* Added .category-card-home */
+        background-color: #2c3136;
+        border-color: #454a4f;
+    }
+    body.dark-mode .quiz-card-sm:hover,
+    body.dark-mode .category-card-home:hover { /* Added .category-card-home */
+        box-shadow: 0 8px 20px rgba(0,0,0,0.3);
+    }
+    body.dark-mode .quiz-card-sm .card-title,
+    body.dark-mode .category-card-home .card-title { /* Added .category-card-home */
+        color: #e9ecef;
+    }
+    body.dark-mode .quiz-card-sm .quiz-description-display { color: #b0b7bf; }
+    body.dark-mode .quiz-card-sm ul.list-unstyled { color: #9fa6ad; }
+    body.dark-mode .quiz-card-sm ul.list-unstyled strong { color: #ced4da; }
+    body.dark-mode .category-card-home .card-title { /* Specific for category card title in dark mode */
+        color: var(--bs-primary-text-emphasis); /* Using existing variable for dark text emphasis */
     }
 "; 
 
@@ -418,6 +503,7 @@ require_once 'includes/header.php';
 </div>
 
 <div class="container content-section">
+    <?php display_flash_message(); ?>
     <?php if (!empty($recent_quizzes_for_display)): ?>
     <div class="recent-quizzes-section">
         <h2 class="section-title">সাম্প্রতিক কুইজসমূহ</h2>
@@ -433,10 +519,7 @@ require_once 'includes/header.php';
                 $display_status_for_card = isset($quiz['status_display']) ? $quiz['status_display'] : $quiz['status'];
                 $description_html = $quiz['description'] ? trim($quiz['description']) : '';
                 $is_description_empty = empty(trim(strip_tags($description_html)));
-
-                // Prepare quiz URL for sharing
                 $quiz_page_url_home = rtrim((isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] === 'on' ? "https" : "http") . "://" . $_SERVER['HTTP_HOST'] . dirname($_SERVER['PHP_SELF']), '/') . '/quiz_page.php?id=' . $quiz['id'];
-
 
                 if ($display_status_for_card === 'upcoming') {
                     $card_class_home .= ' upcoming-quiz-card-home';
@@ -481,6 +564,9 @@ require_once 'includes/header.php';
                 <div class="card h-100 <?php echo $card_class_home; ?>">
                     <div class="card-body d-flex flex-column">
                         <h5 class="card-title"><?php echo htmlspecialchars($quiz['title']); ?></h5>
+                        <?php if (!empty($quiz['category_name'])): ?>
+                            <p class="small text-muted mb-2">ক্যাটাগরি: <?php echo htmlspecialchars($quiz['category_name']); ?></p>
+                        <?php endif; ?>
                        <div class="quiz-description-display <?php echo $is_description_empty ? 'no-real-description' : ''; ?>">
                             <?php echo $is_description_empty ? '<p class="text-muted fst-italic" style="margin-bottom: 0;"><em>কোনো বিবরণ নেই।</em></p>' : $description_html; ?>
                         </div>
@@ -519,6 +605,39 @@ require_once 'includes/header.php';
         <div class="alert alert-light text-center">এখন কোনো সাম্প্রতিক কুইজ নেই।</div>
     <?php endif; ?>
 
+    <?php if (!empty($categories_for_homepage)): ?>
+    <div class="categories-section content-section mt-4">
+        <h2 class="section-title">ক্যাটাগরি ভিত্তিক অনুশীলন</h2>
+        <p class="text-center mb-4">আপনার পছন্দের বিষয় অনুযায়ী কুইজ অনুশীলন করুন।</p>
+        <div class="row row-cols-1 row-cols-md-2 row-cols-lg-3 g-4">
+            <?php foreach ($categories_for_homepage as $category_home): ?>
+            <div class="col">
+                <div class="card h-100 shadow-sm category-card-home">
+                    <div class="card-body text-center d-flex flex-column">
+                        <h5 class="card-title"><?php echo htmlspecialchars($category_home['name']); ?></h5>
+                        <?php if(!empty($category_home['description'])): ?>
+                            <p class="card-text small text-muted mb-3 flex-grow-1">
+                                <?php echo htmlspecialchars(mb_strimwidth($category_home['description'], 0, 80, "...")); ?>
+                            </p>
+                        <?php else: ?>
+                             <p class="card-text small text-muted mb-3 flex-grow-1"><em>কোনো বিবরণ নেই।</em></p>
+                        <?php endif; ?>
+                        <p class="card-text mb-3">
+                            <small class="text-muted">(<?php echo $category_home['quiz_count']; ?> টি কুইজ தொகுনের উপর ভিত্তি করে প্রশ্ন)</small>
+                        </p>
+                        <a href="practice_category.php?category_id=<?php echo $category_home['id']; ?>" class="btn btn-outline-primary mt-auto">অনুশীলন করুন</a>
+                    </div>
+                </div>
+            </div>
+            <?php endforeach; ?>
+        </div>
+        <?php if ($total_categories_count > $max_categories_on_home): ?>
+            <div class="text-center mt-4">
+                <a href="practice_category.php" class="btn btn-secondary">সকল ক্যাটাগরি দেখুন</a>
+            </div>
+        <?php endif; ?>
+    </div>
+    <?php endif; ?>
     <?php if (!empty($study_materials_home)): ?>
     <div class="recent-study-materials-section content-section"> <h2 class="section-title">প্রয়োজনীয় স্টাডি ম্যাটেরিয়ালস</h2>
         <div class="row row-cols-1 row-cols-md-2 row-cols-lg-3 g-4">
@@ -528,10 +647,8 @@ require_once 'includes/header.php';
                         <h5 class="card-title"><?php echo htmlspecialchars($material['title']); ?></h5>
                         <div class="quiz-description-display"> 
                             <?php 
-                            // Since description can be HTML from Quill, we need to be careful.
-                            // For a short preview, strip_tags and then truncate.
                             if (!empty($material['description'])) {
-                                $desc_plain_sm = strip_tags($material['description']); // Remove HTML for plain text preview
+                                $desc_plain_sm = strip_tags($material['description']);
                                 echo htmlspecialchars(mb_substr($desc_plain_sm, 0, 100) . (mb_strlen($desc_plain_sm) > 100 ? '...' : ''));
                             } else {
                                 echo '<p class="text-muted fst-italic" style="margin-bottom: 0;"><em>কোনো বিবরণ নেই।</em></p>';
@@ -659,13 +776,15 @@ document.addEventListener('DOMContentLoaded', function() {
         requestAnimationFrame(animateParticles);
     }
 
-    if (heroSection && heroSection.offsetHeight > 0) {
+    if (heroSection && heroSection.offsetHeight > 0) { // Ensure hero section has height before initializing
         initParticles();
         animateParticles();
     }
-    window.addEventListener('resize', function() {
-        resizeCanvas();
-        initParticles(); 
+    window.addEventListener('resize', function() { // Re-initialize on resize
+        if (heroSection && heroSection.offsetHeight > 0) {
+            resizeCanvas();
+            initParticles(); 
+        }
     });
 });
 </script>
