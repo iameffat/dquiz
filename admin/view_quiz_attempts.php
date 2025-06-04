@@ -275,6 +275,24 @@ require_once 'includes/header.php'; // header.php uses $page_title
                 অংশগ্রহণকারীদের তালিকা ও স্কোর (কুইজ: <?php echo htmlspecialchars($quiz_info['title']); ?>)
             </div>
             <div class="card-body">
+                <?php
+                $duplicate_ips_found = [];
+                foreach($ip_counts as $ip => $count) {
+                    if ($count > 1) {
+                        $duplicate_ips_found[$ip] = $count;
+                    }
+                }
+
+                if (!empty($duplicate_ips_found)) {
+                    echo '<div class="alert alert-warning no-print"><strong>সতর্কতা:</strong> কিছু আইপি অ্যাড্রেস একাধিকবার ব্যবহৃত হয়েছে: ';
+                    $ip_messages = [];
+                    foreach($duplicate_ips_found as $ip => $count) {
+                        $ip_messages[] = htmlspecialchars($ip) . ' (' . $count . ' বার)';
+                    }
+                    echo implode(', ', $ip_messages);
+                    echo '. অনুগ্রহ করে এটি পর্যালোচনা করুন।</div>';
+                }
+                ?>
                 <?php if ($highest_score !== null): ?>
                     <div class="alert alert-info no-print">
                         এই কুইজে সর্বোচ্চ প্রাপ্ত নম্বর: <strong><?php echo number_format($highest_score, 2); ?></strong>
@@ -314,21 +332,25 @@ require_once 'includes/header.php'; // header.php uses $page_title
                                 }
                                 $row_class = '';
                                 
-                                $action_buttons_html = ''; // Start with empty action buttons
+                                // Apply warning class if IP is duplicated
+                                if (!empty($attempt['ip_address']) && isset($ip_counts[$attempt['ip_address']]) && $ip_counts[$attempt['ip_address']] > 1) {
+                                    $row_class .= ' table-warning'; // Add this class to highlight the row
+                                }
+
+                                $action_buttons_html = ''; 
 
                                 if ($attempt['is_cancelled']) {
-                                    $row_class = 'table-danger opacity-75';
+                                    $row_class .= ' table-danger opacity-75'; // Append to existing classes
                                     $status_text = '<span class="badge bg-danger">বাতিলকৃত</span>';
                                     $action_buttons_html = '<a href="view_quiz_attempts.php?quiz_id='.$quiz_id.'&action=reinstate_attempt&attempt_id='.$attempt['attempt_id'].'" class="btn btn-sm btn-warning mb-1 no-print" onclick="return confirm(\'আপনি কি নিশ্চিতভাবে এই অংশগ্রহণটি পুনঃবিবেচনা করতে চান?\');" title="পুনঃবিবেচনা করুন">পুনঃবিবেচনা</a>';
                                 } else {
                                     if ($attempt['score'] !== null && $highest_score !== null && $attempt['score'] == $highest_score && $attempt['score'] > 0) {
-                                        $row_class = 'table-success';
+                                        $row_class .= ' table-success'; // Append to existing classes
                                     }
                                     $status_text = '<span class="badge bg-success">সক্রিয়</span>';
                                     $action_buttons_html = '<a href="view_quiz_attempts.php?quiz_id='.$quiz_id.'&action=cancel_attempt&attempt_id='.$attempt['attempt_id'].'" class="btn btn-sm btn-danger mb-1 no-print" onclick="return confirm(\'আপনি কি নিশ্চিতভাবে এই অংশগ্রহণটি বাতিল করতে চান? বাতিল করলে স্কোর মুছে যাবে এবং র‍্যাংকিং-এ দেখানো হবে না।\');" title="বাতিল করুন">বাতিল</a>';
                                 }
                                 
-                                // Add "Delete Attempt" button
                                 $action_buttons_html .= ' <a href="view_quiz_attempts.php?quiz_id='.$quiz_id.'&action=delete_attempt&attempt_id='.$attempt['attempt_id'].'" class="btn btn-sm btn-outline-danger mb-1 no-print" onclick="return confirm(\'আপনি কি নিশ্চিতভাবে এই অংশগ্রহণ এবং এর সম্পর্কিত সকল উত্তর স্থায়ীভাবে ডিলিট করতে চান? এই কাজটি ফেরানো যাবে না।\');" title="অংশগ্রহণ ডিলিট করুন">ডিলিট</a>';
                                 $action_buttons_html .= ' <a href="../results.php?attempt_id='.$attempt['attempt_id'].'&quiz_id='.$quiz_id.'" target="_blank" class="btn btn-sm btn-outline-info mb-1 no-print" title="উত্তর দেখুন">উত্তর দেখুন</a>';
 
@@ -346,7 +368,7 @@ require_once 'includes/header.php'; // header.php uses $page_title
                                 if (!empty($attempt['os_platform'])) { $device_browser_info_screen .= ($device_browser_info_screen ? ' <small class="text-muted">(' . htmlspecialchars($attempt['os_platform']) . ')</small>' : htmlspecialchars($attempt['os_platform'])); }
                                 if (empty($device_browser_info_screen)) { $device_browser_info_screen = 'N/A'; }
                             ?>
-                            <tr class="<?php echo $row_class; ?>">
+                            <tr class="<?php echo trim($row_class); // trim to remove leading space if any ?>">
                                 <td><?php echo (!$attempt['is_cancelled'] && $attempt['score'] !== null) ? $display_rank : 'N/A'; ?></td>
                                 <td>
                                     <?php echo htmlspecialchars($attempt['user_name']); ?> (ID: <?php echo $attempt['user_id']; ?>)
