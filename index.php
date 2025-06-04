@@ -504,7 +504,7 @@ require_once 'includes/header.php';
     </div>
     <?php endif; ?>
 
-    <div class="row mt-5"> {/* Added mt-5 for more space */}
+    <div class="row mt-5">
         <div class="col-lg-7 col-md-6 mb-4 mb-md-0">
             <div class="quiz-rules-minimal h-100">
                 <h2 class="section-title">কুইজের নিয়মাবলী</h2>
