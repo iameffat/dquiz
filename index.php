@@ -331,7 +331,7 @@ $page_specific_styles = "
     .quiz-card-sm .btn {
         font-size: 0.85rem;
         padding: 0.4rem 0.8rem; 
-        align-self: flex-start; 
+        /* align-self: flex-start; /* Removed to allow button group behavior */
     }
     .quiz-card-sm .additional-info-home {
         font-size: 0.75rem;
@@ -476,13 +476,22 @@ require_once 'includes/header.php';
                             <li><strong>সময়:</strong> <?php echo $quiz['duration_minutes']; ?> মিনিট</li>
                             <li><strong>প্রশ্ন:</strong> <?php echo $quiz['question_count']; ?> টি</li>
                         </ul>
-                        <?php if ($is_disabled_button): ?>
-                            <button class="btn btn-sm <?php echo $button_class_home; ?> mt-2" disabled><?php echo $button_text_home; ?></button>
-                        <?php else: ?>
-                            <a href="<?php echo $link_href_home; ?>" class="btn btn-sm <?php echo $button_class_home; ?> mt-2">
-                                <?php echo $button_text_home; ?>
-                            </a>
-                        <?php endif; ?>
+                        <div class="mt-2"> <?php if ($is_disabled_button): ?>
+                                <button class="btn btn-sm <?php echo $button_class_home; ?>" disabled><?php echo $button_text_home; ?></button>
+                            <?php else: ?>
+                                <a href="<?php echo $link_href_home; ?>" class="btn btn-sm <?php echo $button_class_home; ?>">
+                                    <?php echo $button_text_home; ?>
+                                </a>
+                            <?php endif; ?>
+                            <button type="button" class="btn btn-sm btn-outline-secondary ms-1" 
+                                    onclick="shareQuiz('<?php echo htmlspecialchars(addslashes($quiz['title']), ENT_QUOTES); ?>', '<?php echo $base_url . 'quiz_page.php?id=' . $quiz['id']; ?>', this)" 
+                                    title="শেয়ার করুন">
+                                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-share-fill" viewBox="0 0 16 16">
+                                  <path d="M11 2.5a2.5 2.5 0 1 1 .603 1.628l-6.718 3.12a2.5 2.5 0 0 1 0 1.504l6.718 3.12a2.5 2.5 0 1 1-.488.876l-6.718-3.12a2.5 2.5 0 1 1 0-3.256l6.718-3.12A2.5 2.5 0 0 1 11 2.5"/>
+                                </svg>
+                                <span class="d-none d-sm-inline">শেয়ার</span>
+                            </button>
+                        </div>
                         <?php if (!empty($additional_info_home)): ?>
                             <div class="additional-info-home"><?php echo $additional_info_home; ?></div>
                         <?php endif; ?>
