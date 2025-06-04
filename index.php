@@ -142,12 +142,11 @@ $recent_quizzes_for_display = $temp_display_quizzes;
 
 // --- Fetch Study Materials for Homepage ---
 $study_materials_home = [];
-$max_study_materials_on_home = 3; // আপনি কয়টি দেখাতে চান
-// Ensure your table uses 'google_drive_link' as per your last request
+$max_study_materials_on_home = 3; 
 $sql_study_materials_home = "SELECT id, title, description, google_drive_link 
                              FROM study_materials 
                              ORDER BY created_at DESC 
-                             LIMIT " . $max_study_materials_on_home;
+                             LIMIT " . $max_study_materials_on_home; //
 $result_study_materials_home = $conn->query($sql_study_materials_home);
 if ($result_study_materials_home && $result_study_materials_home->num_rows > 0) {
     while ($row_sm = $result_study_materials_home->fetch_assoc()) {
@@ -155,8 +154,24 @@ if ($result_study_materials_home && $result_study_materials_home->num_rows > 0) 
     }
 }
 
+// --- Fetch Categories for Homepage ---
+$home_categories = [];
+$sql_home_cat = "SELECT c.id, c.name, c.icon_class, COUNT(q.id) as question_count 
+                 FROM categories c
+                 LEFT JOIN questions q ON c.id = q.category_id 
+                 GROUP BY c.id, c.name, c.icon_class
+                 HAVING question_count > 0
+                 ORDER BY question_count DESC, c.name ASC 
+                 LIMIT 4"; // Example: Show top 4 categories
+$result_home_cat = $conn->query($sql_home_cat);
+if ($result_home_cat && $result_home_cat->num_rows > 0) {
+    while ($row_hc = $result_home_cat->fetch_assoc()) {
+        $home_categories[] = $row_hc;
+    }
+}
 
-// Page-specific CSS for Minimal Hero Section, Animations, Snow, and new quiz card styles
+
+// Page-specific CSS 
 $page_specific_styles = "
     body {
         /* overflow-x: hidden; Optional: if animations cause horizontal scroll */
@@ -235,7 +250,7 @@ $page_specific_styles = "
         padding: 3rem 0;
         animation: fadeIn 1.5s ease-out;
     }
-    .quiz-rules-minimal, .how-to-participate, .recent-quizzes-section, .recent-study-materials-section {
+    .quiz-rules-minimal, .how-to-participate, .recent-quizzes-section, .recent-study-materials-section, .category-practice-section { /* Added .category-practice-section */
         background-color: #ffffff; 
         border: 1px solid #e9ecef; 
         border-radius: 12px; 
@@ -273,7 +288,6 @@ $page_specific_styles = "
         top: 2px; 
     }
 
-    /* UPDATED Styles for .quiz-card-sm */
     .quiz-card-sm { 
         border: 1px solid #dee2e6;
         border-radius: 8px;
@@ -304,7 +318,7 @@ $page_specific_styles = "
         margin-bottom: 0.75rem; 
         overflow: hidden;
         display: -webkit-box;
-        -webkit-line-clamp: 3; /* Limit to 3 lines */
+        -webkit-line-clamp: 3; 
         -webkit-box-orient: vertical;
         min-height: calc(1.5em * 1); 
     }
@@ -329,10 +343,10 @@ $page_specific_styles = "
     .quiz-card-sm ul.list-unstyled li {
         margin-bottom: 0.25rem;
     }
-    .quiz-card-sm .btn { /* This style is for all buttons within .quiz-card-sm */
+    .quiz-card-sm .btn { 
         font-size: 0.85rem;
         padding: 0.4rem 0.8rem; 
-        align-self: flex-start; /* Added this line */
+        align-self: flex-start; 
     }
     .quiz-card-sm .additional-info-home {
         font-size: 0.75rem;
@@ -353,6 +367,18 @@ $page_specific_styles = "
     .archived-quiz-card-home { background-color: #f8f9fa; border-left: 4px solid #6c757d; }
     .archived-quiz-card-home .card-title { color: #343a40; }
 
+    .category-card-home { /* Specific for category cards on homepage */
+        text-align: center;
+    }
+    .category-card-home .category-icon-home {
+        font-size: 2.5rem;
+        margin-bottom: 0.75rem;
+        color: var(--bs-primary);
+    }
+    body.dark-mode .category-card-home .category-icon-home {
+        color: var(--bs-primary-text-emphasis);
+    }
+
 
     @keyframes fadeInDown { from { opacity: 0; transform: translateY(-30px); } to { opacity: 1; transform: translateY(0); } }
     @keyframes fadeInUp { from { opacity: 0; transform: translateY(30px); } to { opacity: 1; transform: translateY(0); } }
@@ -365,8 +391,25 @@ $page_specific_styles = "
         .minimal-hero-section .upcoming-quiz-info h3 { font-size: 1.3rem; }
         .minimal-hero-section .upcoming-quiz-info p { font-size: 1rem; }
         .section-title { font-size: 1.5rem; }
-        .quiz-rules-minimal, .how-to-participate, .recent-quizzes-section, .recent-study-materials-section { padding: 1.5rem; }
+        .quiz-rules-minimal, .how-to-participate, .recent-quizzes-section, .recent-study-materials-section, .category-practice-section { padding: 1.5rem; }
     }
+
+    body.dark-mode .minimal-hero-section { background: linear-gradient(180deg, #2b3035 0%, #212529 100%); color: #dee2e6; border-bottom-color: #495057; }
+    body.dark-mode .minimal-hero-section p.lead { color: #adb5bd; }
+    body.dark-mode .minimal-hero-section .upcoming-quiz-info h3 { color: #6ea8fe; }
+    body.dark-mode .minimal-hero-section .btn-custom-primary { background-color: #6ea8fe; border-color: #6ea8fe; color: #212529; }
+    body.dark-mode .minimal-hero-section .btn-custom-primary:hover { background-color: #8bb9fe; border-color: #8bb9fe; box-shadow: 0 4px 15px rgba(110, 168, 254, 0.2); }
+    body.dark-mode .quiz-rules-minimal, body.dark-mode .how-to-participate, body.dark-mode .recent-quizzes-section, body.dark-mode .recent-study-materials-section, body.dark-mode .category-practice-section { background-color: #2b3035; border-color: #495057; box-shadow: 0 6px 18px rgba(0,0,0,0.25); }
+    body.dark-mode .section-title { color: #f8f9fa; }
+    body.dark-mode .quiz-rules-minimal p, body.dark-mode .how-to-participate ul li { color: #adb5bd; }
+    body.dark-mode .how-to-participate ul li::before { color: #20c997; }
+    body.dark-mode .quiz-card-sm { background-color: #2c3136; border-color: #454a4f; }
+    body.dark-mode .quiz-card-sm:hover { box-shadow: 0 8px 20px rgba(0,0,0,0.3); }
+    body.dark-mode .quiz-card-sm .card-title { color: #e9ecef; }
+    body.dark-mode .quiz-card-sm .quiz-description-display { color: #b0b7bf; }
+    body.dark-mode .quiz-card-sm .quiz-description-display.no-real-description p.text-muted { color: var(--text-muted-color) !important; }
+    body.dark-mode .quiz-card-sm ul.list-unstyled { color: #9fa6ad; }
+    body.dark-mode .quiz-card-sm ul.list-unstyled strong { color: #ced4da; }
 "; 
 
 require_once 'includes/header.php'; 
@@ -427,53 +470,52 @@ require_once 'includes/header.php';
                 $card_class_home = 'quiz-card-sm';
                 $button_text_home = 'অংশগ্রহণের জন্য লগইন';
                 $button_class_home = 'btn-outline-primary';
-                $link_href_home = 'quiz_page.php?id=' . $quiz['id'];
+                $link_href_home = 'quiz_page.php?id=' . $quiz['id']; //
                 $additional_info_home = '';
                 $is_disabled_button = false;
-                $display_status_for_card = isset($quiz['status_display']) ? $quiz['status_display'] : $quiz['status'];
+                $display_status_for_card = isset($quiz['status_display']) ? $quiz['status_display'] : $quiz['status']; //
                 $description_html = $quiz['description'] ? trim($quiz['description']) : '';
                 $is_description_empty = empty(trim(strip_tags($description_html)));
 
-                // Prepare quiz URL for sharing
-                $quiz_page_url_home = rtrim((isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] === 'on' ? "https" : "http") . "://" . $_SERVER['HTTP_HOST'] . dirname($_SERVER['PHP_SELF']), '/') . '/quiz_page.php?id=' . $quiz['id'];
+                $quiz_page_url_home = rtrim((isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] === 'on' ? "https" : "http") . "://" . $_SERVER['HTTP_HOST'] . dirname($_SERVER['PHP_SELF']), '/') . '/quiz_page.php?id=' . $quiz['id']; //
 
 
                 if ($display_status_for_card === 'upcoming') {
-                    $card_class_home .= ' upcoming-quiz-card-home';
-                    $button_text_home = 'শীঘ্রই আসছে...';
-                    $button_class_home = 'btn-info';
+                    $card_class_home .= ' upcoming-quiz-card-home'; //
+                    $button_text_home = 'শীঘ্রই আসছে...'; //
+                    $button_class_home = 'btn-info'; //
                     $is_disabled_button = true; 
-                    if ($quiz['live_start_datetime']) {
-                        $additional_info_home = '<p class="small text-muted mt-1 mb-0">সম্ভাব্য শুরু: ' . format_datetime($quiz['live_start_datetime']) . '</p>';
+                    if ($quiz['live_start_datetime']) { //
+                        $additional_info_home = '<p class="small text-muted mt-1 mb-0">সম্ভাব্য শুরু: ' . format_datetime($quiz['live_start_datetime']) . '</p>'; //
                     }
                 } elseif ($display_status_for_card === 'live') {
-                    $card_class_home .= ' live-quiz-card-home';
-                    if (isset($_SESSION["loggedin"]) && $_SESSION["loggedin"] === true && $user_id_for_check) {
-                        list($attempted_this_live, $attempt_id_this_live) = hasUserAttemptedQuiz($conn, $user_id_for_check, $quiz['id']);
-                        if ($attempted_this_live) {
-                            $button_text_home = 'ফলাফল দেখুন';
-                            $link_href_home = 'results.php?attempt_id=' . $attempt_id_this_live . '&quiz_id=' . $quiz['id'];
-                            $additional_info_home = '<p class="small text-primary mt-1 mb-0">আপনি অংশগ্রহণ করেছেন।</p>';
+                    $card_class_home .= ' live-quiz-card-home'; //
+                    if (isset($_SESSION["loggedin"]) && $_SESSION["loggedin"] === true && $user_id_for_check) { //
+                        list($attempted_this_live, $attempt_id_this_live) = hasUserAttemptedQuiz($conn, $user_id_for_check, $quiz['id']); //
+                        if ($attempted_this_live) { //
+                            $button_text_home = 'ফলাফল দেখুন'; //
+                            $link_href_home = 'results.php?attempt_id=' . $attempt_id_this_live . '&quiz_id=' . $quiz['id']; //
+                            $additional_info_home = '<p class="small text-primary mt-1 mb-0">আপনি অংশগ্রহণ করেছেন।</p>'; //
                         } else {
-                             $button_text_home = 'অংশগ্রহণ করুন';
+                             $button_text_home = 'অংশগ্রহণ করুন'; //
                         }
                     } else {
-                         $link_href_home = 'login.php?redirect=' . urlencode('quiz_page.php?id=' . $quiz['id']); 
+                         $link_href_home = 'login.php?redirect=' . urlencode('quiz_page.php?id=' . $quiz['id']);  //
                     }
                 } elseif ($display_status_for_card === 'archived') {
-                    $card_class_home .= ' archived-quiz-card-home';
-                    if (isset($_SESSION["loggedin"]) && $_SESSION["loggedin"] === true && $user_id_for_check) {
-                        list($attempted_this_archived, $attempt_id_this_archived) = hasUserAttemptedQuiz($conn, $user_id_for_check, $quiz['id']);
-                        if ($attempted_this_archived) {
-                            $button_text_home = 'ফলাফল দেখুন';
-                            $link_href_home = 'results.php?attempt_id=' . $attempt_id_this_archived . '&quiz_id=' . $quiz['id'];
-                            $additional_info_home = '<p class="small text-primary mt-1 mb-0">আপনি অংশগ্রহণ করেছেন।</p>';
+                    $card_class_home .= ' archived-quiz-card-home'; //
+                    if (isset($_SESSION["loggedin"]) && $_SESSION["loggedin"] === true && $user_id_for_check) { //
+                        list($attempted_this_archived, $attempt_id_this_archived) = hasUserAttemptedQuiz($conn, $user_id_for_check, $quiz['id']); //
+                        if ($attempted_this_archived) { //
+                            $button_text_home = 'ফলাফল দেখুন'; //
+                            $link_href_home = 'results.php?attempt_id=' . $attempt_id_this_archived . '&quiz_id=' . $quiz['id']; //
+                            $additional_info_home = '<p class="small text-primary mt-1 mb-0">আপনি অংশগ্রহণ করেছেন।</p>'; //
                         } else {
-                            $button_text_home = 'অনুশীলন করুন';
+                            $button_text_home = 'অনুশীলন করুন'; //
                         }
                     } else {
-                        $button_text_home = 'অনুশীলনের জন্য লগইন';
-                         $link_href_home = 'login.php?redirect=' . urlencode('quiz_page.php?id=' . $quiz['id']);
+                        $button_text_home = 'অনুশীলনের জন্য লগইন'; //
+                         $link_href_home = 'login.php?redirect=' . urlencode('quiz_page.php?id=' . $quiz['id']); //
                     }
                 }
             ?>
@@ -519,6 +561,35 @@ require_once 'includes/header.php';
         <div class="alert alert-light text-center">এখন কোনো সাম্প্রতিক কুইজ নেই।</div>
     <?php endif; ?>
 
+
+    <?php if (!empty($home_categories)): ?>
+    <div class="category-practice-section content-section mt-4">
+        <h2 class="section-title">ক্যাটাগরি ভিত্তিক অনুশীলন</h2>
+        <div class="row row-cols-1 row-cols-md-2 row-cols-lg-4 g-4">
+            <?php foreach ($home_categories as $h_category): ?>
+            <div class="col">
+                <div class="card h-100 quiz-card-sm category-card-home">
+                    <div class="card-body d-flex flex-column">
+                         <?php if (!empty($h_category['icon_class'])): ?>
+                            <div class="category-icon-home"><i class="<?php echo htmlspecialchars($h_category['icon_class']); ?>"></i></div>
+                        <?php else: ?>
+                             <div class="category-icon-home"><i class="fas fa-tag"></i></div> {/* Default icon */}
+                        <?php endif; ?>
+                        <h5 class="card-title" style="font-size: 1.1rem;"><?php echo htmlspecialchars($h_category['name']); ?></h5>
+                        <p class="small text-muted mb-2">(<?php echo $h_category['question_count']; ?> টি প্রশ্ন)</p>
+                        <a href="practice_quiz.php?category_id=<?php echo $h_category['id']; ?>" class="btn btn-sm btn-outline-primary mt-auto">এখনই অনুশীলন করুন</a>
+                    </div>
+                </div>
+            </div>
+            <?php endforeach; ?>
+        </div>
+        <div class="text-center mt-4">
+            <a href="categories.php" class="btn btn-secondary">সকল ক্যাটাগরি দেখুন</a>
+        </div>
+    </div>
+    <?php endif; ?>
+
+
     <?php if (!empty($study_materials_home)): ?>
     <div class="recent-study-materials-section content-section"> <h2 class="section-title">প্রয়োজনীয় স্টাডি ম্যাটেরিয়ালস</h2>
         <div class="row row-cols-1 row-cols-md-2 row-cols-lg-3 g-4">
@@ -528,22 +599,20 @@ require_once 'includes/header.php';
                         <h5 class="card-title"><?php echo htmlspecialchars($material['title']); ?></h5>
                         <div class="quiz-description-display"> 
                             <?php 
-                            // Since description can be HTML from Quill, we need to be careful.
-                            // For a short preview, strip_tags and then truncate.
                             if (!empty($material['description'])) {
-                                $desc_plain_sm = strip_tags($material['description']); // Remove HTML for plain text preview
+                                $desc_plain_sm = strip_tags($material['description']); 
                                 echo htmlspecialchars(mb_substr($desc_plain_sm, 0, 100) . (mb_strlen($desc_plain_sm) > 100 ? '...' : ''));
                             } else {
                                 echo '<p class="text-muted fst-italic" style="margin-bottom: 0;"><em>কোনো বিবরণ নেই।</em></p>';
                             }
                             ?>
                         </div>
-                        <a href="<?php echo htmlspecialchars($material['google_drive_link']); ?>" target="_blank" class="btn btn-sm btn-outline-primary mt-auto">
-                           <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-link-45deg me-2" viewBox="0 0 16 16">
-                              <path d="M4.715 6.542 3.343 7.914a3 3 0 1 0 4.243 4.243l1.828-1.829A3 3 0 0 0 8.586 5.5L8 6.086a1 1 0 0 0-.154.199 2 2 0 0 1 .861 3.337L6.88 11.45a2 2 0 1 1-2.83-2.83l.793-.792a4 4 0 0 1-.128-1.287z"/>
-                              <path d="M6.586 4.672A3 3 0 0 0 7.414 9.5l.775-.776a2 2 0 0 1-.896-3.346L9.12 3.55a2 2 0 1 1 2.83 2.83l-.793.792c.112.42.155.855.128 1.287l1.372-1.372a3 3 0 1 0-4.243-4.243z"/>
+                        <a href="<?php echo htmlspecialchars($material['google_drive_link']); ?>" target="_blank" class="btn btn-sm btn-outline-primary mt-auto"> {/* */}
+                           <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-link-45deg me-2" viewBox="0 0 16 16"> {/* */}
+                              <path d="M4.715 6.542 3.343 7.914a3 3 0 1 0 4.243 4.243l1.828-1.829A3 3 0 0 0 8.586 5.5L8 6.086a1 1 0 0 0-.154.199 2 2 0 0 1 .861 3.337L6.88 11.45a2 2 0 1 1-2.83-2.83l.793-.792a4 4 0 0 1-.128-1.287z"/> {/* */}
+                              <path d="M6.586 4.672A3 3 0 0 0 7.414 9.5l.775-.776a2 2 0 0 1-.896-3.346L9.12 3.55a2 2 0 1 1 2.83 2.83l-.793.792c.112.42.155.855.128 1.287l1.372-1.372a3 3 0 1 0-4.243-4.243z"/> {/* */}
                             </svg>
-                            ডাউনলোড
+                            ডাউনলোড {/* */}
                         </a>
                     </div>
                 </div>
@@ -571,12 +640,12 @@ require_once 'includes/header.php';
             <div class="how-to-participate h-100">
                 <h2 class="section-title">কিভাবে অংশগ্রহণ করবেন</h2>
                 <ul>
-                    <li>প্রথমে, সাইটে <a href="register.php">রেজিস্ট্রেশন</a> করুন অথবা <a href="login.php">লগইন</a> করুন।</li>
-                    <li>"সকল কুইজ" পেইজ থেকে আপনার পছন্দের কুইজটি নির্বাচন করুন।</li>
+                    <li>প্রথমে, সাইটে <a href="register.php">রেজিস্ট্রেশন</a> করুন অথবা <a href="login.php">লগইন</a> করুন।</li> {/* */}
+                    <li>"সকল কুইজ" পেইজ থেকে আপনার পছন্দের কুইজটি নির্বাচন করুন।</li> {/* */}
                     <li>"অংশগ্রহণ করুন" বাটনে ক্লিক করে কুইজ শুরু করুন।</li>
                     <li>সঠিক উত্তর নির্বাচন করে সময় শেষ হওয়ার আগে সাবমিট করুন।</li>
-                    <li>সাবমিট করার পর আপনার ফলাফল এবং সঠিক উত্তরগুলো দেখতে পাবেন।</li>
-                    <li>নির্ধারিত কুইজের জন্য "র‍্যাংকিং" পেইজে আপনার অবস্থান দেখুন।</li>
+                    <li>সাবমিট করার পর আপনার ফলাফল এবং সঠিক উত্তরগুলো দেখতে পাবেন।</li> {/* */}
+                    <li>নির্ধারিত কুইজের জন্য "র‍্যাংকিং" পেইজে আপনার অবস্থান দেখুন।</li> {/* */}
                 </ul>
             </div>
         </div>
@@ -619,7 +688,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
         this.update = function() {
             this.y += this.speed;
-            this.x += Math.sin(this.y / (50 + Math.random()*50)) * 0.3;
+            this.x += Math.sin(this.y / (50 + Math.random()*50)) * 0.3; 
 
             if (this.y > canvas.height) {
                 this.y = 0 - this.size; 
@@ -659,13 +728,26 @@ document.addEventListener('DOMContentLoaded', function() {
         requestAnimationFrame(animateParticles);
     }
 
+    // Ensure heroSection is rendered and has a height before starting animation
     if (heroSection && heroSection.offsetHeight > 0) {
         initParticles();
         animateParticles();
+    } else if (heroSection) {
+        // Fallback if offsetHeight is 0 initially, try after a short delay
+        // or use an observer if more robust solution is needed.
+        setTimeout(() => {
+            if (heroSection.offsetHeight > 0) {
+                resizeCanvas(); // Ensure canvas is resized if hero size changed
+                initParticles();
+                animateParticles();
+            }
+        }, 200);
     }
+    
+    // Re-initialize particles on resize for better dynamic resizing
     window.addEventListener('resize', function() {
         resizeCanvas();
-        initParticles(); 
+        initParticles(); // This will recreate particles based on new canvas size
     });
 });
 </script>
