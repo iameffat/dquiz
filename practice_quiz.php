@@ -5,20 +5,37 @@ $base_url = '';
 require_once 'includes/db_connect.php';
 require_once 'includes/functions.php';
 
-$category_id = isset($_REQUEST['category_id']) ? intval($_REQUEST['category_id']) : 0; // GET or POST
+$category_id = isset($_REQUEST['category_id']) ? intval($_REQUEST['category_id']) : 0;
 $category_name = "";
 $questions = [];
 $total_questions_in_category = 0;
 
 // ডিফল্ট মান
-$default_num_questions = 10; // আগের ২০ থেকে কমিয়ে ১০ করা হলো ডিফল্ট
+$default_num_questions = 10;
 $default_duration_minutes = 0; // ০ মানে কোনো সময়সীমা নেই
 
-$num_questions_to_show = isset($_POST['num_questions']) ? intval($_POST['num_questions']) : $default_num_questions;
-$quiz_duration_minutes = isset($_POST['quiz_duration']) ? intval($_POST['quiz_duration']) : $default_duration_minutes;
+// প্রথমে POST থেকে মান নেওয়ার চেষ্টা করুন, না পেলে GET, সবশেষে ডিফল্ট
+if (isset($_POST['num_questions'])) {
+    $num_questions_to_show = intval($_POST['num_questions']);
+} elseif (isset($_GET['num_questions'])) {
+    $num_questions_to_show = intval($_GET['num_questions']);
+} else {
+    $num_questions_to_show = $default_num_questions;
+}
+
+if (isset($_POST['quiz_duration'])) {
+    $quiz_duration_minutes = intval($_POST['quiz_duration']);
+} elseif (isset($_GET['quiz_duration'])) {
+    $quiz_duration_minutes = intval($_GET['quiz_duration']);
+} else {
+    $quiz_duration_minutes = $default_duration_minutes;
+}
+
 $quiz_duration_seconds = $quiz_duration_minutes * 60;
 
-$start_quiz = isset($_POST['start_practice_quiz_submit']); // ফর্ম সাবমিট হয়েছে কিনা
+// ফর্ম সাবমিট হয়েছে কিনা অথবা URL এ প্যারামিটার আছে কিনা
+$start_quiz = isset($_POST['start_practice_quiz_submit']) || (isset($_GET['num_questions']) && isset($_GET['quiz_duration']));
+
 
 if ($category_id <= 0) {
     $_SESSION['flash_message'] = "অবৈধ ক্যাটাগরি ID।";
@@ -64,26 +81,23 @@ if($stmt_q_count){
     error_log("Failed to prepare question count statement: " . $conn->error);
 }
 
-if ($total_questions_in_category == 0 && $start_quiz) { // Check only if trying to start
+if ($total_questions_in_category == 0 && $start_quiz) {
     $_SESSION['flash_message'] = "দুঃখিত, \"" . htmlspecialchars($category_name) . "\" ক্যাটাগরিতে অনুশীলনের জন্য কোনো প্রশ্ন এখনো যোগ করা হয়নি।";
     $_SESSION['flash_message_type'] = "info";
-    header("Location: categories.php"); // Redirect back or to categories.php
+    header("Location: categories.php");
     exit;
 }
 
 
-// যদি ফর্ম সাবমিট করা হয় এবং প্রশ্ন সংখ্যা ভ্যালিড হয়, তাহলে প্রশ্ন লোড করুন
 if ($start_quiz) {
     if ($num_questions_to_show <= 0) {
-        // যদি ইউজার ০ বা তার কম প্রশ্ন সিলেক্ট করে, একটি ডিফল্ট সংখ্যা ব্যবহার করুন বা এরর দেখান
-        // আপাতত ডিফল্ট ১০টি প্রশ্ন লোড করা হচ্ছে।
         $num_questions_to_show = $default_num_questions; 
-        // আপনি চাইলে এখানে একটি এরর মেসেজও সেট করতে পারেন
-        // $_SESSION['flash_message'] = "অনুগ্রহ করে কমপক্ষে ১টি প্রশ্ন নির্বাচন করুন।";
-        // $_SESSION['flash_message_type'] = "warning";
     }
-    $num_questions_to_load = min($num_questions_to_show, $total_questions_in_category);
-    if($num_questions_to_load <=0 && $total_questions_in_category > 0) $num_questions_to_load = $total_questions_in_category;
+    if ($num_questions_to_show > $total_questions_in_category && $total_questions_in_category > 0) {
+        $num_questions_to_show = $total_questions_in_category; // যদি ইউজার বেশি প্রশ্ন চায় কিন্তু ক্যাটাগরিতে কম থাকে
+    }
+    
+    $num_questions_to_load = $num_questions_to_show;
 
 
     $sql_questions = "SELECT id, question_text, image_url, explanation FROM questions WHERE category_id = ? ORDER BY RAND() LIMIT ?";
@@ -117,7 +131,6 @@ if ($start_quiz) {
         error_log("Failed to prepare questions fetch statement: " . $conn->error);
         $_SESSION['flash_message'] = "প্রশ্ন আনতে ডাটাবেস সমস্যা হয়েছে।";
         $_SESSION['flash_message_type'] = "danger";
-        // Redirect or handle error display
         header("Location: practice_quiz.php?category_id=" . $category_id);
         exit;
     }
@@ -136,6 +149,8 @@ $page_specific_styles = "
     .practice-mode-notice { font-size: 0.9rem; padding: 0.75rem 1.25rem; margin-bottom: 1.5rem; border: 1px solid var(--bs-info-border-subtle); background-color: var(--bs-info-bg-subtle); color: var(--bs-info-text-emphasis); border-radius: var(--bs-border-radius); text-align: center; }
     body.dark-mode .practice-mode-notice { border-color: var(--bs-info-border-subtle); background-color: var(--bs-info-bg-subtle); color: var(--bs-info-text-emphasis); }
 
+    .timer-display-container { position: sticky; top: 0; background-color: var(--body-bg); padding: 10px 0; z-index: 100; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+    body.dark-mode .timer-display-container { background-color: var(--bs-dark-bg-subtle); box-shadow: 0 2px 4px rgba(255,255,255,0.05); }
     .timer-display { font-size: 1.2rem; font-weight: bold; }
     .timer-display.critical { color: var(--bs-danger); }
     .settings-card { max-width: 600px; margin: 2rem auto; }
@@ -156,32 +171,29 @@ require_once 'includes/header.php';
                     <input type="hidden" name="category_id" value="<?php echo $category_id; ?>">
                     <div class="mb-3">
                         <label for="num_questions" class="form-label">কতটি প্রশ্ন দিয়ে অনুশীলন করতে চান?</label>
-                        <select name="num_questions" id="num_questions" class="form-select">
-                            <?php
-                                $options_q_count = [5, 10, 15, 20, 25, 30, 50];
-                                if ($total_questions_in_category > 0) {
-                                    echo "<option value='{$total_questions_in_category}'>সবগুলো ({$total_questions_in_category}টি)</option>";
-                                }
-                                foreach($options_q_count as $count_opt){
-                                    if($count_opt < $total_questions_in_category){
-                                        echo "<option value='{$count_opt}' ".($count_opt == $default_num_questions ? 'selected' : '').">{$count_opt} টি</option>";
-                                    }
-                                }
-                                if ($total_questions_in_category > 0 && !in_array($total_questions_in_category, $options_q_count) && $total_questions_in_category <= max($options_q_count) && $total_questions_in_category > min($options_q_count)) {
-                                    // Add if total is unique and within reasonable range
-                                } elseif ($total_questions_in_category == 0 && empty($options_q_count)) {
-                                     echo "<option value='10' selected>১০ টি (ডিফল্ট)</option>"; // Fallback if no questions
-                                }
-                            ?>
-                        </select>
-                         <small class="form-text text-muted">এই ক্যাটাগরিতে মোট <?php echo $total_questions_in_category; ?> টি প্রশ্ন রয়েছে।</small>
+                        <input type="number" name="num_questions" id="num_questions" class="form-control" 
+                               value="<?php echo $default_num_questions; ?>" 
+                               min="1" 
+                               max="<?php echo $total_questions_in_category > 0 ? $total_questions_in_category : $default_num_questions; ?>" 
+                               required>
+                        <small class="form-text text-muted">
+                            এই ক্যাটাগরিতে মোট <?php echo $total_questions_in_category; ?> টি প্রশ্ন রয়েছে। 
+                            আপনি ১ থেকে <?php echo $total_questions_in_category > 0 ? $total_questions_in_category : $default_num_questions; ?> এর মধ্যে যেকোনো সংখ্যা দিতে পারেন।
+                        </small>
                     </div>
                     <div class="mb-3">
                         <label for="quiz_duration" class="form-label">সময়সীমা (মিনিট):</label>
-                        <input type="number" name="quiz_duration" id="quiz_duration" class="form-control" value="<?php echo $default_duration_minutes; ?>" min="0">
+                        <input type="number" name="quiz_duration" id="quiz_duration" class="form-control" 
+                               value="<?php echo $default_duration_minutes; ?>" 
+                               min="0">
                         <small class="form-text text-muted">০ দিলে কোনো সময়সীমা থাকবে না।</small>
                     </div>
-                    <button type="submit" name="start_practice_quiz_submit" class="btn btn-primary w-100">অনুশীলন শুরু করুন</button>
+                    <button type="submit" name="start_practice_quiz_submit" class="btn btn-primary w-100" <?php if ($total_questions_in_category == 0) echo 'disabled'; ?>>
+                        অনুশীলন শুরু করুন
+                    </button>
+                    <?php if ($total_questions_in_category == 0): ?>
+                        <p class="text-danger mt-2 text-center">এই ক্যাটাগরিতে কোনো প্রশ্ন না থাকায় অনুশীলন শুরু করা যাচ্ছে না।</p>
+                    <?php endif; ?>
                 </form>
                  <div class="mt-3 practice-mode-notice">
                     <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-info-circle-fill me-2" viewBox="0 0 16 16">
@@ -195,12 +207,18 @@ require_once 'includes/header.php';
         
         <?php if ($quiz_duration_seconds > 0): ?>
         <div class="text-center my-3 timer-display-container">
-            <span id="timerDisplayPractice" class="timer-display">সময় বাকি: <?php echo gmdate("H:i:s", $quiz_duration_seconds); ?></span>
+            <span id="timerDisplayPractice" class="timer-display">সময় বাকি: --:--:--</span>
         </div>
         <?php endif; ?>
 
         <?php if (empty($questions)): ?>
-            <div class="alert alert-warning text-center">এই ক্যাটাগরি বা নির্বাচিত সংখ্যক প্রশ্নের জন্য কোনো প্রশ্ন পাওয়া যায়নি।</div>
+            <div class="alert alert-warning text-center">
+                <?php if ($total_questions_in_category > 0): ?>
+                    আপনি যে সংখ্যক প্রশ্ন নির্বাচন করেছেন (<?php echo $num_questions_to_show; ?>), সেই সংখ্যক প্রশ্ন এই ক্যাটাগরিতে পাওয়া যায়নি বা প্রশ্ন লোড করতে সমস্যা হয়েছে।
+                <?php else: ?>
+                    এই ক্যাটাগরিতে অনুশীলনের জন্য কোনো প্রশ্ন পাওয়া যায়নি।
+                <?php endif; ?>
+            </div>
              <div class="text-center mt-3">
                 <a href="practice_quiz.php?category_id=<?php echo $category_id; ?>" class="btn btn-secondary">সেটিংস পরিবর্তন করুন</a>
                 <a href="categories.php" class="btn btn-info">অন্য ক্যাটাগরি দেখুন</a>
@@ -244,7 +262,7 @@ require_once 'includes/header.php';
                                     <input class="form-check-input question-option-radio" type="radio"
                                            name="answers[<?php echo $question['id']; ?>]"
                                            id="option_<?php echo $option['id']; ?>_q<?php echo $question['id']; ?>"
-                                           value="<?php echo $option['id']; ?>" required>
+                                           value="<?php echo $option['id']; ?>"> {/* removed 'required' attribute */}
                                     <label class="form-check-label w-100 p-2 rounded border" for="option_<?php echo $option['id']; ?>_q<?php echo $question['id']; ?>">
                                         <?php echo escape_html($option['option_text']); ?>
                                     </label>
@@ -266,53 +284,45 @@ require_once 'includes/header.php';
 document.addEventListener('DOMContentLoaded', function() {
     const quizForm = document.getElementById('practiceQuizForm');
     const timerDisplay = document.getElementById('timerDisplayPractice');
-    let timeLeft = <?php echo $quiz_duration_seconds > 0 ? $quiz_duration_seconds : -1; ?>; // -1 if no timer
+    let timeLeft = <?php echo $quiz_duration_seconds > 0 ? $quiz_duration_seconds : -1; ?>;
     let timerInterval;
+
+    function formatTime(seconds) {
+        const h = Math.floor(seconds / 3600);
+        const m = Math.floor((seconds % 3600) / 60);
+        const s = seconds % 60;
+        let timeString = "";
+        if (h > 0) timeString += String(h).padStart(2, '0') + ":";
+        timeString += String(m).padStart(2, '0') + ":" + String(s).padStart(2, '0');
+        return timeString;
+    }
 
     function updateTimerDisplay() {
         if (!timerDisplay || timeLeft < 0) return;
-        const hours = Math.floor(timeLeft / 3600);
-        const minutes = Math.floor((timeLeft % 3600) / 60);
-        const seconds = timeLeft % 60;
         
-        let displayString = "সময় বাকি: ";
-        if (hours > 0) displayString += String(hours).padStart(2, '0') + ":";
-        displayString += String(minutes).padStart(2, '0') + ":" + String(seconds).padStart(2, '0');
-        
-        timerDisplay.textContent = displayString;
+        timerDisplay.textContent = "সময় বাকি: " + formatTime(timeLeft);
 
         if (timeLeft <= 60 && timeLeft > 0) { 
             timerDisplay.classList.add('critical'); 
-            timerDisplay.classList.remove('text-success'); // Example: remove other colors
+            timerDisplay.classList.remove('text-success');
         } else if (timeLeft > 60) {
             timerDisplay.classList.remove('critical');
-             // timerDisplay.classList.add('text-success'); // Example: green for ample time
         }
         
         if (timeLeft <= 0) {
             timerDisplay.textContent = "সময় শেষ!";
             timerDisplay.classList.remove('critical');
-            timerDisplay.classList.add('text-danger');
+            timerDisplay.classList.add('text-danger'); // Bootstrap class for red color
             if (quizForm && !quizForm.dataset.submitted) {
                 quizForm.dataset.submitted = 'true';
-                // Check if all questions have an answer before submitting
-                let allAnswered = true;
-                const questionCards = document.querySelectorAll('.question-card');
-                questionCards.forEach(card => {
-                    const questionId = card.id.split('_')[1];
-                    if (!document.querySelector(`input[name="answers[${questionId}]"]:checked`)) {
-                        // If an answer is required even on timeout, you can alert the user or handle it.
-                        // For practice, it might be okay to submit as is.
-                    }
-                });
-                quizForm.submit();
+                quizForm.submit(); // Submit the form when time is up
             }
             if(timerInterval) clearInterval(timerInterval);
         }
         if (timeLeft > 0) timeLeft--;
     }
 
-    if (timeLeft > 0) { // Start timer only if duration is set
+    if (timeLeft >= 0 && document.getElementById('practiceQuizForm')) { // Start timer only if form exists and time is set
         updateTimerDisplay(); // Initial display
         timerInterval = setInterval(updateTimerDisplay, 1000);
     }
@@ -339,6 +349,21 @@ document.addEventListener('DOMContentLoaded', function() {
             });
         });
     });
+
+    // Form validation for number of questions
+    const practiceSettingsForm = document.getElementById('practiceSettingsForm');
+    if (practiceSettingsForm) {
+        const numQuestionsInput = document.getElementById('num_questions');
+        const totalQuestionsAvailable = <?php echo $total_questions_in_category; ?>;
+
+        numQuestionsInput.addEventListener('input', function() {
+            let val = parseInt(this.value);
+            if (val < 1) this.value = 1;
+            if (totalQuestionsAvailable > 0 && val > totalQuestionsAvailable) {
+                this.value = totalQuestionsAvailable;
+            }
+        });
+    }
 });
 </script>
 
