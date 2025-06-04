@@ -1,4 +1,5 @@
 <?php
+// quizzes.php
 $page_title = "সকল কুইজ";
 $base_url = ''; // Root directory
 require_once 'includes/db_connect.php';
@@ -228,17 +229,28 @@ $page_specific_styles = "
         color: #495057;
     }
 
+    .quiz-item-card .btn-action-group { /* Wrapper for buttons */
+        display: flex;
+        flex-wrap: wrap; /* Allow buttons to wrap */
+        gap: 0.5rem; /* Space between buttons */
+        margin-top: auto; /* Push to bottom if description is short */
+    }
     .quiz-item-card .btn-action {
         font-size: 0.9rem;
-        padding: 0.6rem 1.5rem; 
+        padding: 0.6rem 1.2rem; /* Adjusted for better look with icon */
         border-radius: 50px; 
         font-weight: 500;
-        align-self: flex-start;
+        /* align-self: flex-start; Removed to allow flex-wrap to manage alignment */
         transition: all 0.3s ease;
-        margin-top: auto; 
+        /* margin-top: auto; Removed as group handles this */
+        display: inline-flex; /* For icon alignment */
+        align-items: center; /* For icon alignment */
+    }
+    .quiz-item-card .btn-action svg { /* For share icon */
+        margin-right: 0.3rem;
     }
     .quiz-item-card .btn-action:hover {
-        transform: scale(1.05);
+        transform: scale(1.03); /* Slightly less aggressive hover */
     }
     
     .btn-success-custom { background-color: #28a745; border-color: #28a745; color: white; }
@@ -306,6 +318,7 @@ require_once 'includes/header.php';
                         list($attempted_live, $attempt_id_live) = hasUserAttemptedQuiz($conn, $user_id_for_check, $quiz['id']); 
                         $description_html_live = $quiz['description'] ? trim($quiz['description']) : ''; // Keep HTML
                         $is_description_empty_live = empty(trim(strip_tags($description_html_live))); // Check if visually empty
+                        $quiz_page_url_live = rtrim((isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] === 'on' ? "https" : "http") . "://" . $_SERVER['HTTP_HOST'] . dirname($_SERVER['PHP_SELF']), '/') . '/quiz_page.php?id=' . $quiz['id'];
                     ?>
                     <div class="col">
                         <div class="card quiz-item-card live-quiz">
@@ -324,15 +337,25 @@ require_once 'includes/header.php';
                                         <li><i>📅</i><small>শেষ হবে: <?php echo format_datetime($quiz['live_end_datetime']); ?></small></li>
                                     <?php endif; ?>
                                 </ul>
-                                <?php if (isset($_SESSION["loggedin"]) && $_SESSION["loggedin"] === true): ?>
-                                    <?php if ($attempted_live): ?>
-                                        <a href="results.php?attempt_id=<?php echo $attempt_id_live; ?>&quiz_id=<?php echo $quiz['id']; ?>" class="btn btn-action btn-outline-info-custom">ফলাফল দেখুন</a>
-                                        <p class="small text-success mt-2 mb-0">আপনি অংশগ্রহণ করেছেন।</p>
+                                <div class="btn-action-group"> {/* Wrapper for buttons */}
+                                    <?php if (isset($_SESSION["loggedin"]) && $_SESSION["loggedin"] === true): ?>
+                                        <?php if ($attempted_live): ?>
+                                            <a href="results.php?attempt_id=<?php echo $attempt_id_live; ?>&quiz_id=<?php echo $quiz['id']; ?>" class="btn btn-action btn-outline-info-custom">ফলাফল দেখুন</a>
+                                        <?php else: ?>
+                                            <a href="quiz_page.php?id=<?php echo $quiz['id']; ?>" class="btn btn-action btn-success-custom">অংশগ্রহণ করুন</a>
+                                        <?php endif; ?>
                                     <?php else: ?>
-                                        <a href="quiz_page.php?id=<?php echo $quiz['id']; ?>" class="btn btn-action btn-success-custom">অংশগ্রহণ করুন</a>
+                                        <a href="login.php?redirect=<?php echo urlencode('quiz_page.php?id=' . $quiz['id']); ?>" class="btn btn-action btn-primary-custom">লগইন করে অংশগ্রহণ করুন</a>
                                     <?php endif; ?>
-                                <?php else: ?>
-                                    <a href="login.php?redirect=<?php echo urlencode('quiz_page.php?id=' . $quiz['id']); ?>" class="btn btn-action btn-primary-custom">লগইন করে অংশগ্রহণ করুন</a>
+                                    <button class="btn btn-action btn-outline-secondary-custom" 
+                                            onclick="shareQuiz('<?php echo htmlspecialchars(addslashes($quiz['title']), ENT_QUOTES); ?>', '<?php echo htmlspecialchars($quiz_page_url_live, ENT_QUOTES); ?>', this)">
+                                        <svg xmlns="http://www.w3.org/2000/svg" width="1em" height="1em" fill="currentColor" class="bi bi-share-fill" viewBox="0 0 16 16">
+                                            <path d="M11 2.5a2.5 2.5 0 1 1 .603 1.628l-6.718 3.12a2.5 2.5 0 0 1 0 1.504l6.718 3.12a2.5 2.5 0 1 1-.488.876l-6.718-3.12a2.5 2.5 0 1 1 0-3.256l6.718-3.12A2.5 2.5 0 0 1 11 2.5"/>
+                                        </svg> শেয়ার
+                                    </button>
+                                </div>
+                                <?php if (isset($_SESSION["loggedin"]) && $_SESSION["loggedin"] === true && $attempted_live): ?>
+                                    <p class="small text-primary mt-2 mb-0">আপনি অংশগ্রহণ করেছেন।</p>
                                 <?php endif; ?>
                             </div>
                         </div>
@@ -351,6 +374,7 @@ require_once 'includes/header.php';
                     <?php
                         $description_html_upcoming = $quiz['description'] ? trim($quiz['description']) : '';
                         $is_description_empty_upcoming = empty(trim(strip_tags($description_html_upcoming)));
+                        $quiz_page_url_upcoming = rtrim((isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] === 'on' ? "https" : "http") . "://" . $_SERVER['HTTP_HOST'] . dirname($_SERVER['PHP_SELF']), '/') . '/quiz_page.php?id=' . $quiz['id'];
                     ?>
                     <div class="col">
                         <div class="card quiz-item-card upcoming-quiz">
@@ -369,7 +393,15 @@ require_once 'includes/header.php';
                                         <li><i>📅</i><small>শুরু হবে: <?php echo format_datetime($quiz['live_start_datetime']); ?></small></li>
                                     <?php endif; ?>
                                 </ul>
-                                <button class="btn btn-action btn-info-custom" disabled>শীঘ্রই আসছে...</button>
+                                <div class="btn-action-group">
+                                    <button class="btn btn-action btn-info-custom" disabled>শীঘ্রই আসছে...</button>
+                                    <button class="btn btn-action btn-outline-secondary-custom" 
+                                            onclick="shareQuiz('<?php echo htmlspecialchars(addslashes($quiz['title']), ENT_QUOTES); ?>', '<?php echo htmlspecialchars($quiz_page_url_upcoming, ENT_QUOTES); ?>', this)">
+                                        <svg xmlns="http://www.w3.org/2000/svg" width="1em" height="1em" fill="currentColor" class="bi bi-share-fill" viewBox="0 0 16 16">
+                                            <path d="M11 2.5a2.5 2.5 0 1 1 .603 1.628l-6.718 3.12a2.5 2.5 0 0 1 0 1.504l6.718 3.12a2.5 2.5 0 1 1-.488.876l-6.718-3.12a2.5 2.5 0 1 1 0-3.256l6.718-3.12A2.5 2.5 0 0 1 11 2.5"/>
+                                        </svg> শেয়ার
+                                    </button>
+                                </div>
                             </div>
                         </div>
                     </div>
@@ -388,6 +420,7 @@ require_once 'includes/header.php';
                         list($attempted_archived, $attempt_id_archived) = hasUserAttemptedQuiz($conn, $user_id_for_check, $quiz['id']); 
                         $description_html_archived = $quiz['description'] ? trim($quiz['description']) : '';
                         $is_description_empty_archived = empty(trim(strip_tags($description_html_archived)));
+                        $quiz_page_url_archived = rtrim((isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] === 'on' ? "https" : "http") . "://" . $_SERVER['HTTP_HOST'] . dirname($_SERVER['PHP_SELF']), '/') . '/quiz_page.php?id=' . $quiz['id'];
                     ?>
                     <div class="col">
                         <div class="card quiz-item-card archived-quiz">
@@ -403,15 +436,25 @@ require_once 'includes/header.php';
                                    <li><i>🕒</i><strong>সময়:</strong> <?php echo $quiz['duration_minutes']; ?> মিনিট</li>
                                    <li><i>❓</i><strong>প্রশ্ন:</strong> <?php echo $quiz['question_count']; ?> টি</li>
                                 </ul>
-                                <?php if (isset($_SESSION["loggedin"]) && $_SESSION["loggedin"] === true): ?>
-                                    <?php if ($attempted_archived): ?>
-                                        <a href="results.php?attempt_id=<?php echo $attempt_id_archived; ?>&quiz_id=<?php echo $quiz['id']; ?>" class="btn btn-action btn-outline-info-custom">ফলাফল দেখুন</a>
-                                        <p class="small text-primary mt-2 mb-0">আপনি এই কুইজে অংশগ্রহণ করেছিলেন।</p>
+                                <div class="btn-action-group">
+                                    <?php if (isset($_SESSION["loggedin"]) && $_SESSION["loggedin"] === true): ?>
+                                        <?php if ($attempted_archived): ?>
+                                            <a href="results.php?attempt_id=<?php echo $attempt_id_archived; ?>&quiz_id=<?php echo $quiz['id']; ?>" class="btn btn-action btn-outline-info-custom">ফলাফল দেখুন</a>
+                                        <?php else: ?>
+                                            <a href="quiz_page.php?id=<?php echo $quiz['id']; ?>" class="btn btn-action btn-secondary-custom">অনুশীলন করুন</a>
+                                        <?php endif; ?>
                                     <?php else: ?>
-                                        <a href="quiz_page.php?id=<?php echo $quiz['id']; ?>" class="btn btn-action btn-secondary-custom">অনুশীলন করুন</a>
+                                         <a href="login.php?redirect=<?php echo urlencode('quiz_page.php?id=' . $quiz['id']); ?>" class="btn btn-action btn-outline-secondary-custom">লগইন করে অনুশীলন করুন</a>
                                     <?php endif; ?>
-                                <?php else: ?>
-                                     <a href="login.php?redirect=<?php echo urlencode('quiz_page.php?id=' . $quiz['id']); ?>" class="btn btn-action btn-outline-secondary-custom">লগইন করে অনুশীলন করুন</a>
+                                    <button class="btn btn-action btn-outline-secondary-custom" 
+                                            onclick="shareQuiz('<?php echo htmlspecialchars(addslashes($quiz['title']), ENT_QUOTES); ?>', '<?php echo htmlspecialchars($quiz_page_url_archived, ENT_QUOTES); ?>', this)">
+                                        <svg xmlns="http://www.w3.org/2000/svg" width="1em" height="1em" fill="currentColor" class="bi bi-share-fill" viewBox="0 0 16 16">
+                                            <path d="M11 2.5a2.5 2.5 0 1 1 .603 1.628l-6.718 3.12a2.5 2.5 0 0 1 0 1.504l6.718 3.12a2.5 2.5 0 1 1-.488.876l-6.718-3.12a2.5 2.5 0 1 1 0-3.256l6.718-3.12A2.5 2.5 0 0 1 11 2.5"/>
+                                        </svg> শেয়ার
+                                    </button>
+                                </div>
+                                 <?php if (isset($_SESSION["loggedin"]) && $_SESSION["loggedin"] === true && $attempted_archived): ?>
+                                    <p class="small text-primary mt-2 mb-0">আপনি এই কুইজে অংশগ্রহণ করেছিলেন।</p>
                                 <?php endif; ?>
                             </div>
                         </div>
