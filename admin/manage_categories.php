@@ -11,14 +11,13 @@ $feedback_type = "";
 
 // Handle Add/Edit/Delete Actions
 $edit_mode = false;
-$category_to_edit = ['id' => '', 'name' => '', 'description' => '', 'icon_class' => ''];
+$category_to_edit = ['id' => '', 'name' => '']; // বিবরণ এবং আইকন ক্লাস সরানো হয়েছে
 
 if ($_SERVER["REQUEST_METHOD"] == "POST") {
     if (isset($_POST['save_category'])) {
         $category_id = isset($_POST['category_id']) ? intval($_POST['category_id']) : 0;
         $name = trim($_POST['name']);
-        $description = trim($_POST['description']);
-        $icon_class = trim($_POST['icon_class']);
+        // বিবরণ এবং আইকন ক্লাসের ইনপুট আর নেওয়া হচ্ছে না
 
         if (empty($name)) {
             $errors[] = "ক্যাটাগরির নাম আবশ্যক।";
@@ -26,9 +25,9 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
 
         if (empty($errors)) {
             if ($category_id > 0) { // Update existing category
-                $sql = "UPDATE categories SET name = ?, description = ?, icon_class = ? WHERE id = ?";
+                $sql = "UPDATE categories SET name = ? WHERE id = ?"; // SQL আপডেটেড
                 $stmt = $conn->prepare($sql);
-                $stmt->bind_param("sssi", $name, $description, $icon_class, $category_id);
+                $stmt->bind_param("si", $name, $category_id); // বাইন্ডিং আপডেটেড
                 if ($stmt->execute()) {
                     $_SESSION['flash_message'] = "ক্যাটাগরি সফলভাবে আপডেট করা হয়েছে।";
                     $_SESSION['flash_message_type'] = "success";
@@ -37,14 +36,14 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
                     $_SESSION['flash_message_type'] = "danger";
                 }
             } else { // Add new category
-                $sql = "INSERT INTO categories (name, description, icon_class) VALUES (?, ?, ?)";
+                $sql = "INSERT INTO categories (name) VALUES (?)"; // SQL আপডেটেড
                 $stmt = $conn->prepare($sql);
-                $stmt->bind_param("sss", $name, $description, $icon_class);
+                $stmt->bind_param("s", $name); // বাইন্ডিং আপডেটেড
                 if ($stmt->execute()) {
                     $_SESSION['flash_message'] = "নতুন ক্যাটাগরি \"".htmlspecialchars($name)."\" সফলভাবে যোগ করা হয়েছে।";
                     $_SESSION['flash_message_type'] = "success";
                 } else {
-                    if ($conn->errno == 1062) { // Duplicate entry
+                    if ($conn->errno == 1062) { 
                          $_SESSION['flash_message'] = "এই নামের ক্যাটাগরি 이미 আছে।";
                          $_SESSION['flash_message_type'] = "warning";
                     } else {
@@ -57,19 +56,16 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
             header("Location: manage_categories.php");
             exit;
         } else {
-            // Preserve form data on error for add/edit
             $category_to_edit['id'] = $category_id;
             $category_to_edit['name'] = $name;
-            $category_to_edit['description'] = $description;
-            $category_to_edit['icon_class'] = $icon_class;
-            if($category_id > 0) $edit_mode = true; // Stay in edit mode if there was an error during update
+            if($category_id > 0) $edit_mode = true;
         }
     }
 } elseif (isset($_GET['action'])) {
     if ($_GET['action'] == 'edit' && isset($_GET['id'])) {
         $edit_mode = true;
         $category_id_to_fetch = intval($_GET['id']);
-        $sql_fetch = "SELECT id, name, description, icon_class FROM categories WHERE id = ?";
+        $sql_fetch = "SELECT id, name FROM categories WHERE id = ?"; // বিবরণ এবং আইকন ক্লাস সরানো হয়েছে
         $stmt_fetch = $conn->prepare($sql_fetch);
         $stmt_fetch->bind_param("i", $category_id_to_fetch);
         $stmt_fetch->execute();
@@ -85,8 +81,6 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
         $stmt_fetch->close();
     } elseif ($_GET['action'] == 'delete' && isset($_GET['id'])) {
         $category_id_to_delete = intval($_GET['id']);
-        // Optional: Check if any questions are using this category before deleting
-        // For simplicity, we'll allow deletion. Associated questions will have category_id set to NULL due to FOREIGN KEY constraint.
         $sql_delete = "DELETE FROM categories WHERE id = ?";
         $stmt_delete = $conn->prepare($sql_delete);
         $stmt_delete->bind_param("i", $category_id_to_delete);
@@ -105,10 +99,11 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
 
 // Fetch all categories for display
 $categories = [];
-$sql_all_categories = "SELECT c.id, c.name, c.description, c.icon_class, COUNT(q.id) as question_count 
+// বিবরণ এবং আইকন ক্লাস সরানো হয়েছে SQL থেকে
+$sql_all_categories = "SELECT c.id, c.name, COUNT(q.id) as question_count 
                        FROM categories c
                        LEFT JOIN questions q ON c.id = q.category_id
-                       GROUP BY c.id, c.name, c.description, c.icon_class
+                       GROUP BY c.id, c.name
                        ORDER BY c.name ASC";
 $result_all_categories = $conn->query($sql_all_categories);
 if ($result_all_categories) {
@@ -144,6 +139,7 @@ require_once 'includes/header.php';
                     <label for="name" class="form-label">ক্যাটাগরির নাম <span class="text-danger">*</span></label>
                     <input type="text" class="form-control" id="name" name="name" value="<?php echo htmlspecialchars($category_to_edit['name']); ?>" required>
                 </div>
+                <?php /* বিবরণ এবং আইকন ক্লাসের ইনপুট ফিল্ডগুলো সরিয়ে ফেলা হয়েছে
                 <div class="mb-3">
                     <label for="description" class="form-label">বিবরণ (ঐচ্ছিক)</label>
                     <textarea class="form-control" id="description" name="description" rows="3"><?php echo htmlspecialchars($category_to_edit['description']); ?></textarea>
@@ -153,6 +149,7 @@ require_once 'includes/header.php';
                     <input type="text" class="form-control" id="icon_class" name="icon_class" value="<?php echo htmlspecialchars($category_to_edit['icon_class']); ?>" placeholder="যেমন: fas fa-book">
                     <small class="form-text text-muted">Font Awesome বা অন্য কোনো আইকন লাইব্রেরির ক্লাস এখানে দিতে পারেন। যেমন: `fas fa-star`</small>
                 </div>
+                */ ?>
                 <button type="submit" name="save_category" class="btn btn-primary"><?php echo $edit_mode ? "আপডেট করুন" : "সংরক্ষণ করুন"; ?></button>
                 <?php if ($edit_mode): ?>
                     <a href="manage_categories.php" class="btn btn-secondary">বাতিল</a>
@@ -171,8 +168,8 @@ require_once 'includes/header.php';
                         <tr>
                             <th>ID</th>
                             <th>নাম</th>
-                            <th>বিবরণ</th>
-                            <th>আইকন</th>
+                            <?php /*<th>বিবরণ</th> - সরানো হয়েছে */ ?>
+                            <?php /*<th>আইকন</th> - সরানো হয়েছে */ ?>
                             <th>প্রশ্ন সংখ্যা</th>
                             <th>একশন</th>
                         </tr>
@@ -182,8 +179,8 @@ require_once 'includes/header.php';
                         <tr>
                             <td><?php echo $category['id']; ?></td>
                             <td><?php echo htmlspecialchars($category['name']); ?></td>
-                            <td><?php echo htmlspecialchars(mb_strimwidth($category['description'], 0, 70, "...")); ?></td>
-                            <td><?php echo !empty($category['icon_class']) ? '<i class="' . htmlspecialchars($category['icon_class']) . '"></i>' : 'N/A'; ?></td>
+                            <?php /*<td><?php echo htmlspecialchars(mb_strimwidth($category['description'], 0, 70, "...")); ?></td> - সরানো হয়েছে */ ?>
+                            <?php /*<td><?php echo !empty($category['icon_class']) ? '<i class="' . htmlspecialchars($category['icon_class']) . '"></i>' : 'N/A'; ?></td> - সরানো হয়েছে */ ?>
                             <td><?php echo $category['question_count']; ?></td>
                             <td>
                                 <a href="manage_categories.php?action=edit&id=<?php echo $category['id']; ?>" class="btn btn-sm btn-info">এডিট</a>
