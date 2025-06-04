@@ -188,6 +188,7 @@ require_once 'includes/header.php';
                             <div class="card-icon"><i class="<?php echo htmlspecialchars($category['icon_class']); ?>"></i></div>
                         <?php else: ?>
                              <div class="card-icon"><i class="fas fa-tags"></i></div> 
+                        <?php endif; ?>
                         <h5 class="card-title"><?php echo htmlspecialchars($category['name']); ?></h5>
                         
                         <div class="category-description-placeholder">
