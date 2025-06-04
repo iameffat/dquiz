@@ -195,5 +195,41 @@ function verify_cloudflare_turnstile(string $turnstile_response, string $secret_
     }
 }
 
+/**
+ * Get the user's IP address.
+ * Tries to get the real IP address even if behind a proxy.
+ *
+ * @return string The user's IP address or 'UNKNOWN'.
+ */
+function get_user_ip() {
+    $ip_keys = [
+        'HTTP_CLIENT_IP',
+        'HTTP_X_FORWARDED_FOR',
+        'HTTP_X_FORWARDED',
+        'HTTP_X_CLUSTER_CLIENT_IP',
+        'HTTP_FORWARDED_FOR',
+        'HTTP_FORWARDED',
+        'REMOTE_ADDR'
+    ];
+    foreach ($ip_keys as $key) {
+        if (array_key_exists($key, $_SERVER) === true) {
+            foreach (explode(',', $_SERVER[$key]) as $ip) {
+                // Trim and validate IP address
+                $ip = trim($ip);
+                // FILTER_FLAG_NO_PRIV_RANGE and FILTER_FLAG_NO_RES_RANGE prevent matching private and reserved IPs
+                if (filter_var($ip, FILTER_VALIDATE_IP, FILTER_FLAG_NO_PRIV_RANGE | FILTER_FLAG_NO_RES_RANGE) !== false) {
+                    return $ip;
+                }
+            }
+        }
+    }
+    // Fallback to REMOTE_ADDR if no other IP is found or if it's a private/reserved IP (though filtered above)
+    // For logging purposes, we might want to log REMOTE_ADDR if others are not "public"
+    // For now, if all else fails or if it's a private IP from the list, REMOTE_ADDR is the last resort.
+    $remote_addr = isset($_SERVER['REMOTE_ADDR']) ? trim($_SERVER['REMOTE_ADDR']) : 'UNKNOWN';
+    return filter_var($remote_addr, FILTER_VALIDATE_IP) ? $remote_addr : 'UNKNOWN';
+}
+
+
 // আপনি এখানে আরও প্রয়োজনীয় কমন ফাংশন যোগ করতে পারেন।
 ?>

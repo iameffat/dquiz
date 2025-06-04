@@ -221,7 +221,9 @@ if (!isset($_SESSION["loggedin"]) || $_SESSION["loggedin"] !== true) {
             header("Location: quizzes.php");
             exit;
         }
+        // Archived quizzes can be attempted for practice by logged-in users
     }
+
 
     $questions = [];
     $sql_questions = "SELECT id, question_text, image_url FROM questions WHERE quiz_id = ? ORDER BY order_number ASC, id ASC";
@@ -231,7 +233,7 @@ if (!isset($_SESSION["loggedin"]) || $_SESSION["loggedin"] !== true) {
     $result_questions = $stmt_questions->get_result();
     while ($q_row = $result_questions->fetch_assoc()) {
         $options = [];
-        $sql_options = "SELECT id, option_text FROM options WHERE question_id = ?";
+        $sql_options = "SELECT id, option_text FROM options WHERE question_id = ? ORDER BY RAND()"; // অপশনগুলো এলোমেলো করতে
         $stmt_options = $conn->prepare($sql_options);
         $stmt_options->bind_param("i", $q_row['id']);
         $stmt_options->execute();
@@ -240,14 +242,18 @@ if (!isset($_SESSION["loggedin"]) || $_SESSION["loggedin"] !== true) {
             $options[] = $opt_row;
         }
         $stmt_options->close();
-        shuffle($options); // Shuffle options for each question
+        // shuffle($options); // PHP তেও অপশন এলোমেলো করা যায়
         $q_row['options'] = $options;
         $questions[] = $q_row;
     }
     $stmt_questions->close();
 
+    // প্রশ্নগুলো এলোমেলো করুন (যদি করতে চান)
+    // shuffle($questions);
+
+
     $total_questions = count($questions);
-    if ($total_questions === 0 && $user_role !== 'admin' && $quiz['status'] !== 'archived') {
+    if ($total_questions === 0 && $user_role !== 'admin' && $quiz['status'] !== 'archived') { // অ্যাডমিন এবং আর্কাইভ কুইজের জন্য প্রশ্ন ০ হলেও সমস্যা নেই
         $_SESSION['flash_message'] = "দুঃখিত, এই কুইজে এখনো কোনো প্রশ্ন যোগ করা হয়নি।";
         $_SESSION['flash_message_type'] = "warning";
         header("Location: quizzes.php");
@@ -258,7 +264,9 @@ if (!isset($_SESSION["loggedin"]) || $_SESSION["loggedin"] !== true) {
     // Create a new attempt record
     $attempt_id = null;
     $start_time = date('Y-m-d H:i:s');
-    $sql_start_attempt = "INSERT INTO quiz_attempts (user_id, quiz_id, start_time) VALUES (?, ?, ?)";
+    $attempt_ip = get_user_ip(); // আইপি অ্যাড্রেস পান
+
+    $sql_start_attempt = "INSERT INTO quiz_attempts (user_id, quiz_id, start_time, attempt_ip) VALUES (?, ?, ?, ?)";
     $stmt_start_attempt = $conn->prepare($sql_start_attempt);
 
     if (!$stmt_start_attempt) {
@@ -268,7 +276,7 @@ if (!isset($_SESSION["loggedin"]) || $_SESSION["loggedin"] !== true) {
         header("Location: quizzes.php");
         exit;
     }
-    $stmt_start_attempt->bind_param("iis", $user_id, $quiz_id, $start_time);
+    $stmt_start_attempt->bind_param("iiss", $user_id, $quiz_id, $start_time, $attempt_ip);
     if ($stmt_start_attempt->execute()) {
         $attempt_id = $stmt_start_attempt->insert_id;
     } else {
@@ -298,7 +306,7 @@ if (!isset($_SESSION["loggedin"]) || $_SESSION["loggedin"] !== true) {
                             <li>এই কুইজের জন্য আপনার হাতে মোট <strong><?php echo $quiz['duration_minutes']; ?> মিনিট</strong> সময় থাকবে।</li>
                             <li>প্রতিটি প্রশ্নের জন্য চারটি অপশন থাকবে, যার মধ্যে একটি সঠিক উত্তর।</li>
                             <li>একবার উত্তর নির্বাচন করার পর তা পরিবর্তন করা যাবে না।</li>
-<li>কোনো প্রকার অসাধু উপায় (যেমন: অন্যের সাহায্য নেওয়া, ইন্টারনেট সার্চ করা, কপি-পেস্ট করা) অবলম্বন করলে সাক্ষী হিসেবে আল্লাহ তায়ালাই যথেষ্ট।</li>
+                            <li>কোনো প্রকার অসাধু উপায় (যেমন: অন্যের সাহায্য নেওয়া, ইন্টারনেট সার্চ করা, কপি-পেস্ট করা) অবলম্বন করলে সাক্ষী হিসেবে আল্লাহ তায়ালাই যথেষ্ট।</li>
                             <li>সময় শেষ হওয়ার সাথে সাথে আপনার পরীক্ষা স্বয়ংক্রিয়ভাবে সাবমিট হয়ে যাবে।</li>
                             <li>প্রতি ভুল উত্তরের জন্য ০.২০ নম্বর কাটা যাবে।</li>
                         </ul>
@@ -390,7 +398,9 @@ if (!isset($_SESSION["loggedin"]) || $_SESSION["loggedin"] !== true) {
         const timerProgressBar = document.querySelector('.timer-progress-bar');
 
         let quizLogicInitialized = false;
-        let quizCanStart = !warningModalElement; 
+        // Modal is shown only if quiz is startable
+        const quizCanStart = <?php echo (isset($quiz_is_startable_for_modal) && $quiz_is_startable_for_modal) ? 'true' : 'false'; ?>;
+
 
         function applyBlurToBackground(shouldBlur) {
             if (mainQuizContainer) mainQuizContainer.classList.toggle('blur-background', shouldBlur);
@@ -411,6 +421,15 @@ if (!isset($_SESSION["loggedin"]) || $_SESSION["loggedin"] !== true) {
             bodyElement.addEventListener('paste', function(e) { e.preventDefault(); });
             bodyElement.addEventListener('cut', function(e) { e.preventDefault(); });
             bodyElement.addEventListener('contextmenu', function(e) { e.preventDefault(); });
+            // Prevent specific key combinations like Ctrl+U, Ctrl+S, Ctrl+P (though this is often browser-dependent and hard to fully block)
+            // document.addEventListener('keydown', function(e) {
+            //     if (e.ctrlKey && (e.key === 'u' || e.key === 's' || e.key === 'p' || e.key === 'c' || e.key === 'x')) {
+            //         e.preventDefault();
+            //     }
+            //     if (e.key === 'F12') { // Prevent F12
+            //         e.preventDefault();
+            //     }
+            // });
 
 
             const timerDisplay = document.getElementById('timer');
@@ -426,10 +445,14 @@ if (!isset($_SESSION["loggedin"]) || $_SESSION["loggedin"] !== true) {
                 const seconds = timeLeft % 60;
                 timerDisplay.textContent = `সময়: ${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
 
-                if (timeLeft <= 60 && timeLeft > 0) {
+                if (timeLeft <= 60 && timeLeft > 0 && !timerDisplay.classList.contains('critical')) {
                     timerDisplay.classList.add('critical');
-                } else if (timeLeft <= 0) {
-                    timerDisplay.classList.remove('critical');
+                } else if (timeLeft > 60 && timerDisplay.classList.contains('critical')) {
+                     timerDisplay.classList.remove('critical');
+                }
+                
+                if (timeLeft <= 0) {
+                    timerDisplay.classList.remove('critical'); // Ensure critical removed when time is up
                     timerDisplay.textContent = "সময় শেষ!";
                     if (quizForm && !quizForm.dataset.submitted) {
                         quizForm.dataset.submitted = 'true';
@@ -440,7 +463,7 @@ if (!isset($_SESSION["loggedin"]) || $_SESSION["loggedin"] !== true) {
                 if (timeLeft > 0) timeLeft--; else timeLeft = 0;
             }
 
-            if (totalQuestionsJS > 0) {
+            if (totalQuestionsJS > 0) { // Only start timer if there are questions
                 updateTimerDisplay(); 
                 timerInterval = setInterval(updateTimerDisplay, 1000);
             } else {
@@ -449,6 +472,7 @@ if (!isset($_SESSION["loggedin"]) || $_SESSION["loggedin"] !== true) {
                 const submitButton = quizForm ? quizForm.querySelector('button[type="submit"]') : null;
                 if(submitButton) submitButton.disabled = true;
             }
+
 
             const questionCards = document.querySelectorAll('.question-card');
             questionCards.forEach(questionCard => {
@@ -460,8 +484,8 @@ if (!isset($_SESSION["loggedin"]) || $_SESSION["loggedin"] !== true) {
                         if (this.checked && !answeredQuestionLocks.has(questionId)) {
                             const allLabelsInQuestion = questionCard.querySelectorAll('.question-option-wrapper label');
                             allLabelsInQuestion.forEach(lbl => {
-                                lbl.classList.remove('selected-option-display', 'border-primary', 'border-2');
-                                lbl.style.opacity = '1';
+                                lbl.classList.remove('selected-option-display', 'border-primary', 'border-2'); // Bootstrap 5 border classes
+                                lbl.style.opacity = '1'; // Reset opacity
                             });
 
                             radiosInThisGroup.forEach(r => {
@@ -471,57 +495,107 @@ if (!isset($_SESSION["loggedin"]) || $_SESSION["loggedin"] !== true) {
                                     if (labelForRadio) {
                                         if (r.checked) {
                                             labelForRadio.classList.add('selected-option-display', 'border-primary', 'border-2');
-                                            labelForRadio.style.opacity = '1';
+                                            labelForRadio.style.opacity = '1'; // Keep selected fully visible
                                         } else {
-                                            labelForRadio.style.opacity = '0.6';
+                                            // For non-selected options in the same group once an answer is locked
+                                            // labelForRadio.style.opacity = '0.6'; // Dim others only after locking
                                         }
                                     }
                                 }
                             });
-
+                            
                             answeredQuestionLocks.add(questionId);
                             if(progressIndicator) progressIndicator.textContent = `উত্তর: ${answeredQuestionLocks.size}/${totalQuestionsJS}`;
 
+                            // Disable other radios in this group and change cursor style for labels
                             radiosInThisGroup.forEach(otherRadioInGroup => {
                                 const otherLabel = otherRadioInGroup.closest('.question-option-wrapper').querySelector('label');
                                 if (otherRadioInGroup !== this) {
                                     otherRadioInGroup.disabled = true;
-                                    if(otherLabel) otherLabel.style.cursor = 'default';
+                                     if(otherLabel) otherLabel.style.cursor = 'default';
                                 } else {
-                                    if(otherLabel) otherLabel.style.cursor = 'default';
+                                    // For the selected radio's label
+                                     if(otherLabel) otherLabel.style.cursor = 'default';
                                 }
+                                // Dim unselected options after one is chosen and locked
+                                if (!otherRadioInGroup.checked) {
+                                     if(otherLabel) otherLabel.style.opacity = '0.6';
+                                }
+
                             });
                         }
                     });
                 });
             });
 
-            if (window.history.replaceState) {
-                window.history.replaceState(null, null, window.location.href);
+            // Prevent back navigation after quiz starts
+            if (window.history && window.history.pushState) {
+                window.history.pushState('forward', null, './#quizinprogress'); // Add a history entry
+                window.addEventListener('popstate', function(event) {
+                    // If user tries to go back
+                    if (quizLogicInitialized && quizForm && !quizForm.dataset.submitted) {
+                        // const confirmLeave = confirm("আপনি কি নিশ্চিতভাবে কুইজ থেকে বের হতে চান? আপনার অগ্রগতি সেভ হবে না।");
+                        // if (confirmLeave) {
+                        //     // Allow back navigation, or submit form
+                        //     quizForm.dataset.submitted = 'true'; 
+                        //     quizForm.submit();
+                        // } else {
+                            // Stay on the page
+                            window.history.pushState('forward', null, './#quizinprogress');
+                        // }
+                    }
+                });
             }
         } 
 
-        const quizShouldShowModal = <?php echo (isset($quiz_is_startable_for_modal) && $quiz_is_startable_for_modal) ? 'true' : 'false'; ?>;
-
-        if (warningModalElement && agreeAndStartButton && quizShouldShowModal) {
+        if (warningModalElement && agreeAndStartButton && quizCanStart) {
             const warningModal = new bootstrap.Modal(warningModalElement);
             warningModal.show();
             applyBlurToBackground(true); 
 
             agreeAndStartButton.addEventListener('click', function() {
-                initializeQuizFunctionalities();
+                // Modal will be dismissed automatically by data-bs-dismiss="modal"
+                // The 'hidden.bs.modal' event will then fire
             });
 
             warningModalElement.addEventListener('hidden.bs.modal', function () {
-                applyBlurToBackground(false);
-                if (!quizLogicInitialized) { // If modal was closed without agreeing (e.g. by other means if possible)
-                    // Potentially redirect or handle as "not agreed"
-                    // window.location.href = 'quizzes.php'; // Example: redirect if not agreed
+                 // Check if the agree button was the one that closed the modal
+                 // This is a bit tricky as 'hidden.bs.modal' doesn't directly tell you which button closed it.
+                 // We assume if quizLogicInitialized is false here, it means agree was not clicked (or modal closed via other means)
+                if (!quizLogicInitialized) { // If user clicks "সম্মত নই" or closes modal via ESC/backdrop
+                    const activeElement = document.activeElement;
+                    // If agree button was not the one focused when modal closed, then it means user did not agree
+                    if(activeElement !== agreeAndStartButton){
+                        window.location.href = 'quizzes.php'; // Redirect if modal closed without starting
+                        return;
+                    }
                 }
+                // If agree was clicked (or modal somehow closed after agree), quiz logic should be initialized.
+                // initializeQuizFunctionalities() will handle unblurring.
+                initializeQuizFunctionalities(); 
             });
+
+             // Handle the "সম্মত নই" button specifically if it doesn't dismiss modal or if we want explicit redirect
+            const notAgreeButton = warningModalElement.querySelector('.btn-secondary');
+            if (notAgreeButton) {
+                notAgreeButton.addEventListener('click', function() {
+                    // Explicitly ensure quiz logic doesn't run and redirect
+                    quizLogicInitialized = false; // Ensure this flag reflects the choice
+                    // The modal might dismiss via its own mechanism or not. This ensures redirection.
+                    window.location.href = 'quizzes.php';
+                });
+            }
+
+
         } else {
-            if (quizForm) {
+            if (quizForm && totalQuestionsJS > 0) { // If no modal but form exists and there are questions
                 initializeQuizFunctionalities();
+            } else if (quizForm && totalQuestionsJS === 0) {
+                // Handle case where quiz page loads but there are no questions (e.g., for admin preview)
+                if(document.getElementById('timer')) document.getElementById('timer').textContent = "কোনো প্রশ্ন নেই";
+                if(document.getElementById('progress_indicator')) document.getElementById('progress_indicator').textContent = "উত্তর: 0/0";
+                const submitButton = quizForm.querySelector('button[type="submit"]');
+                if(submitButton) submitButton.disabled = true;
             }
         }
     });
