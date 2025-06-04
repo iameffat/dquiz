@@ -110,9 +110,6 @@ require_once 'includes/header.php';
                              <div class="card-icon"><i class="fas fa-tags"></i></div>
                         <?php endif; ?>
                         <h5 class="card-title"><?php echo htmlspecialchars($category['name']); ?></h5>
-                        
-                        <?php // বিবরণ দেখানোর অংশটি বাদ দেওয়া হয়েছে ?>
-                        <div class="category-description-placeholder"></div> {/* বিবরণ না দেখালেও লেআউট ঠিক রাখার জন্য একটি খালি ডিভ */}
 
                         <p class="question-count">(<?php echo $category['question_count']; ?> টি প্রশ্ন)</p>
                         <a href="practice_quiz.php?category_id=<?php echo $category['id']; ?>" class="btn btn-primary mt-auto">অনুশীলন শুরু করুন</a>
