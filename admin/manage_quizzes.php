@@ -7,14 +7,13 @@ require_once '../includes/functions.php';
 
 define('QUESTION_IMAGE_UPLOAD_DIR_MANAGE', '../uploads/question_images/');
 
-
-// Handle Delete Action
+// Handle Delete Action (Your existing delete logic remains here - unchanged)
 if (isset($_GET['action']) && $_GET['action'] == 'delete' && isset($_GET['quiz_id'])) {
     $quiz_id_to_delete = intval($_GET['quiz_id']);
     
     $conn->begin_transaction();
     try {
-        // Fetch image_urls of questions related to this quiz to delete files
+        // ... (আপনার ডিলিট কোড যেমন ছিল) ...
         $sql_get_images = "SELECT image_url FROM questions WHERE quiz_id = ?";
         $stmt_get_images = $conn->prepare($sql_get_images);
         $stmt_get_images->bind_param("i", $quiz_id_to_delete);
@@ -28,13 +27,6 @@ if (isset($_GET['action']) && $_GET['action'] == 'delete' && isset($_GET['quiz_i
         }
         $stmt_get_images->close();
 
-        // It's generally better to delete from child tables (options) first, then questions, then quizzes.
-        // Assuming options are deleted via cascade or handled elsewhere if directly linked to quizzes.
-        // Delete user_answers first if they exist for this quiz
-        // This part needs to be added if user_answers reference quiz_attempts which reference quizzes
-        // For now, we are focusing on questions and options related to questions.
-
-        // Delete options associated with questions of this quiz
         $sql_delete_options_indirect = "DELETE o FROM options o JOIN questions q ON o.question_id = q.id WHERE q.quiz_id = ?";
         $stmt_delete_options_indirect = $conn->prepare($sql_delete_options_indirect);
         $stmt_delete_options_indirect->bind_param("i", $quiz_id_to_delete);
@@ -47,17 +39,11 @@ if (isset($_GET['action']) && $_GET['action'] == 'delete' && isset($_GET['quiz_i
         if (!$stmt_delete_qs->execute()) throw new Exception("প্রশ্ন ডিলিট করতে সমস্যা: " . $stmt_delete_qs->error);
         $stmt_delete_qs->close();
 
-        // Delete quiz_attempts associated with this quiz
         $sql_delete_attempts = "DELETE FROM quiz_attempts WHERE quiz_id = ?";
         $stmt_delete_attempts = $conn->prepare($sql_delete_attempts);
         $stmt_delete_attempts->bind_param("i", $quiz_id_to_delete);
         if (!$stmt_delete_attempts->execute()) throw new Exception("কুইজ এটেম্পট ডিলিট করতে সমস্যা: " . $stmt_delete_attempts->error);
         $stmt_delete_attempts->close();
-        // User_answers are usually linked to attempt_id and question_id, if they are not deleted by cascade from quiz_attempts, 
-        // they might need to be handled separately if directly linked or via questions.
-        // Given the current structure, deleting questions should ideally cascade or handle related user_answers.
-        // If user_answers has a foreign key to questions.id, they would be handled by question deletion.
-        // If user_answers has FK to quiz_attempts.id, then deleting attempts should handle them.
 
         $sql_delete_quiz = "DELETE FROM quizzes WHERE id = ?";
         $stmt_delete_quiz = $conn->prepare($sql_delete_quiz);
@@ -68,7 +54,6 @@ if (isset($_GET['action']) && $_GET['action'] == 'delete' && isset($_GET['quiz_i
         $stmt_delete_quiz->close();
 
         foreach ($images_to_delete as $image_url) {
-            // Ensure the path is correct relative to this file's location
             $image_path_actual = realpath(QUESTION_IMAGE_UPLOAD_DIR_MANAGE . basename($image_url));
             if ($image_path_actual && strpos($image_path_actual, realpath(QUESTION_IMAGE_UPLOAD_DIR_MANAGE)) === 0 && file_exists($image_path_actual)) {
                 unlink($image_path_actual);
@@ -91,19 +76,79 @@ if (isset($_GET['action']) && $_GET['action'] == 'delete' && isset($_GET['quiz_i
 
 require_once 'includes/header.php';
 
-// Fetch all quizzes
-$quizzes = [];
-$sql_quizzes = "SELECT q.id, q.title, q.status, q.duration_minutes, q.live_start_datetime, q.live_end_datetime, COUNT(qs.id) as question_count 
-                FROM quizzes q 
-                LEFT JOIN questions qs ON q.id = qs.quiz_id 
-                GROUP BY q.id
-                ORDER BY q.created_at DESC";
-$result_quizzes = $conn->query($sql_quizzes);
-if ($result_quizzes && $result_quizzes->num_rows > 0) {
-    while ($row = $result_quizzes->fetch_assoc()) {
-        $quizzes[] = $row;
+// --- Filter Logic ---
+$where_clauses = [];
+$params = [];
+$types = "";
+
+// Status Filter
+$filter_status = isset($_GET['status_filter']) ? $_GET['status_filter'] : '';
+if (!empty($filter_status) && in_array($filter_status, ['draft', 'upcoming', 'live', 'archived'])) {
+    if ($filter_status === 'archived') {
+        // Archived can be explicitly 'archived' or 'live' whose live_end_datetime has passed
+        $where_clauses[] = "(q.status = ? OR (q.status = 'live' AND q.live_end_datetime IS NOT NULL AND q.live_end_datetime < NOW()))";
+        $params[] = $filter_status;
+        $types .= "s";
+    } elseif ($filter_status === 'live') {
+        // Live quizzes are those with status 'live' AND within their live period (or no period defined)
+        $where_clauses[] = "q.status = ? AND (q.live_start_datetime IS NULL OR q.live_start_datetime <= NOW()) AND (q.live_end_datetime IS NULL OR q.live_end_datetime >= NOW())";
+        $params[] = $filter_status;
+        $types .= "s";
+    } else {
+        $where_clauses[] = "q.status = ?";
+        $params[] = $filter_status;
+        $types .= "s";
     }
 }
+
+// Date Filter (Created At)
+$filter_date_from = isset($_GET['date_from']) ? trim($_GET['date_from']) : '';
+$filter_date_to = isset($_GET['date_to']) ? trim($_GET['date_to']) : '';
+
+if (!empty($filter_date_from)) {
+    $where_clauses[] = "DATE(q.created_at) >= ?";
+    $params[] = $filter_date_from;
+    $types .= "s";
+}
+if (!empty($filter_date_to)) {
+    $where_clauses[] = "DATE(q.created_at) <= ?";
+    $params[] = $filter_date_to;
+    $types .= "s";
+}
+
+
+// Fetch quizzes with filtering
+$quizzes = [];
+$sql_quizzes = "SELECT q.id, q.title, q.status, q.duration_minutes, q.live_start_datetime, q.live_end_datetime, q.created_at, COUNT(qs.id) as question_count 
+                FROM quizzes q 
+                LEFT JOIN questions qs ON q.id = qs.quiz_id";
+
+if (!empty($where_clauses)) {
+    $sql_quizzes .= " WHERE " . implode(" AND ", $where_clauses);
+}
+
+$sql_quizzes .= " GROUP BY q.id ORDER BY q.created_at DESC";
+
+$stmt_quizzes = $conn->prepare($sql_quizzes);
+
+if ($stmt_quizzes) {
+    if (!empty($params)) {
+        $stmt_quizzes->bind_param($types, ...$params);
+    }
+    $stmt_quizzes->execute();
+    $result_quizzes = $stmt_quizzes->get_result();
+    if ($result_quizzes) {
+        while ($row = $result_quizzes->fetch_assoc()) {
+            $quizzes[] = $row;
+        }
+    } else {
+        echo '<div class="alert alert-danger">কুইজ আনতে সমস্যা হয়েছে: ' . $conn->error . '</div>';
+    }
+    $stmt_quizzes->close();
+} else {
+    echo '<div class="alert alert-danger">কুইজ স্টেটমেন্ট প্রস্তুত করতে সমস্যা: ' . $conn->error . '</div>';
+}
+
 ?>
 
 <div class="container-fluid">
@@ -112,6 +157,37 @@ if ($result_quizzes && $result_quizzes->num_rows > 0) {
         <div>
             <a href="add_quiz.php" class="btn btn-primary">নতুন কুইজ যোগ করুন</a>
             <a href="import_bulk_questions.php" class="btn btn-info">বাল্ক ইম্পোর্ট</a>
+        </div>
+    </div>
+
+    <div class="card mb-4">
+        <div class="card-header">
+            ফিল্টার করুন
+        </div>
+        <div class="card-body">
+            <form action="manage_quizzes.php" method="get" class="row g-3 align-items-end">
+                <div class="col-md-4">
+                    <label for="status_filter" class="form-label">স্ট্যাটাস অনুযায়ী</label>
+                    <select class="form-select" id="status_filter" name="status_filter">
+                        <option value="">সকল স্ট্যাটাস</option>
+                        <option value="draft" <?php echo ($filter_status == 'draft') ? 'selected' : ''; ?>>ড্রাফট</option>
+                        <option value="upcoming" <?php echo ($filter_status == 'upcoming') ? 'selected' : ''; ?>>আপকামিং</option>
+                        <option value="live" <?php echo ($filter_status == 'live') ? 'selected' : ''; ?>>লাইভ</option>
+                        <option value="archived" <?php echo ($filter_status == 'archived') ? 'selected' : ''; ?>>আর্কাইভড</option>
+                    </select>
+                </div>
+                <div class="col-md-3">
+                    <label for="date_from" class="form-label">তৈরির তারিখ (শুরু)</label>
+                    <input type="date" class="form-control" id="date_from" name="date_from" value="<?php echo htmlspecialchars($filter_date_from); ?>">
+                </div>
+                <div class="col-md-3">
+                    <label for="date_to" class="form-label">তৈরির তারিখ (শেষ)</label>
+                    <input type="date" class="form-control" id="date_to" name="date_to" value="<?php echo htmlspecialchars($filter_date_to); ?>">
+                </div>
+                <div class="col-md-2">
+                    <button type="submit" class="btn btn-success w-100">ফিল্টার</button>
+                </div>
+            </form>
         </div>
     </div>
 
@@ -134,6 +210,7 @@ if ($result_quizzes && $result_quizzes->num_rows > 0) {
                             <th>প্রশ্ন সংখ্যা</th>
                             <th>লাইভ শুরু</th>
                             <th>লাইভ শেষ</th>
+                            <th>তৈরির তারিখ</th>
                             <th>একশন</th>
                         </tr>
                     </thead>
@@ -144,11 +221,30 @@ if ($result_quizzes && $result_quizzes->num_rows > 0) {
                             <td><?php echo htmlspecialchars($quiz['title']); ?></td>
                             <td>
                                 <?php
-                                    $status_class = 'secondary'; // Default for draft
+                                    // Determine actual display status based on live dates for 'live' quizzes
+                                    $display_status = $quiz['status'];
+                                    $status_class = 'secondary'; 
                                     $status_text = 'ড্রাফট';
-                                    if ($quiz['status'] == 'upcoming') { $status_class = 'info'; $status_text = 'আপকামিং'; }
-                                    elseif ($quiz['status'] == 'live') { $status_class = 'success'; $status_text = 'লাইভ'; }
-                                    elseif ($quiz['status'] == 'archived') { $status_class = 'warning text-dark'; $status_text = 'আর্কাইভড'; }
+
+                                    if ($quiz['status'] == 'live') {
+                                        $now_time = time();
+                                        $start_time = !empty($quiz['live_start_datetime']) ? strtotime($quiz['live_start_datetime']) : null;
+                                        $end_time = !empty($quiz['live_end_datetime']) ? strtotime($quiz['live_end_datetime']) : null;
+
+                                        if ($end_time && $now_time > $end_time) {
+                                            $display_status = 'archived'; // Effectively archived
+                                        } elseif ($start_time && $now_time < $start_time) {
+                                            $display_status = 'upcoming'; // Not yet started
+                                        } else {
+                                            $display_status = 'live'; // Truly live
+                                        }
+                                    }
+
+                                    if ($display_status == 'upcoming') { $status_class = 'info'; $status_text = 'আপকামিং'; }
+                                    elseif ($display_status == 'live') { $status_class = 'success'; $status_text = 'লাইভ'; }
+                                    elseif ($display_status == 'archived') { $status_class = 'warning text-dark'; $status_text = 'আর্কাইভড'; }
+                                    elseif ($display_status == 'draft') { $status_class = 'secondary'; $status_text = 'ড্রাফট';}
+
                                     echo '<span class="badge bg-' . $status_class . '">' . $status_text . '</span>';
                                 ?>
                             </td>
@@ -156,6 +252,7 @@ if ($result_quizzes && $result_quizzes->num_rows > 0) {
                             <td><?php echo $quiz['question_count']; ?></td>
                             <td><?php echo $quiz['live_start_datetime'] ? format_datetime($quiz['live_start_datetime']) : 'N/A'; ?></td>
                             <td><?php echo $quiz['live_end_datetime'] ? format_datetime($quiz['live_end_datetime']) : 'N/A'; ?></td>
+                            <td><?php echo format_datetime($quiz['created_at'], "d M Y"); ?></td>
                             <td>
                                 <a href="edit_quiz.php?id=<?php echo $quiz['id']; ?>" class="btn btn-sm btn-info mb-1" title="এডিট করুন">এডিট</a>
                                 <a href="duplicate_quiz.php?quiz_id_to_duplicate=<?php echo $quiz['id']; ?>" class="btn btn-sm btn-warning mb-1" onclick="return confirm('আপনি কি নিশ্চিতভাবে এই কুইজটি ডুপ্লিকেট করতে চান?');" title="ডুপ্লিকেট করুন">ডুপ্লিকেট</a>
@@ -180,7 +277,13 @@ if ($result_quizzes && $result_quizzes->num_rows > 0) {
                 </table>
             </div>
             <?php else: ?>
-            <p class="text-center">এখনও কোনো কুইজ তৈরি করা হয়নি।</p>
+            <p class="text-center">
+                <?php if (!empty($filter_status) || !empty($filter_date_from) || !empty($filter_date_to)): ?>
+                    আপনার ফিল্টার অনুযায়ী কোনো কুইজ পাওয়া যায়নি। <a href="manage_quizzes.php">সকল কুইজ দেখুন</a>
+                <?php else: ?>
+                    এখনও কোনো কুইজ তৈরি করা হয়নি।
+                <?php endif; ?>
+            </p>
             <?php endif; ?>
         </div>
     </div>
@@ -193,7 +296,7 @@ document.addEventListener('DOMContentLoaded', function() {
         button.addEventListener('click', function() {
             const linkToCopy = this.dataset.link;
             navigator.clipboard.writeText(linkToCopy).then(() => {
-                const originalContent = this.innerHTML; // SVG সহ পুরো কনটেন্ট সেভ করা
+                const originalContent = this.innerHTML;
                 this.innerHTML = `
                     <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" fill="currentColor" class="bi bi-check-lg me-1" viewBox="0 0 16 16">
                       <path d="M12.736 3.97a.733.733 0 0 1 1.047 0c.286.289.29.756.01 1.05L7.88 12.01a.733.733 0 0 1-1.065.02L3.217 8.384a.757.757 0 0 1 0-1.06.733.733 0 0 1 1.047 0l3.052 3.093 5.4-6.425z"/>
@@ -203,13 +306,12 @@ document.addEventListener('DOMContentLoaded', function() {
                 this.classList.add('btn-success');
                 
                 setTimeout(() => {
-                    this.innerHTML = originalContent; // আগের কনটেন্ট ফিরিয়ে আনা
+                    this.innerHTML = originalContent;
                     this.classList.remove('btn-success');
                     this.classList.add('btn-outline-success');
                 }, 2000);
             }).catch(err => {
                 console.error('লিংক কপি করতে সমস্যা হয়েছে: ', err);
-                // Fallback for browsers that might not support clipboard API well or if user denies permission
                 prompt("লিংক কপি করা যায়নি। অনুগ্রহ করে ম্যানুয়ালি কপি করুন:", linkToCopy);
             });
         });
