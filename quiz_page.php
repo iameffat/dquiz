@@ -61,6 +61,24 @@ $page_specific_styles = "
         -ms-user-select: none; /* Internet Explorer/Edge */
         user-select: none; /* Standard syntax */
     }
+    .question-image { 
+        max-width: 100%; 
+        height: auto; 
+        max-height: 350px; 
+        margin-bottom: 15px; 
+        border-radius: 5px; 
+        box-shadow: 0 2px 5px rgba(0,0,0,0.1); 
+        display: block; 
+        margin-left: auto; 
+        margin-right: auto;
+    }
+    /* Progress bar custom style */
+    .custom-progress-container {
+        padding-top: 5px; 
+    }
+    #quizProgressBarVisual {
+        transition: width 0.3s ease-in-out; 
+    }
 ";
 
 require_once 'includes/header.php'; // header.php এখানে include করা হচ্ছে
@@ -299,7 +317,7 @@ if (!isset($_SESSION["loggedin"]) || $_SESSION["loggedin"] !== true) {
                             <li>একবার উত্তর নির্বাচন করার পর তা পরিবর্তন করা যাবে না।</li>
                             <li>কোনো প্রকার অসাধু উপায় (যেমন: অন্যের সাহায্য নেওয়া, ইন্টারনেট সার্চ করা, কপি-পেস্ট করা) অবলম্বন করলে সাক্ষী হিসেবে আল্লাহ তায়ালাই যথেষ্ট।</li>
                             <li>সময় শেষ হওয়ার সাথে সাথে আপনার পরীক্ষা স্বয়ংক্রিয়ভাবে সাবমিট হয়ে যাবে।</li>
-                            <li>প্রতি ভুল উত্তরের জন্য ০.২০ নম্বর কাটা যাবে।</li>
+                             <li>প্রতি ভুল উত্তরের জন্য ০.২০ নম্বর কাটা যাবে।</li>
                         </ul>
                         <p class="text-danger fw-bold">আপনি কি উপরের সকল নিয়মের সাথে একমত এবং কুইজ শুরু করতে প্রস্তুত?</p>
                     </div>
@@ -313,13 +331,15 @@ if (!isset($_SESSION["loggedin"]) || $_SESSION["loggedin"] !== true) {
     <?php
     }
     ?>
-    <style>
-    .question-image { max-width: 100%; height: auto; max-height: 350px; margin-bottom: 15px; border-radius: 5px; box-shadow: 0 2px 5px rgba(0,0,0,0.1); display: block; margin-left: auto; margin-right: auto;}
-    </style>
     <div class="timer-progress-bar py-2 px-3 mb-4">
-        <div class="container d-flex justify-content-between align-items-center">
-            <div id="timer" class="fs-5 fw-bold">সময়: --:--</div>
-            <div id="progress_indicator" class="fs-5">উত্তর: 0/<?php echo $total_questions; ?></div>
+        <div class="container">
+            <div class="d-flex justify-content-between align-items-center mb-1">
+                <div id="timer" class="fs-5 fw-bold">সময়: --:--</div>
+                <div id="progress_indicator" class="fs-5">উত্তর: 0/<?php echo $total_questions; ?></div>
+            </div>
+            <div class="progress custom-progress-container" style="height: 12px;">
+                <div id="quizProgressBarVisual" class="progress-bar bg-success" role="progressbar" style="width: 0%;" aria-valuenow="0" aria-valuemin="0" aria-valuemax="100"></div>
+            </div>
         </div>
     </div>
 
@@ -376,14 +396,14 @@ if (!isset($_SESSION["loggedin"]) || $_SESSION["loggedin"] !== true) {
         const warningModalElement = document.getElementById('quizWarningModal');
         const agreeAndStartButton = document.getElementById('agreeAndStartQuiz');
         const mainQuizContainer = document.getElementById('quizContainer');
-        const timerProgressBar = document.querySelector('.timer-progress-bar');
+        const timerProgressBarDiv = document.querySelector('.timer-progress-bar');
         const totalQuestionsJS = <?php echo isset($total_questions) ? $total_questions : 0; ?>;
 
         let quizLogicInitialized = false;
 
         function applyBlurToBackground(shouldBlur) {
             if (mainQuizContainer) mainQuizContainer.classList.toggle('blur-background', shouldBlur);
-            if (timerProgressBar) timerProgressBar.classList.toggle('blur-background', shouldBlur);
+            if (timerProgressBarDiv) timerProgressBarDiv.classList.toggle('blur-background', shouldBlur);
         }
 
         function initializeQuizFunctionalities() {
@@ -400,6 +420,7 @@ if (!isset($_SESSION["loggedin"]) || $_SESSION["loggedin"] !== true) {
 
             const timerDisplay = document.getElementById('timer');
             const progressIndicator = document.getElementById('progress_indicator');
+            const progressBarVisual = document.getElementById('quizProgressBarVisual'); // Get the visual bar
             const answeredQuestionLocks = new Set();
             let timeLeft = <?php echo isset($quiz_duration_seconds) ? $quiz_duration_seconds : 0; ?>;
             var timerInterval;
@@ -425,9 +446,17 @@ if (!isset($_SESSION["loggedin"]) || $_SESSION["loggedin"] !== true) {
             if (totalQuestionsJS > 0) {
                 updateTimerDisplay();
                 timerInterval = setInterval(updateTimerDisplay, 1000);
+                 if(progressBarVisual) { 
+                    progressBarVisual.style.width = '0%';
+                    progressBarVisual.setAttribute('aria-valuenow', '0');
+                }
             } else {
                 if(timerDisplay) timerDisplay.textContent = "কোনো প্রশ্ন নেই";
                 if(progressIndicator) progressIndicator.textContent = "উত্তর: 0/0";
+                 if(progressBarVisual) { 
+                    progressBarVisual.style.width = '0%';
+                    progressBarVisual.setAttribute('aria-valuenow', '0');
+                }
                 const submitButton = quizForm ? quizForm.querySelector('button[type="submit"]') : null;
                 if(submitButton) { submitButton.disabled = true; submitButton.style.display = 'none'; }
             }
@@ -460,6 +489,23 @@ if (!isset($_SESSION["loggedin"]) || $_SESSION["loggedin"] !== true) {
                             });
                             answeredQuestionLocks.add(questionId);
                             if(progressIndicator) progressIndicator.textContent = `উত্তর: ${answeredQuestionLocks.size}/${totalQuestionsJS}`;
+                            
+                            if(progressBarVisual && totalQuestionsJS > 0) {
+                                const percentage = (answeredQuestionLocks.size / totalQuestionsJS) * 100;
+                                progressBarVisual.style.width = percentage + '%';
+                                progressBarVisual.setAttribute('aria-valuenow', percentage.toFixed(0));
+                                if (percentage > 80) {
+                                    progressBarVisual.classList.remove('bg-warning', 'bg-info');
+                                    progressBarVisual.classList.add('bg-success');
+                                } else if (percentage > 40) {
+                                    progressBarVisual.classList.remove('bg-success', 'bg-info');
+                                    progressBarVisual.classList.add('bg-warning');
+                                } else {
+                                     progressBarVisual.classList.remove('bg-success', 'bg-warning');
+                                     progressBarVisual.classList.add('bg-info');
+                                }
+                            }
+                            
                             radiosInThisGroup.forEach(otherRadioInGroup => {
                                 const otherLabel = otherRadioInGroup.closest('.question-option-wrapper').querySelector('label');
                                 if (otherRadioInGroup !== this) {
@@ -486,8 +532,7 @@ if (!isset($_SESSION["loggedin"]) || $_SESSION["loggedin"] !== true) {
             warningModalElement.addEventListener('hidden.bs.modal', function () {
                 applyBlurToBackground(false);
                 if (!quizLogicInitialized && document.body.contains(warningModalElement)) {
-                    // If modal was closed by other means (ESC, backdrop click) before starting quiz
-                    // window.location.href = 'quizzes.php'; // Optionally redirect
+                    // window.location.href = 'quizzes.php'; 
                 }
             });
         } else {
@@ -499,6 +544,10 @@ if (!isset($_SESSION["loggedin"]) || $_SESSION["loggedin"] !== true) {
                  bodyElement.addEventListener('contextmenu', function(e) { e.preventDefault(); });
                  if (document.getElementById('timer')) document.getElementById('timer').textContent = "কোনো প্রশ্ন নেই";
                  if (document.getElementById('progress_indicator')) document.getElementById('progress_indicator').textContent = "উত্তর: 0/0";
+                 if (document.getElementById('quizProgressBarVisual')) { 
+                     document.getElementById('quizProgressBarVisual').style.width = '0%';
+                     document.getElementById('quizProgressBarVisual').setAttribute('aria-valuenow', '0');
+                 }
                  const submitButton = quizForm.querySelector('button[type="submit"]');
                  if(submitButton) submitButton.style.display = 'none';
             }
