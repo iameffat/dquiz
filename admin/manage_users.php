@@ -148,6 +148,15 @@ if (!empty($search_term)) {
 <div class="container-fluid">
     <div class="d-flex justify-content-between align-items-center mt-4 mb-3">
         <h1>ইউজার ম্যানেজমেন্ট</h1>
+        <?php if (!empty($users)): ?>
+        <button id="copyAllEmailsBtn" class="btn btn-success">
+            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-clipboard-plus me-1" viewBox="0 0 16 16">
+              <path fill-rule="evenodd" d="M4 1.5H3a2 2 0 0 0-2 2V14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V3.5a2 2 0 0 0-2-2h-1v1h1a1 1 0 0 1 1 1V14a1 1 0 0 1-1 1H3a1 1 0 0 1-1-1V3.5a1 1 0 0 1 1-1h1z"/>
+              <path fill-rule="evenodd" d="M9.5 1a.5.5 0 0 1 .5.5v1a.5.5 0 0 1-.5.5h-3a.5.5 0 0 1-.5-.5v-1a.5.5 0 0 1 .5-.5zM8 7a.5.5 0 0 1 .5.5V9H10a.5.5 0 0 1 0 1H8.5v1.5a.5.5 0 0 1-1 0V10H6a.5.5 0 0 1 0-1h1.5V7.5A.5.5 0 0 1 8 7"/>
+            </svg>
+            সকল ইমেইল কপি করুন
+        </button>
+        <?php endif; ?>
     </div>
 
     <div class="card mb-4">
@@ -181,12 +190,12 @@ if (!empty($search_term)) {
         <div class="card-body">
             <?php if (!empty($users)): ?>
             <div class="table-responsive">
-                <table class="table table-striped table-hover">
+                <table class="table table-striped table-hover" id="usersTable">
                     <thead>
                         <tr>
                             <th>ID</th>
                             <th>নাম</th>
-                            <th>ইমেইল</th>
+                            <th class="user-email-cell">ইমেইল</th>
                             <th>মোবাইল</th>
                             <th>ভূমিকা</th>
                             <th>স্ট্যাটাস</th>
@@ -199,7 +208,7 @@ if (!empty($search_term)) {
                         <tr class="<?php echo $user['is_banned'] ? 'table-secondary text-muted' : ''; ?>">
                             <td><?php echo $user['id']; ?></td>
                             <td><?php echo htmlspecialchars($user['name']); ?></td>
-                            <td><?php echo htmlspecialchars($user['email']); ?></td>
+                            <td class="user-email-cell"><?php echo htmlspecialchars($user['email']); ?></td>
                             <td><?php echo htmlspecialchars($user['mobile_number']); ?></td>
                             <td>
                                 <?php 
@@ -239,8 +248,48 @@ if (!empty($search_term)) {
         </div>
     </div>
 </div>
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const copyAllEmailsBtn = document.getElementById('copyAllEmailsBtn');
+    if (copyAllEmailsBtn) {
+        copyAllEmailsBtn.addEventListener('click', function() {
+            const emailCells = document.querySelectorAll('#usersTable tbody .user-email-cell');
+            let emails = [];
+            emailCells.forEach(cell => {
+                if (cell.textContent.trim() !== '') {
+                    emails.push(cell.textContent.trim());
+                }
+            });
 
+            if (emails.length > 0) {
+                const emailString = emails.join(', ');
+                navigator.clipboard.writeText(emailString).then(() => {
+                    const originalText = this.innerHTML;
+                    this.innerHTML = `
+                        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-clipboard-check-fill me-1" viewBox="0 0 16 16">
+                          <path d="M6.5 0A1.5 1.5 0 0 0 5 1.5v1A1.5 1.5 0 0 0 6.5 4h3A1.5 1.5 0 0 0 11 2.5v-1A1.5 1.5 0 0 0 9.5 0zm3 1a.5.5 0 0 1 .5.5v1a.5.5 0 0 1-.5.5h-3a.5.5 0 0 1-.5-.5v-1a.5.5 0 0 1 .5-.5z"/>
+                          <path d="M4 1.5H3a2 2 0 0 0-2 2V14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V3.5a2 2 0 0 0-2-2h-1v1A2.5 2.5 0 0 1 9.5 5h-3A2.5 2.5 0 0 1 4 2.5v-1Zm6.854 7.354-3 3a.5.5 0 0 1-.708 0l-1.5-1.5a.5.5 0 0 1 .708-.708L7.5 10.793l2.646-2.647a.5.5 0 0 1 .708.708"/>
+                        </svg>
+                        ইমেইল কপি হয়েছে!`;
+                    this.classList.remove('btn-success');
+                    this.classList.add('btn-primary');
+                    setTimeout(() => {
+                        this.innerHTML = originalText;
+                        this.classList.remove('btn-primary');
+                        this.classList.add('btn-success');
+                    }, 2500);
+                }).catch(err => {
+                    console.error('ইমেইল কপি করতে সমস্যা হয়েছে: ', err);
+                    alert('ইমেইল কপি করা যায়নি। ব্রাউজার কনসোল দেখুন।');
+                });
+            } else {
+                alert('কপি করার জন্য কোনো ইমেইল পাওয়া যায়নি।');
+            }
+        });
+    }
+});
+</script>
 <?php
 $conn->close();
 require_once 'includes/footer.php';
-?>
+?>a
