@@ -24,98 +24,111 @@ if ($result) {
     error_log("Error fetching categories: " . $conn->error);
 }
 
-// কিছু স্যাম্পল গ্র্যাডিয়েন্ট কালার
+// হালকা এবং সফট্ গ্র্যাডিয়েন্ট কালারের উদাহরণ
 $gradient_colors = [
-    "linear-gradient(135deg, #667eea 0%, #764ba2 100%)", // বেগুনী-নীল
-    "linear-gradient(135deg, #ff9a9e 0%, #fecfef 100%)", // গোলাপী
-    "linear-gradient(135deg, #f6d365 0%, #fda085 100%)", // কমলা-হলুদ
-    "linear-gradient(135deg, #5ee7df 0%, #b490ca 100%)", // সায়ান-পার্পল
-    "linear-gradient(135deg, #d299c2 0%, #fef9d7 100%)", // হালকা গোলাপী-ক্রিম
-    "linear-gradient(135deg, #a1c4fd 0%, #c2e9fb 100%)", // আকাশি নীল
-    "linear-gradient(135deg, #84fab0 0%, #8fd3f4 100%)", // সবুজ-নীল
-    "linear-gradient(135deg, #fccb90 0%, #d57eeb 100%)", // পীচ-পার্পল
-    "linear-gradient(135deg, #e0c3fc 0%, #8ec5fc 100%)", // ল্যাভেন্ডার-নীল
-    "linear-gradient(135deg, #f093fb 0%, #f5576c 100%)", // ম্যাজেন্টা-লাল
+    "linear-gradient(135deg, #e0c3fc 0%, #8ec5fc 100%)", // ল্যাভেন্ডার থেকে আকাশি
+    "linear-gradient(135deg, #fddb92 0%, #d1fdff 100%)", // হালকা পীচ থেকে হালকা সায়ান
+    "linear-gradient(135deg, #a1c4fd 0%, #c2e9fb 100%)", // আকাশি থেকে আরও হালকা আকাশি
+    "linear-gradient(135deg, #ffecd2 0%, #fcb69f 100%)", // খুব হালকা পীচ থেকে স্যালমন
+    "linear-gradient(135deg, #d4fc79 0%, #96e6a1 100%)", // হালকা সবুজ থেকে সবুজ
+    "linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%)", // অফ-হোয়াইট থেকে হালকা ধূসর-নীল
+    "linear-gradient(135deg, #fdfbfb 0%, #ebedee 100%)", // প্রায় সাদা
+    "linear-gradient(135deg, #fff1eb 0%, #ace0f9 100%)", // হালকা কমলা আভা থেকে হালকা নীল
+    "linear-gradient(135deg, #ede574 0%, #e1f5c4 100%)", // হালকা হলুদ থেকে হালকা সবুজ-হলুদ
+    "linear-gradient(135deg, #f8f9d2 0%, #e2d1c3 100%)", // হালকা ক্রিম থেকে ফ্যাকাশে বাদামী
+    "linear-gradient(135deg, #c1dfc4 0%, #deecdd 100%)", // ফ্যাকাশে সবুজ
+    "linear-gradient(135deg, #f3e7e9 0%, #e3eeff 100%)"  // খুব হালকা গোলাপী থেকে খুব হালকা নীল
 ];
 $num_colors = count($gradient_colors);
 
 $page_specific_styles = "
     .category-card {
-        border: none; /* গ্র্যাডিয়েন্টের জন্য বর্ডার বাদ দেওয়া হলো */
-        border-radius: 0.75rem; /* একটু বেশি রাউন্ডেড */
+        border: 1px solid var(--bs-border-color-translucent); /* হালকা বর্ডার যোগ করা হলো */
+        border-radius: 0.75rem;
         transition: all 0.3s ease-in-out;
         display: flex;
         flex-direction: column;
         height: 100%;
         text-align: center;
         padding: 1.5rem;
-        color: #fff; /* গ্র্যাডিয়েন্টের উপর সাদা টেক্সট */
-        overflow: hidden; /* ইনকেস কোনো এলিমেন্ট বাইরে যায় */
-        position: relative; /* আফটার এলিমেন্টের জন্য */
+        color: var(--bs-body-color); /* টেক্সটের রঙ পরিবর্তন করে ডিফল্ট করা হলো */
+        overflow: hidden;
+        position: relative;
     }
-    .category-card::before { /* Optional: subtle overlay for better text readability */
+    /* হালকা গ্র্যাডিয়েন্টের জন্য ::before ওভারলে বাদ দেওয়া যেতে পারে বা আরও হালকা করা যেতে পারে */
+    /* .category-card::before {
         content: '';
         position: absolute;
-        top: 0;
-        left: 0;
-        right: 0;
-        bottom: 0;
-        background-color: rgba(0,0,0,0.15); /* হালকা কালো ওভারলে */
+        top: 0; left: 0; right: 0; bottom: 0;
+        background-color: rgba(0,0,0,0.03); 
         border-radius: 0.75rem;
         z-index: 1;
-    }
-    .category-card > * { /* Ensure content is above the overlay */
+    } */
+    .category-card > * {
         position: relative;
         z-index: 2;
     }
 
     .category-card:hover {
-        box-shadow: 0 0.75rem 1.5rem rgba(0, 0, 0, 0.2);
-        transform: translateY(-7px) scale(1.02);
+        box-shadow: 0 0.75rem 1.5rem rgba(0, 0, 0, 0.1); /* শ্যাডো একটু কমানো হলো */
+        transform: translateY(-5px) scale(1.01); /* হোভার ইফেক্ট একটু কমানো হলো */
     }
-    /* ডার্ক মোডে হোভার শ্যাডো পরিবর্তন করা যেতে পারে */
+    body.dark-mode .category-card {
+        color: var(--bs-body-color); /* ডার্ক মোডেও টেক্সটের রঙ পরিবর্তন */
+        border: 1px solid var(--bs-border-color);
+    }
     body.dark-mode .category-card:hover {
-        box-shadow: 0 0.75rem 1.5rem rgba(255, 255, 255, 0.15);
+        box-shadow: 0 0.75rem 1.5rem rgba(255, 255, 255, 0.08);
     }
 
     .category-card .card-icon {
-        font-size: 3rem; 
+        font-size: 2.8rem; /* আইকন সাইজ সামান্য কমানো */
         margin-bottom: 1rem;
-        /* আইকনের রঙ সরাসরি সাদা বা গ্র্যাডিয়েন্টের সাথে মানানসই */
-        color: rgba(255, 255, 255, 0.9); 
+        color: var(--bs-primary); /* আইকনের রঙ প্রাইমারি রাখা হলো */
+    }
+    body.dark-mode .category-card .card-icon {
+        color: var(--bs-primary-text-emphasis);
     }
    
     .category-card .card-title {
-        font-size: 1.35rem; /* টাইটেল একটু বড় করা হলো */
-        font-weight: 700;  /* আরও বোল্ড */
-        color: #fff; /* টাইটেলের রঙ সাদা */
+        font-size: 1.25rem; /* টাইটেল সাইজ আগের মতো */
+        font-weight: 600; 
+        color: var(--bs-emphasis-color); /* টেক্সটের রঙ পরিবর্তন */
         margin-bottom: 0.5rem;
-        text-shadow: 1px 1px 3px rgba(0,0,0,0.3); /* টেক্সটে হালকা শ্যাডো */
+        text-shadow: none; /* টেক্সট শ্যাডো বাদ দেওয়া হলো */
     }
     .category-card .category-description-placeholder {
         margin-bottom: 1rem;
         flex-grow: 1;
         min-height: 20px; 
         font-size: 0.9rem;
-        color: rgba(255, 255, 255, 0.85); /* বিবরণের রঙ */
+        color: var(--bs-secondary-color); /* বিবরণের রঙ পরিবর্তন */
     }
     .category-card .question-count {
         font-size: 0.9rem;
-        color: rgba(255, 255, 255, 0.75); /* প্রশ্ন সংখ্যার রঙ */
+        color: var(--bs-tertiary-color); /* প্রশ্ন সংখ্যার রঙ পরিবর্তন */
         margin-bottom: 1.25rem;
     }
-    .category-card .btn-practice { /* কাস্টম বাটন স্টাইল */
-        background-color: rgba(255,255,255,0.2);
-        border: 1px solid rgba(255,255,255,0.5);
-        color: #fff;
+    .category-card .btn-practice { 
+        background-color: var(--bs-primary); /* বাটনকে প্রাইমারি বাটন করা হলো */
+        border: none;
+        color: #fff; /* সাদা টেক্সট */
         font-weight: 500;
-        transition: background-color 0.2s ease, border-color 0.2s ease;
+        transition: background-color 0.2s ease, transform 0.2s ease;
     }
     .category-card .btn-practice:hover {
-        background-color: rgba(255,255,255,0.35);
-        border-color: rgba(255,255,255,0.75);
+        background-color: var(--bs-link-hover-color); /* Bootstrap এর ডিফল্ট hover color */
+        color: #fff;
+        transform: translateY(-1px);
+    }
+    body.dark-mode .category-card .btn-practice {
+        background-color: var(--bs-primary);
         color: #fff;
     }
+    body.dark-mode .category-card .btn-practice:hover {
+        background-color: var(--bs-link-hover-color);
+    }
+
 
     .page-header-custom {
         background: linear-gradient(135deg, var(--secondary-bg-color) 0%, var(--tertiary-bg-color) 100%);
@@ -136,17 +149,16 @@ $page_specific_styles = "
         font-size: 1.1rem;
     }
     
-    /* মোবাইলের জন্য স্টাইল (আগের মতই) */
-    @media (max-width: 575.98px) { /* Extra small devices */
+    @media (max-width: 575.98px) { 
         .category-card {
             padding: 1rem;
         }
         .category-card .card-icon {
-            font-size: 2.5rem;
+            font-size: 2.2rem;
             margin-bottom: 0.75rem;
         }
         .category-card .card-title {
-            font-size: 1.15rem; /* মোবাইলের জন্য টাইটেল */
+            font-size: 1.1rem; 
         }
         .category-card .btn-practice {
             font-size: 0.9rem;
@@ -179,7 +191,6 @@ require_once 'includes/header.php';
     <?php if (!empty($categories)): ?>
         <div class="row row-cols-2 row-cols-sm-2 row-cols-md-3 row-cols-lg-4 g-4">
             <?php foreach ($categories as $index => $category): 
-                // গ্র্যাডিয়েন্ট কালার নির্ধারণ
                 $current_gradient = $gradient_colors[$index % $num_colors];
             ?>
                 <div class="col">
@@ -187,12 +198,12 @@ require_once 'includes/header.php';
                         <?php if (!empty($category['icon_class'])): ?>
                             <div class="card-icon"><i class="<?php echo htmlspecialchars($category['icon_class']); ?>"></i></div>
                         <?php else: ?>
-                             <div class="card-icon"><i class="fas fa-tags"></i></div> 
+                             <div class="card-icon"><i class="fas fa-tags"></i></div>
                         <?php endif; ?>
                         <h5 class="card-title"><?php echo htmlspecialchars($category['name']); ?></h5>
                         
                         <div class="category-description-placeholder">
-                            <?php /* বিবরণ এখানে দেখানো হচ্ছে না আপনার অনুরোধ অনুযায়ী */ ?>
+                            <?php /* বিবরণ এখানে দেখানো হচ্ছে না */ ?>
                         </div>
 
                         <p class="question-count">(<?php echo $category['question_count']; ?> টি প্রশ্ন)</p>
@@ -208,8 +219,6 @@ require_once 'includes/header.php';
     <?php endif; ?>
 </div>
 <?php
-// Font Awesome এর জন্য CDN লিঙ্ক (যদি হেডার ফাইলে না থাকে)
-// echo '<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css">';
 if ($conn) { $conn->close(); }
 require_once 'includes/footer.php';
 ?>
