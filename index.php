@@ -328,10 +328,14 @@ $page_specific_styles = "
     .quiz-card-sm ul.list-unstyled li {
         margin-bottom: 0.25rem;
     }
-    .quiz-card-sm .btn {
+    .quiz-card-sm .btn { /* General button style in quiz-card-sm */
         font-size: 0.85rem;
         padding: 0.4rem 0.8rem; 
-        align-self: flex-start; 
+    }
+    .quiz-card-sm .quiz-actions-wrapper { /* Wrapper for buttons */
+        margin-top: auto; /* Pushes buttons to the bottom of the card body */
+        display: flex; /* Allows buttons to be side-by-side */
+        gap: 0.5rem; /* Adds space between buttons */
     }
     .quiz-card-sm .additional-info-home {
         font-size: 0.75rem;
@@ -476,13 +480,23 @@ require_once 'includes/header.php';
                             <li><strong>সময়:</strong> <?php echo $quiz['duration_minutes']; ?> মিনিট</li>
                             <li><strong>প্রশ্ন:</strong> <?php echo $quiz['question_count']; ?> টি</li>
                         </ul>
-                        <?php if ($is_disabled_button): ?>
-                            <button class="btn btn-sm <?php echo $button_class_home; ?> mt-2" disabled><?php echo $button_text_home; ?></button>
-                        <?php else: ?>
-                            <a href="<?php echo $link_href_home; ?>" class="btn btn-sm <?php echo $button_class_home; ?> mt-2">
-                                <?php echo $button_text_home; ?>
-                            </a>
-                        <?php endif; ?>
+                        <div class="quiz-actions-wrapper">
+                            <?php if ($is_disabled_button): ?>
+                                <button class="btn btn-sm <?php echo $button_class_home; ?>" disabled><?php echo $button_text_home; ?></button>
+                            <?php else: ?>
+                                <a href="<?php echo $link_href_home; ?>" class="btn btn-sm <?php echo $button_class_home; ?>">
+                                    <?php echo $button_text_home; ?>
+                                </a>
+                            <?php endif; ?>
+                            <button type="button" class="btn btn-sm btn-outline-secondary" 
+                                    onclick="shareQuiz('<?php echo htmlspecialchars(addslashes($quiz['title']), ENT_QUOTES); ?>', '<?php echo $base_url . 'quiz_page.php?id=' . $quiz['id']; ?>', this)" 
+                                    title="শেয়ার করুন">
+                                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-share-fill" viewBox="0 0 16 16">
+                                  <path d="M11 2.5a2.5 2.5 0 1 1 .603 1.628l-6.718 3.12a2.5 2.5 0 0 1 0 1.504l6.718 3.12a2.5 2.5 0 1 1-.488.876l-6.718-3.12a2.5 2.5 0 1 1 0-3.256l6.718-3.12A2.5 2.5 0 0 1 11 2.5"/>
+                                </svg>
+                                <span class="d-none d-sm-inline">শেয়ার</span>
+                            </button>
+                        </div>
                         <?php if (!empty($additional_info_home)): ?>
                             <div class="additional-info-home"><?php echo $additional_info_home; ?></div>
                         <?php endif; ?>
@@ -508,18 +522,15 @@ require_once 'includes/header.php';
                         <h5 class="card-title"><?php echo htmlspecialchars($material['title']); ?></h5>
                         <div class="quiz-description-display"> 
                             <?php 
-                            // Since description can be HTML from Quill, we need to be careful.
-                            // For a short preview, strip_tags and then truncate.
                             if (!empty($material['description'])) {
-                                $desc_plain_sm = strip_tags($material['description']); // Remove HTML for plain text preview
+                                $desc_plain_sm = strip_tags($material['description']);
                                 echo htmlspecialchars(mb_substr($desc_plain_sm, 0, 100) . (mb_strlen($desc_plain_sm) > 100 ? '...' : ''));
                             } else {
                                 echo '<p class="text-muted fst-italic" style="margin-bottom: 0;"><em>কোনো বিবরণ নেই।</em></p>';
                             }
                             ?>
                         </div>
-                        <a href="<?php echo htmlspecialchars($material['google_drive_link']); ?>" target="_blank" class="btn btn-sm btn-outline-primary mt-auto">
-                           <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-link-45deg me-1" viewBox="0 0 16 16">
+                        <a href="<?php echo htmlspecialchars($material['google_drive_link']); ?>" target="_blank" class="btn btn-primary mt-auto"> <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-link-45deg me-1" viewBox="0 0 16 16">
                               <path d="M4.715 6.542 3.343 7.914a3 3 0 1 0 4.243 4.243l1.828-1.829A3 3 0 0 0 8.586 5.5L8 6.086a1 1 0 0 0-.154.199 2 2 0 0 1 .861 3.337L6.88 11.45a2 2 0 1 1-2.83-2.83l.793-.792a4 4 0 0 1-.128-1.287z"/>
                               <path d="M6.586 4.672A3 3 0 0 0 7.414 9.5l.775-.776a2 2 0 0 1-.896-3.346L9.12 3.55a2 2 0 1 1 2.83 2.83l-.793.792c.112.42.155.855.128 1.287l1.372-1.372a3 3 0 1 0-4.243-4.243z"/>
                             </svg>
