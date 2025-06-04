@@ -262,7 +262,7 @@ require_once 'includes/header.php';
                                     <input class="form-check-input question-option-radio" type="radio"
                                            name="answers[<?php echo $question['id']; ?>]"
                                            id="option_<?php echo $option['id']; ?>_q<?php echo $question['id']; ?>"
-                                           value="<?php echo $option['id']; ?>"> {/* removed 'required' attribute */}
+                                           value="<?php echo $option['id']; ?>"> 
                                     <label class="form-check-label w-100 p-2 rounded border" for="option_<?php echo $option['id']; ?>_q<?php echo $question['id']; ?>">
                                         <?php echo escape_html($option['option_text']); ?>
                                     </label>
