@@ -180,6 +180,11 @@ $current_admin_base_url = isset($admin_base_url) ? $admin_base_url : '';
             </a>
         </li>
         <li class="nav-item">
+    <a class="nav-link <?php echo (basename($_SERVER['PHP_SELF']) == 'manage_categories.php') ? 'active' : ''; ?>" href="<?php echo $current_admin_base_url; ?>manage_categories.php">
+        ক্যাটাগরি ম্যানেজমেন্ট
+    </a>
+</li>
+        <li class="nav-item">
             <a class="nav-link <?php echo (basename($_SERVER['PHP_SELF']) == 'manage_study_materials.php' || basename($_SERVER['PHP_SELF']) == 'add_study_material.php' || basename($_SERVER['PHP_SELF']) == 'edit_study_material.php') ? 'active' : ''; ?>" href="<?php echo $current_admin_base_url; ?>manage_study_materials.php">
                 স্টাডি ম্যাটেরিয়ালস
             </a>
