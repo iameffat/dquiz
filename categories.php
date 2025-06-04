@@ -24,99 +24,97 @@ if ($result) {
     error_log("Error fetching categories: " . $conn->error);
 }
 
-// হালকা সলিড কালারের উদাহরণ (আপনি এগুলো পরিবর্তন করতে পারেন)
-$solid_colors = [
-    "#e7f5ff", // খুব হালকা নীল
-    "#e0f7fa", // খুব হালকা সায়ান
-    "#e8f5e9", // খুব হালকা সবুজ
-    "#fffde7", // খুব হালকা হলুদ
-    "#fce4ec", // খুব হালকা গোলাপী
-    "#f3e5f5", // খুব হালকা পার্পল (ল্যাভেন্ডার)
-    "#fff8e1", // খুব হালকা কমলা (ক্রিম)
-    "#f1f8e9", // আরও একটি হালকা সবুজ
-    "#e3f2fd", // আরও একটি হালকা নীল
-    "#ffebee", // খুব হালকা লাল/গোলাপী
-    "#fafafa", // প্রায় সাদা (হালকা ধূসর)
-    "#e0e0e0", // খুব হালকা ধূসর
+// কিছু স্যাম্পল গ্র্যাডিয়েন্ট কালার
+$gradient_colors = [
+    "linear-gradient(135deg, #667eea 0%, #764ba2 100%)", // বেগুনী-নীল
+    "linear-gradient(135deg, #ff9a9e 0%, #fecfef 100%)", // গোলাপী
+    "linear-gradient(135deg, #f6d365 0%, #fda085 100%)", // কমলা-হলুদ
+    "linear-gradient(135deg, #5ee7df 0%, #b490ca 100%)", // সায়ান-পার্পল
+    "linear-gradient(135deg, #d299c2 0%, #fef9d7 100%)", // হালকা গোলাপী-ক্রিম
+    "linear-gradient(135deg, #a1c4fd 0%, #c2e9fb 100%)", // আকাশি নীল
+    "linear-gradient(135deg, #84fab0 0%, #8fd3f4 100%)", // সবুজ-নীল
+    "linear-gradient(135deg, #fccb90 0%, #d57eeb 100%)", // পীচ-পার্পল
+    "linear-gradient(135deg, #e0c3fc 0%, #8ec5fc 100%)", // ল্যাভেন্ডার-নীল
+    "linear-gradient(135deg, #f093fb 0%, #f5576c 100%)", // ম্যাজেন্টা-লাল
 ];
-$num_colors = count($solid_colors);
+$num_colors = count($gradient_colors);
 
 $page_specific_styles = "
     .category-card {
-        border: 1px solid var(--bs-border-color-translucent); 
-        border-radius: 0.75rem;
+        border: none; /* গ্র্যাডিয়েন্টের জন্য বর্ডার বাদ দেওয়া হলো */
+        border-radius: 0.75rem; /* একটু বেশি রাউন্ডেড */
         transition: all 0.3s ease-in-out;
         display: flex;
         flex-direction: column;
         height: 100%;
         text-align: center;
         padding: 1.5rem;
-        color: var(--bs-body-color); 
-        overflow: hidden;
+        color: #fff; /* গ্র্যাডিয়েন্টের উপর সাদা টেক্সট */
+        overflow: hidden; /* ইনকেস কোনো এলিমেন্ট বাইরে যায় */
+        position: relative; /* আফটার এলিমেন্টের জন্য */
+    }
+    .category-card::before { /* Optional: subtle overlay for better text readability */
+        content: '';
+        position: absolute;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background-color: rgba(0,0,0,0.15); /* হালকা কালো ওভারলে */
+        border-radius: 0.75rem;
+        z-index: 1;
+    }
+    .category-card > * { /* Ensure content is above the overlay */
         position: relative;
+        z-index: 2;
     }
 
     .category-card:hover {
-        box-shadow: 0 0.5rem 1.25rem rgba(0, 0, 0, 0.12); /* শ্যাডো সামান্য পরিবর্তন */
-        transform: translateY(-6px); /* হোভার ইফেক্ট */
+        box-shadow: 0 0.75rem 1.5rem rgba(0, 0, 0, 0.2);
+        transform: translateY(-7px) scale(1.02);
     }
-    body.dark-mode .category-card {
-        color: var(--bs-body-color); 
-        border: 1px solid var(--bs-border-color);
-        /* ডার্ক মোডে কার্ডের ব্যাকগ্রাউন্ড কালার CSS ভেরিয়েবল থেকে নেওয়া ভালো, 
-           নয়তো PHP থেকে আসা লাইট কালারগুলো ডার্ক মোডে বেমানান লাগতে পারে। 
-           আপাতত PHP থেকে আসা কালারই ব্যবহৃত হবে। 
-           যদি ডার্ক মোডে ভিন্ন কালার চান, তাহলে CSS এ ক্লাস দিয়ে করা ভালো। */
-    }
+    /* ডার্ক মোডে হোভার শ্যাডো পরিবর্তন করা যেতে পারে */
     body.dark-mode .category-card:hover {
-        box-shadow: 0 0.5rem 1.25rem rgba(255, 255, 255, 0.1);
+        box-shadow: 0 0.75rem 1.5rem rgba(255, 255, 255, 0.15);
     }
 
     .category-card .card-icon {
-        font-size: 2.8rem; 
+        font-size: 3rem; 
         margin-bottom: 1rem;
-        color: var(--bs-primary); 
-    }
-    body.dark-mode .category-card .card-icon {
-        color: var(--bs-primary-text-emphasis);
+        /* আইকনের রঙ সরাসরি সাদা বা গ্র্যাডিয়েন্টের সাথে মানানসই */
+        color: rgba(255, 255, 255, 0.9); 
     }
    
     .category-card .card-title {
-        font-size: 1.25rem; 
-        font-weight: 600; 
-        color: var(--bs-emphasis-color); 
+        font-size: 1.35rem; /* টাইটেল একটু বড় করা হলো */
+        font-weight: 700;  /* আরও বোল্ড */
+        color: #fff; /* টাইটেলের রঙ সাদা */
         margin-bottom: 0.5rem;
+        text-shadow: 1px 1px 3px rgba(0,0,0,0.3); /* টেক্সটে হালকা শ্যাডো */
     }
     .category-card .category-description-placeholder {
         margin-bottom: 1rem;
         flex-grow: 1;
         min-height: 20px; 
         font-size: 0.9rem;
-        color: var(--bs-secondary-color); 
+        color: rgba(255, 255, 255, 0.85); /* বিবরণের রঙ */
     }
     .category-card .question-count {
         font-size: 0.9rem;
-        color: var(--bs-tertiary-color); 
+        color: rgba(255, 255, 255, 0.75); /* প্রশ্ন সংখ্যার রঙ */
         margin-bottom: 1.25rem;
     }
-    .category-card .btn-practice { 
-        background-color: var(--bs-primary); 
-        border: none;
-        color: #fff; 
+    .category-card .btn-practice { /* কাস্টম বাটন স্টাইল */
+        background-color: rgba(255,255,255,0.2);
+        border: 1px solid rgba(255,255,255,0.5);
+        color: #fff;
         font-weight: 500;
-        transition: background-color 0.2s ease, transform 0.2s ease;
+        transition: background-color 0.2s ease, border-color 0.2s ease;
     }
     .category-card .btn-practice:hover {
-        background-color: var(--bs-link-hover-color); 
+        background-color: rgba(255,255,255,0.35);
+        border-color: rgba(255,255,255,0.75);
         color: #fff;
-        transform: translateY(-1px);
-    }
-    body.dark-mode .category-card .btn-practice {
-        background-color: var(--bs-primary); /* ডার্ক মোডেও একই রকম বাটন রাখতে পারেন */
-        color: #fff;
-    }
-    body.dark-mode .category-card .btn-practice:hover {
-        background-color: var(--bs-link-hover-color);
     }
 
     .page-header-custom {
@@ -138,16 +136,17 @@ $page_specific_styles = "
         font-size: 1.1rem;
     }
     
-    @media (max-width: 575.98px) { 
+    /* মোবাইলের জন্য স্টাইল (আগের মতই) */
+    @media (max-width: 575.98px) { /* Extra small devices */
         .category-card {
             padding: 1rem;
         }
         .category-card .card-icon {
-            font-size: 2.2rem;
+            font-size: 2.5rem;
             margin-bottom: 0.75rem;
         }
         .category-card .card-title {
-            font-size: 1.1rem; 
+            font-size: 1.15rem; /* মোবাইলের জন্য টাইটেল */
         }
         .category-card .btn-practice {
             font-size: 0.9rem;
@@ -178,22 +177,22 @@ require_once 'includes/header.php';
     <?php display_flash_message(); ?>
 
     <?php if (!empty($categories)): ?>
-        <div class="row row-cols-2 row-cols-sm-2 row-cols-md-3 row-cols-lg-4 g-4">
+        <div class="row row-cols-2 row-cols-sm-2 row-cols-md-3 row-cols-lg-4 g-4">a
             <?php foreach ($categories as $index => $category): 
-                // সলিড কালার নির্ধারণ
-                $current_solid_color = $solid_colors[$index % $num_colors];
+                // গ্র্যাডিয়েন্ট কালার নির্ধারণ
+                $current_gradient = $gradient_colors[$index % $num_colors];
             ?>
                 <div class="col">
-                    <div class="category-card" style="background-color: <?php echo $current_solid_color; ?>;">
+                    <div class="category-card" style="background: <?php echo $current_gradient; ?>;">
                         <?php if (!empty($category['icon_class'])): ?>
                             <div class="card-icon"><i class="<?php echo htmlspecialchars($category['icon_class']); ?>"></i></div>
                         <?php else: ?>
-                             <div class="card-icon"><i class="fas fa-tags"></i></div>
+                             <div class="card-icon"><i class="fas fa-tags"></i></div> 
                         <?php endif; ?>
                         <h5 class="card-title"><?php echo htmlspecialchars($category['name']); ?></h5>
                         
                         <div class="category-description-placeholder">
-                            <?php /* বিবরণ এখানে দেখানো হচ্ছে না */ ?>
+                            <?php /* বিবরণ এখানে দেখানো হচ্ছে না আপনার অনুরোধ অনুযায়ী */ ?>
                         </div>
 
                         <p class="question-count">(<?php echo $category['question_count']; ?> টি প্রশ্ন)</p>
@@ -209,6 +208,8 @@ require_once 'includes/header.php';
     <?php endif; ?>
 </div>
 <?php
+// Font Awesome এর জন্য CDN লিঙ্ক (যদি হেডার ফাইলে না থাকে)
+// echo '<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css">';
 if ($conn) { $conn->close(); }
 require_once 'includes/footer.php';
 ?>
