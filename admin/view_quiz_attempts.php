@@ -355,4 +355,4 @@ if (isset($conn) && $conn instanceof mysqli) {
     $conn->close();
 }
 require_once 'includes/footer.php';
-?>অ্যাড
+?>
