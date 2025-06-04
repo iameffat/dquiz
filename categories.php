@@ -6,14 +6,11 @@ require_once 'includes/db_connect.php';
 require_once 'includes/functions.php';
 
 $categories = [];
-// Updated SQL query: Shows categories if they have questions associated with them.
-// The previous condition `q.quiz_id IS NULL` has been removed to allow questions from quizzes
-// (that have a category_id set) to also count towards category questions for practice.
 $sql = "SELECT c.id, c.name, c.description, c.icon_class, COUNT(q.id) as question_count 
         FROM categories c
         LEFT JOIN questions q ON c.id = q.category_id
         GROUP BY c.id, c.name, c.description, c.icon_class
-        HAVING question_count > 0 -- Only display categories that have at least one question
+        HAVING question_count > 0 
         ORDER BY c.name ASC";
 
 $result = $conn->query($sql);
@@ -24,11 +21,7 @@ if ($result) {
         }
     }
 } else {
-    // Log error or display a user-friendly message if query fails
     error_log("Error fetching categories: " . $conn->error);
-    // You could set a flash message here if you have a system for it
-    // $_SESSION['flash_message'] = "ক্যাটাগরি আনতে সমস্যা হয়েছে।";
-    // $_SESSION['flash_message_type'] = "danger";
 }
 
 $page_specific_styles = "
@@ -51,7 +44,7 @@ $page_specific_styles = "
         box-shadow: 0 0.5rem 1rem rgba(255, 255, 255, 0.1);
     }
     .category-card .card-icon {
-        font-size: 3rem; /* Increased icon size */
+        font-size: 3rem; 
         margin-bottom: 1rem;
         color: var(--bs-primary);
     }
@@ -69,7 +62,7 @@ $page_specific_styles = "
         color: var(--bs-secondary-text-emphasis);
         margin-bottom: 1rem;
         flex-grow: 1;
-        min-height: 40px; /* Ensure a minimum height for description area */
+        min-height: 40px; 
     }
     .category-card .question-count {
         font-size: 0.85rem;
@@ -105,7 +98,7 @@ require_once 'includes/header.php';
         <p>আপনার পছন্দের বিষয় নির্বাচন করে জ্ঞান যাচাই করুন ও বাড়ান।</p>
     </div>
 
-    <?php display_flash_message(); // To show any messages from redirects ?>
+    <?php display_flash_message(); ?>
 
     <?php if (!empty($categories)): ?>
         <div class="row row-cols-1 row-cols-sm-2 row-cols-md-3 row-cols-lg-4 g-4">
@@ -115,14 +108,17 @@ require_once 'includes/header.php';
                         <?php if (!empty($category['icon_class'])): ?>
                             <div class="card-icon"><i class="<?php echo htmlspecialchars($category['icon_class']); ?>"></i></div>
                         <?php else: ?>
-                             <div class="card-icon"><i class="fas fa-tags"></i></div> {/* Default icon: Make sure Font Awesome is linked */}
+                             <div class="card-icon"><i class="fas fa-tags"></i></div>
                         <?php endif; ?>
                         <h5 class="card-title"><?php echo htmlspecialchars($category['name']); ?></h5>
-                        <?php if(!empty($category['description'])): ?>
-                            <p class="category-description"><?php echo htmlspecialchars(mb_strimwidth($category['description'], 0, 80, "...")); ?></p>
+                        
+                        <?php // পরিবর্তন এখানে: ?>
+                        <?php if(!empty(trim($category['description']))): // বিবরণ থাকলে তবেই <p> ট্যাগ দেখাবে ?>
+                            <p class="category-description"><?php echo htmlspecialchars(mb_strimwidth(trim($category['description']), 0, 80, "...")); ?></p>
                         <?php else: ?>
-                            <p class="category-description text-muted fst-italic"><em>কোনো বিবরণ নেই।</em></p>
+                            <p class="category-description">&nbsp;</p> <?php // বিবরণ না থাকলে একটি খালি প্যারাগ্রাফ বা কিছুই না দেখানো যেতে পারে, অথবা min-height দিয়ে জায়গা ঠিক রাখা হয়েছে ?>
                         <?php endif; ?>
+
                         <p class="question-count">(<?php echo $category['question_count']; ?> টি প্রশ্ন)</p>
                         <a href="practice_quiz.php?category_id=<?php echo $category['id']; ?>" class="btn btn-primary mt-auto">অনুশীলন শুরু করুন</a>
                     </div>
@@ -136,10 +132,6 @@ require_once 'includes/header.php';
     <?php endif; ?>
 </div>
 <?php
-// Font Awesome CDN for icons (if not already in main header.php, which it should be for consistency)
-// Ensure your main `includes/header.php` has Font Awesome, or add it here or in `includes/footer.php`.
-// Example: echo '<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css" integrity="sha512-1ycn6IcaQQ40/MKBW2W4Rhis/DbILU74C1vSrLJxCq57o941Ym01SwNsOMqvEBFlcgUa6xLiPY/NS5R+E6ztJQ==" crossorigin="anonymous" referrerpolicy="no-referrer" />';
-
 if ($conn) { $conn->close(); }
 require_once 'includes/footer.php';
 ?>
