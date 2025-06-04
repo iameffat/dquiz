@@ -41,8 +41,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
     if (empty($errors)) { // Only proceed if identifier and password are not empty
         if (isset($_POST['cf-turnstile-response']) && !empty($_POST['cf-turnstile-response'])) {
             $turnstile_token = $_POST['cf-turnstile-response'];
-            // গুরুত্বপূর্ণ: আপনার আসল Secret Key এখানে ব্যবহার করুন
-            $secret_key = '0x4AAAAAABfuh_4bXftQJeiM0UhI6HVZ8GM'; 
+            $secret_key = '0x4AAAAAABfuh_4bXftQJeiM0UhI6HVZ8GM'; // আপনার আসল Secret Key
             
             $verification_result = verify_cloudflare_turnstile($turnstile_token, $secret_key);
 
@@ -54,11 +53,10 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
         }
     }
 
-    if (empty($errors)) { // This now checks all previous errors including captcha
-        // Check if identifier is email or mobile
+    if (empty($errors)) {
         $field_type = filter_var($login_identifier, FILTER_VALIDATE_EMAIL) ? 'email' : 'mobile_number';
-
-        $sql = "SELECT id, name, email, mobile_number, password, role FROM users WHERE $field_type = ?";
+        // Fetch is_banned status as well
+        $sql = "SELECT id, name, email, mobile_number, password, role, is_banned FROM users WHERE $field_type = ?";
         
         if ($stmt = $conn->prepare($sql)) {
             $stmt->bind_param("s", $param_identifier);
@@ -67,24 +65,28 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
             if ($stmt->execute()) {
                 $stmt->store_result();
                 if ($stmt->num_rows == 1) {
-                    $stmt->bind_result($id, $name, $db_email, $db_mobile, $hashed_password, $role);
+                    $stmt->bind_result($id, $name, $db_email, $db_mobile, $hashed_password, $role, $is_banned); // Added $is_banned
                     if ($stmt->fetch()) {
                         if (password_verify($password, $hashed_password)) {
-                            $_SESSION["loggedin"] = true;
-                            $_SESSION["user_id"] = $id;
-                            $_SESSION["name"] = $name;
-                            $_SESSION["email"] = $db_email; 
-                            $_SESSION["mobile_number"] = $db_mobile; 
-                            $_SESSION["role"] = $role;
-                            
-                            if (isset($_SESSION['redirect_url_user'])) {
-                                $redirect_url = $_SESSION['redirect_url_user'];
-                                unset($_SESSION['redirect_url_user']); 
-                                header("location: " . $redirect_url);
-                                exit;
+                            if ($is_banned == 1) { // Check if banned
+                                $errors['login'] = "আপনার একাউন্টটি নিষিদ্ধ করা হয়েছে। অনুগ্রহ করে সাপোর্টে যোগাযোগ করুন।";
                             } else {
-                                header("location: profile.php"); 
-                                exit;
+                                $_SESSION["loggedin"] = true;
+                                $_SESSION["user_id"] = $id;
+                                $_SESSION["name"] = $name;
+                                $_SESSION["email"] = $db_email; 
+                                $_SESSION["mobile_number"] = $db_mobile; 
+                                $_SESSION["role"] = $role;
+                                
+                                if (isset($_SESSION['redirect_url_user'])) {
+                                    $redirect_url = $_SESSION['redirect_url_user'];
+                                    unset($_SESSION['redirect_url_user']); 
+                                    header("location: " . $redirect_url);
+                                    exit;
+                                } else {
+                                    header("location: profile.php"); 
+                                    exit;
+                                }
                             }
                         } else {
                             $errors['login'] = "পাসওয়ার্ড সঠিক নয়।";
@@ -101,9 +103,6 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
              $errors['login'] = "ডাটাবেস সমস্যা: " . $conn->error;
         }
     }
-    if ($conn) { 
-       // $conn->close(); // Connection will be closed in footer
-    }
 }
 
 require_once 'includes/header.php';
@@ -117,7 +116,7 @@ require_once 'includes/header.php';
     <?php if (!empty($errors['login'])): ?>
         <div class="alert alert-danger"><?php echo $errors['login']; ?></div>
     <?php endif; ?>
-    <?php if (!empty($errors['captcha']) && empty($errors['login']) ): // Show captcha error if no general login error ?>
+    <?php if (!empty($errors['captcha']) && empty($errors['login']) ): ?>
         <div class="alert alert-danger"><?php echo $errors['captcha']; ?></div>
     <?php endif; ?>
 
@@ -136,9 +135,6 @@ require_once 'includes/header.php';
         
         <div class="mb-3">
             <div class="cf-turnstile" data-sitekey="0x4AAAAAABfuh1aGZng_WR9b" data-theme="auto"></div>
-
-            <?php if (!empty($errors['captcha']) && !empty($errors['login_identifier'].$errors['password']) ): // Show captcha specific error only if other fields might be valid, or it was already handled by general $errors['login'] ?>
-                <?php endif; ?>
         </div>
 
         <div class="mb-3">
@@ -151,12 +147,16 @@ require_once 'includes/header.php';
     $redirect_param_for_register_link = ''; 
     if (isset($_SESSION['redirect_url_user'])) { 
          $redirect_param_for_register_link = '?redirect=' . urlencode($_SESSION['redirect_url_user']);
+    } elseif (isset($_SESSION['redirect_url_on_register_init'])) { // Use the temp session var if general one isn't set
+        $redirect_param_for_register_link = '?redirect=' . urlencode($_SESSION['redirect_url_on_register_init']);
     }
     echo $redirect_param_for_register_link;
 ?>">রেজিস্টার করুন</a></p>
+</form>
+</div>
 <?php 
 if ($conn && $conn->ping()) { 
-    // $conn->close(); 
+    // $conn->close(); // Connection will be closed in footer
 }
 include 'includes/footer.php'; 
 ?>

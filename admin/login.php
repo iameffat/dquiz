@@ -1,7 +1,6 @@
 <?php
 $page_title = "এডমিন লগইন";
 $admin_base_url = ''; // Current directory is admin/
-// db_connect.php path is relative to the admin folder
 require_once '../includes/db_connect.php'; // Session is started here
 require_once '../includes/functions.php';
 
@@ -27,7 +26,8 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
 
     if (empty($errors)) {
         $field_type = filter_var($login_identifier, FILTER_VALIDATE_EMAIL) ? 'email' : 'mobile_number';
-        $sql = "SELECT id, name, email, mobile_number, password, role FROM users WHERE $field_type = ? AND role = 'admin'";
+        // Fetch is_banned status
+        $sql = "SELECT id, name, email, mobile_number, password, role, is_banned FROM users WHERE $field_type = ? AND role = 'admin'";
         
         if ($stmt = $conn->prepare($sql)) {
             $stmt->bind_param("s", $param_identifier);
@@ -36,21 +36,24 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
             if ($stmt->execute()) {
                 $stmt->store_result();
                 if ($stmt->num_rows == 1) {
-                    $stmt->bind_result($id, $name, $db_email, $db_mobile, $hashed_password, $role);
+                    $stmt->bind_result($id, $name, $db_email, $db_mobile, $hashed_password, $role, $is_banned); // Added $is_banned
                     if ($stmt->fetch()) {
                         if (password_verify($password, $hashed_password)) {
-                            $_SESSION["loggedin"] = true;
-                            $_SESSION["user_id"] = $id;
-                            $_SESSION["name"] = $name;
-                            $_SESSION["email"] = $db_email;
-                            $_SESSION["mobile_number"] = $db_mobile;
-                            $_SESSION["role"] = $role;
-                            
-                            // Redirect to stored URL or admin dashboard
-                            $redirect_url = isset($_SESSION['redirect_url_admin']) ? $_SESSION['redirect_url_admin'] : 'index.php';
-                            unset($_SESSION['redirect_url_admin']); // Clear the stored URL
-                            header("location: " . $redirect_url);
-                            exit;
+                            if ($is_banned == 1) { // Check if banned
+                                $errors['login'] = "এই এডমিন একাউন্টটি নিষিদ্ধ করা হয়েছে।";
+                            } else {
+                                $_SESSION["loggedin"] = true;
+                                $_SESSION["user_id"] = $id;
+                                $_SESSION["name"] = $name;
+                                $_SESSION["email"] = $db_email;
+                                $_SESSION["mobile_number"] = $db_mobile;
+                                $_SESSION["role"] = $role;
+                                
+                                $redirect_url = isset($_SESSION['redirect_url_admin']) ? $_SESSION['redirect_url_admin'] : 'index.php';
+                                unset($_SESSION['redirect_url_admin']);
+                                header("location: " . $redirect_url);
+                                exit;
+                            }
                         } else {
                             $errors['login'] = "পাসওয়ার্ড সঠিক নয় অথবা আপনি এডমিন নন।";
                         }
@@ -66,7 +69,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
             $errors['login'] = "ডাটাবেস সমস্যা: " . $conn->error;
         }
     }
-    $conn->close();
+    // No need to close connection here if it's closed in footer
 }
 ?>
 <!DOCTYPE html>
@@ -111,5 +114,8 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
         </form>
     </div>
     <script src="../assets/js/bootstrap.bundle.min.js"></script>
+    <?php
+     if ($conn) { $conn->close(); } // Close connection if it was opened
+    ?>
 </body>
 </html>
