@@ -152,7 +152,7 @@ require_once 'includes/header.php';
     <?php display_flash_message(); ?>
 
     <?php if (!empty($categories)): ?>
-        <div class="row row-cols-2 row-cols-sm-2 row-cols-md-3 row-cols-lg-4 g-4"> {/* গ্রিড লেআউট আগের মতোই */}
+        <div class="row row-cols-2 row-cols-sm-2 row-cols-md-3 row-cols-lg-4 g-4">
             <?php foreach ($categories as $category): 
                 // নামের প্রথম অক্ষর বা ডিফল্ট আইকন
                 $category_initial = mb_substr(trim($category['name']), 0, 1, "UTF-8");
