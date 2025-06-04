@@ -8,10 +8,22 @@ document.addEventListener('DOMContentLoaded', function() {
             url: url
         };
 
+        // Store original button content and classes
         const originalButtonInnerHTML = buttonElement.innerHTML;
         const originalButtonClasses = buttonElement.className;
-        let successClass = 'btn-success'; 
-        
+        const isOutlineButton = originalButtonClasses.includes('btn-outline-');
+        let successClass = 'btn-success'; // Default success class
+        let originalShareClass = 'btn-outline-secondary'; // Default original class to restore
+
+        // Determine specific original class for restoration
+        if (originalButtonClasses.includes('btn-outline-secondary-custom')) {
+            originalShareClass = 'btn-outline-secondary-custom';
+        } else if (originalButtonClasses.includes('btn-outline-secondary')) {
+             originalShareClass = 'btn-outline-secondary';
+        }
+        // Add other specific outline classes if needed
+
+
         try {
             if (navigator.share) {
                 await navigator.share(shareData);
@@ -28,10 +40,7 @@ document.addEventListener('DOMContentLoaded', function() {
                     কপি হয়েছে!`;
                 
                 buttonElement.className = originalButtonClasses.replace(/btn-outline-\w+-?\w*/g, '').replace(/btn-\w+-?\w*/g, ''); 
-                buttonElement.classList.add('btn', successClass); // Ensure 'btn' class is present
-                if (originalButtonClasses.includes('btn-sm')) { // Re-add btn-sm if it was there
-                    buttonElement.classList.add('btn-sm');
-                }
+                buttonElement.classList.add('btn', successClass);
 
 
                 setTimeout(() => {
@@ -42,6 +51,7 @@ document.addEventListener('DOMContentLoaded', function() {
         } catch (err) {
             console.error('Error sharing quiz or copying link:', err);
             // Fallback alert removed as per user request
+            // alert(`কুইজটি শেয়ার করতে এই লিংকটি কপি করুন: ${url}`); 
         }
     }
 });
