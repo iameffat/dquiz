@@ -57,12 +57,11 @@ $page_specific_styles = "
         color: var(--bs-primary-text-emphasis);
         margin-bottom: 0.5rem;
     }
-    .category-card .category-description {
-        font-size: 0.9rem;
-        color: var(--bs-secondary-text-emphasis);
+    /* .category-description is no longer shown, but keeping style for min-height consistency if you re-add it */
+    .category-card .category-description-placeholder { /* New class for placeholder */
         margin-bottom: 1rem;
         flex-grow: 1;
-        min-height: 40px; 
+        min-height: 20px; /* Adjusted min-height, or can be removed if not needed */
     }
     .category-card .question-count {
         font-size: 0.85rem;
@@ -112,12 +111,8 @@ require_once 'includes/header.php';
                         <?php endif; ?>
                         <h5 class="card-title"><?php echo htmlspecialchars($category['name']); ?></h5>
                         
-                        <?php // পরিবর্তন এখানে: ?>
-                        <?php if(!empty(trim($category['description']))): // বিবরণ থাকলে তবেই <p> ট্যাগ দেখাবে ?>
-                            <p class="category-description"><?php echo htmlspecialchars(mb_strimwidth(trim($category['description']), 0, 80, "...")); ?></p>
-                        <?php else: ?>
-                            <p class="category-description">&nbsp;</p> <?php // বিবরণ না থাকলে একটি খালি প্যারাগ্রাফ বা কিছুই না দেখানো যেতে পারে, অথবা min-height দিয়ে জায়গা ঠিক রাখা হয়েছে ?>
-                        <?php endif; ?>
+                        <?php // বিবরণ দেখানোর অংশটি বাদ দেওয়া হয়েছে ?>
+                        <div class="category-description-placeholder"></div> {/* বিবরণ না দেখালেও লেআউট ঠিক রাখার জন্য একটি খালি ডিভ */}
 
                         <p class="question-count">(<?php echo $category['question_count']; ?> টি প্রশ্ন)</p>
                         <a href="practice_quiz.php?category_id=<?php echo $category['id']; ?>" class="btn btn-primary mt-auto">অনুশীলন শুরু করুন</a>
