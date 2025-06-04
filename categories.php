@@ -138,7 +138,7 @@ require_once 'includes/header.php';
 
     <?php if (!empty($categories)): ?>
         <?php // পরিবর্তন এখানে: row-cols-2 mobiles (default), row-cols-sm-2 for sm, row-cols-md-3 for md, row-cols-lg-4 for lg and up ?>
-        <div class="row row-cols-2 row-cols-sm-2 row-cols-md-3 row-cols-lg-4 g-3"> {/* g-3 for slightly less gap on mobile */}
+        <div class="row row-cols-2 row-cols-sm-2 row-cols-md-3 row-cols-lg-4 g-3">
             <?php foreach ($categories as $category): ?>
                 <div class="col">
                     <div class="category-card">
