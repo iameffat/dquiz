@@ -13,8 +13,21 @@ if (isset($_GET['action']) && $_GET['action'] == 'delete' && isset($_GET['user_i
         $_SESSION['flash_message'] = "আপনি নিজেকে ডিলিট করতে পারবেন না।";
         $_SESSION['flash_message_type'] = "warning";
     } else {
+        // First, delete related records from quiz_attempts
+        // This is important to avoid foreign key constraint errors if they exist
+        // Note: user_answers are typically linked to quiz_attempts or questions,
+        // so deleting attempts or questions (if quiz is deleted) should handle them.
+        // If user_answers are directly linked to users.id without ON DELETE CASCADE,
+        // you might need to delete from user_answers first.
+        
         $conn->begin_transaction();
         try {
+            // Delete user_answers related to attempts by this user
+            // This might be complex depending on your exact schema.
+            // A simpler approach if direct user_id link exists in user_answers:
+            // $sql_delete_user_answers_direct = "DELETE FROM user_answers WHERE attempt_id IN (SELECT id FROM quiz_attempts WHERE user_id = ?)";
+            // If user_answers are only linked via question_id and attempt_id, deleting attempts covers it.
+
             // Delete from quiz_attempts
             $sql_delete_attempts = "DELETE FROM quiz_attempts WHERE user_id = ?";
             $stmt_delete_attempts = $conn->prepare($sql_delete_attempts);
@@ -29,7 +42,8 @@ if (isset($_GET['action']) && $_GET['action'] == 'delete' && isset($_GET['user_i
             if (!$stmt_delete_user) throw new Exception("ডাটাবেস সমস্যা (ইউজার ডিলিট প্রস্তুতি): " . $conn->error);
             $stmt_delete_user->bind_param("i", $user_id_to_delete);
             if (!$stmt_delete_user->execute()) {
-                if ($conn->errno == 1451) { // MySQL error code for foreign key constraint violation
+                 // Check for specific foreign key error (e.g., MySQL error code 1451)
+                if ($conn->errno == 1451) {
                      throw new Exception("ইউজার ডিলিট করা যায়নি কারণ এই ইউজারের সাথে অন্যান্য ডেটা (যেমন অ্যাডমিন হিসেবে কুইজ তৈরি) সংযুক্ত রয়েছে।");
                 } else {
                     throw new Exception("ইউজার ডিলিট করতে সমস্যা হয়েছে: " . $stmt_delete_user->error);
@@ -53,13 +67,29 @@ if (isset($_GET['action']) && $_GET['action'] == 'delete' && isset($_GET['user_i
 // Handle Ban/Unban Action
 else if (isset($_GET['action']) && ($_GET['action'] == 'ban_user' || $_GET['action'] == 'unban_user') && isset($_GET['user_id'])) {
     $user_id_to_modify = intval($_GET['user_id']);
-    $new_status_is_banned = ($_GET['action'] == 'ban_user') ? 1 : 0;
+    $new_status_is_banned = ($_GET['action'] == 'ban_user') ? 1 : 0; // 1 for banned, 0 for not banned
     $action_text = ($new_status_is_banned == 1) ? 'নিষিদ্ধ (banned)' : 'সক্রিয় (unbanned)';
 
     if ($user_id_to_modify == $_SESSION['user_id']) {
         $_SESSION['flash_message'] = "আপনি নিজেকে নিষিদ্ধ বা সক্রিয় করতে পারবেন না।";
         $_SESSION['flash_message_type'] = "warning";
     } else {
+        // Check current role of the user to be banned/unbanned
+        $sql_check_role = "SELECT role FROM users WHERE id = ?";
+        $stmt_check_role = $conn->prepare($sql_check_role);
+        $stmt_check_role->bind_param("i", $user_id_to_modify);
+        $stmt_check_role->execute();
+        $result_role = $stmt_check_role->get_result();
+        $user_to_modify_data = $result_role->fetch_assoc();
+        $stmt_check_role->close();
+
+        if ($user_to_modify_data && $user_to_modify_data['role'] === 'admin' && $new_status_is_banned == 1) {
+            // Optional: Add an extra confirmation or prevent banning other admins directly if needed.
+            // For now, allowing admin to ban other admins (except self).
+            // $_SESSION['flash_message'] = "এডমিন ইউজারকে নিষিদ্ধ করা যাবে না। প্রথমে ভূমিকা পরিবর্তন করুন।";
+            // $_SESSION['flash_message_type'] = "warning";
+        }
+        // Proceed with ban/unban
         $sql_update_status = "UPDATE users SET is_banned = ? WHERE id = ?";
         if ($stmt_update = $conn->prepare($sql_update_status)) {
             $stmt_update->bind_param("ii", $new_status_is_banned, $user_id_to_modify);
@@ -80,11 +110,13 @@ else if (isset($_GET['action']) && ($_GET['action'] == 'ban_user' || $_GET['acti
     exit;
 }
 
+
 require_once 'includes/header.php';
 
+// --- সার্চ লজিক ---
 $search_term = isset($_GET['search']) ? trim($_GET['search']) : '';
 $users = [];
-$sql_base = "SELECT id, name, email, mobile_number, role, created_at, is_banned FROM users";
+$sql_base = "SELECT id, name, email, mobile_number, role, created_at, is_banned FROM users"; // Added is_banned
 $params = [];
 $types = "";
 
@@ -116,7 +148,6 @@ if (!empty($search_term)) {
 <div class="container-fluid">
     <div class="d-flex justify-content-between align-items-center mt-4 mb-3">
         <h1>ইউজার ম্যানেজমেন্ট</h1>
-        <a href="send_email.php?target=all_users" class="btn btn-info">সকল ইউজারকে ইমেইল করুন</a>
     </div>
 
     <div class="card mb-4">
