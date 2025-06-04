@@ -187,12 +187,87 @@ function verify_cloudflare_turnstile(string $turnstile_response, string $secret_
         } elseif (in_array('invalid-input-response', $error_codes)) {
             $user_error_message = "অবৈধ ক্যাপচা টোকেন। অনুগ্রহ করে পৃষ্ঠাটি রিফ্রেশ করে আবার চেষ্টা করুন।";
         }
-        // একটি সাধারণ এরর কোড 'bad-request' হতে পারে যদি secret key ভুল হয়
         elseif (in_array('bad-request', $error_codes) || in_array('invalid-input-secret', $error_codes)) {
             $user_error_message = "ক্যাপচা কনফিগারেশনে সমস্যা। অনুগ্রহ করে সাইট অ্যাডমিনের সাথে যোগাযোগ করুন।";
         }
         return ['success' => false, 'error_message' => $user_error_message, 'error_codes' => $error_codes];
     }
+}
+
+
+/**
+ * Parses the User-Agent string to get browser and OS information.
+ *
+ * @param string $user_agent The User-Agent string.
+ * @return array Associative array with 'browser' and 'os'.
+ */
+function parse_user_agent_simple(string $user_agent): array {
+    $browser = "Unknown Browser";
+    $os_platform = "Unknown OS Platform";
+
+    // Get Operating System
+    if (preg_match('/windows nt 10/i', $user_agent)) {
+        $os_platform = 'Windows 10/11';
+    } elseif (preg_match('/windows nt 6.3/i', $user_agent)) {
+        $os_platform = 'Windows 8.1';
+    } elseif (preg_match('/windows nt 6.2/i', $user_agent)) {
+        $os_platform = 'Windows 8';
+    } elseif (preg_match('/windows nt 6.1/i', $user_agent)) {
+        $os_platform = 'Windows 7';
+    } elseif (preg_match('/windows nt 5.1/i', $user_agent) || preg_match('/windows xp/i', $user_agent)) {
+        $os_platform = 'Windows XP';
+    } elseif (preg_match('/macintosh|mac os x/i', $user_agent)) {
+        $os_platform = 'Mac OS X';
+        if (preg_match('/mac os x 10_([0-9_]+)/i', $user_agent, $matches)) {
+            $os_platform .= " " . str_replace('_', '.', $matches[1]);
+        }
+    } elseif (preg_match('/iphone os ([0-9_]+)/i', $user_agent, $matches)) {
+        $os_platform = 'iOS ' . str_replace('_', '.', $matches[1]);
+    } elseif (preg_match('/android ([\d\.]+)/i', $user_agent, $matches)) {
+        $os_platform = 'Android ' . $matches[1];
+    } elseif (preg_match('/linux/i', $user_agent)) {
+        $os_platform = 'Linux';
+    } elseif (preg_match('/ubuntu/i', $user_agent)) {
+        $os_platform = 'Ubuntu';
+    }
+
+    // Get Browser
+    if (preg_match('/msie/i', $user_agent) && !preg_match('/opera/i', $user_agent)) {
+        $browser = 'Internet Explorer';
+    } elseif (preg_match('/trident\/7.0/i', $user_agent)) { // IE11
+        $browser = 'Internet Explorer 11';
+    } elseif (preg_match('/firefox/i', $user_agent)) {
+        $browser = 'Mozilla Firefox';
+    } elseif (preg_match('/chrome/i', $user_agent) && !preg_match('/edg/i', $user_agent) && !preg_match('/opr/i', $user_agent) ) { // Chrome, not Edge Chromium or Opera
+        $browser = 'Google Chrome';
+    } elseif (preg_match('/safari/i', $user_agent) && !preg_match('/chrome/i', $user_agent) && !preg_match('/edg/i', $user_agent) && !preg_match('/opr/i', $user_agent)) { // Safari, not Chrome, Edge or Opera
+        $browser = 'Apple Safari';
+    } elseif (preg_match('/opera/i', $user_agent) || preg_match('/opr/i', $user_agent)) { // Opera
+        $browser = 'Opera';
+    } elseif (preg_match('/edg/i', $user_agent)) { // Edge (Chromium-based)
+        $browser = 'Microsoft Edge';
+    } elseif (preg_match('/edge/i', $user_agent)) { // Edge (Legacy - very old)
+        $browser = 'Microsoft Edge (Legacy)';
+    }
+
+
+    // Extract versions (simple approach)
+    // This regex needs to be general enough
+    if (preg_match('/(msie |firefox\/|chrome\/|version\/|opera\/|opr\/|edg\/|edge\/)([0-9\.]+)/i', $user_agent, $matches_ver)) {
+         if (count($matches_ver) > 2 && !empty(trim($matches_ver[2]))) {
+             // Check if the browser name is already set to avoid appending version to "Unknown Browser"
+             if ($browser !== "Unknown Browser") {
+                 // Remove existing version if any to avoid duplication like "Google Chrome 100.0.0.0 100.0.0.0"
+                 $browser = preg_replace('/\s+[0-9\.]+$/', '', $browser);
+                 $browser .= ' ' . $matches_ver[2];
+             } elseif (stripos($matches_ver[1], 'version') !== false && stripos($user_agent, 'safari') !== false) {
+                // This is likely Safari, where version is separate
+                $browser = 'Apple Safari ' . $matches_ver[2];
+             }
+         }
+     }
+
+    return ['browser' => $browser, 'os' => $os_platform];
 }
 
 // আপনি এখানে আরও প্রয়োজনীয় কমন ফাংশন যোগ করতে পারেন।
