@@ -69,7 +69,12 @@ if (isset($_GET['action']) && $_GET['action'] == 'delete' && isset($_GET['quiz_i
         $_SESSION['flash_message'] = "কুইজ ডিলিট করার সময় ত্রুটি: " . $e->getMessage();
         $_SESSION['flash_message_type'] = "danger";
     }
-    header("Location: manage_quizzes.php");
+    // Redirect back to the same page with filter preserved
+    $redirect_url = "manage_quizzes.php";
+    if (isset($_GET['status_filter']) && !empty($_GET['status_filter'])) {
+        $redirect_url .= "?status_filter=" . urlencode($_GET['status_filter']);
+    }
+    header("Location: " . $redirect_url);
     exit;
 }
 
@@ -86,11 +91,11 @@ $filter_status = isset($_GET['status_filter']) ? $_GET['status_filter'] : '';
 if (!empty($filter_status) && in_array($filter_status, ['draft', 'upcoming', 'live', 'archived'])) {
     if ($filter_status === 'archived') {
         $where_clauses[] = "(q.status = ? OR (q.status = 'live' AND q.live_end_datetime IS NOT NULL AND q.live_end_datetime < NOW()))";
-        $params[] = $filter_status;
+        $params[] = 'archived'; // Keep original status for query parameter
         $types .= "s";
     } elseif ($filter_status === 'live') {
         $where_clauses[] = "q.status = ? AND (q.live_start_datetime IS NULL OR q.live_start_datetime <= NOW()) AND (q.live_end_datetime IS NULL OR q.live_end_datetime >= NOW())";
-        $params[] = $filter_status;
+        $params[] = 'live';
         $types .= "s";
     } else { // For 'draft' and 'upcoming'
         $where_clauses[] = "q.status = ?";
@@ -134,34 +139,22 @@ if ($stmt_quizzes) {
 ?>
 
 <div class="container-fluid">
-    <div class="d-flex justify-content-between align-items-center mt-4 mb-3">
+    <div class="d-sm-flex justify-content-between align-items-center mt-4 mb-3">
         <h1>কুইজ ম্যানেজমেন্ট</h1>
-        <div>
-            <a href="add_quiz.php" class="btn btn-primary">নতুন কুইজ যোগ করুন</a>
-            <a href="import_bulk_questions.php" class="btn btn-info">বাল্ক ইম্পোর্ট</a>
-        </div>
-    </div>
-
-    <div class="card mb-4">
-        <div class="card-header">
-            ফিল্টার করুন
-        </div>
-        <div class="card-body">
-            <form action="manage_quizzes.php" method="get" class="row g-3 align-items-end">
-                <div class="col-md-10">
-                    <label for="status_filter" class="form-label">স্ট্যাটাস অনুযায়ী</label>
-                    <select class="form-select" id="status_filter" name="status_filter">
-                        <option value="">সকল স্ট্যাটাস</option>
-                        <option value="draft" <?php echo ($filter_status == 'draft') ? 'selected' : ''; ?>>ড্রাফট</option>
-                        <option value="upcoming" <?php echo ($filter_status == 'upcoming') ? 'selected' : ''; ?>>আপকামিং</option>
-                        <option value="live" <?php echo ($filter_status == 'live') ? 'selected' : ''; ?>>লাইভ</option>
-                        <option value="archived" <?php echo ($filter_status == 'archived') ? 'selected' : ''; ?>>আর্কাইভড</option>
-                    </select>
-                </div>
-                <div class="col-md-2">
-                    <button type="submit" class="btn btn-success w-100">ফিল্টার</button>
-                </div>
+        <div class="d-flex align-items-center mt-2 mt-sm-0">
+            <form action="manage_quizzes.php" method="get" class="d-flex align-items-center me-3">
+                <label for="status_filter" class="form-label me-2 mb-0 text-nowrap">স্ট্যাটাস:</label>
+                <select class="form-select form-select-sm me-2" id="status_filter" name="status_filter" onchange="this.form.submit()">
+                    <option value="">সকল</option>
+                    <option value="draft" <?php echo ($filter_status == 'draft') ? 'selected' : ''; ?>>ড্রাফট</option>
+                    <option value="upcoming" <?php echo ($filter_status == 'upcoming') ? 'selected' : ''; ?>>আপকামিং</option>
+                    <option value="live" <?php echo ($filter_status == 'live') ? 'selected' : ''; ?>>লাইভ</option>
+                    <option value="archived" <?php echo ($filter_status == 'archived') ? 'selected' : ''; ?>>আর্কাইভড</option>
+                </select>
+                <noscript><button type="submit" class="btn btn-sm btn-outline-secondary">ফিল্টার</button></noscript>
             </form>
+            <a href="add_quiz.php" class="btn btn-primary btn-sm me-2 text-nowrap">নতুন কুইজ</a>
+            <a href="import_bulk_questions.php" class="btn btn-info btn-sm text-nowrap">বাল্ক ইম্পোর্ট</a>
         </div>
     </div>
 
@@ -170,6 +163,10 @@ if ($stmt_quizzes) {
     <div class="card">
         <div class="card-header">
             কুইজের তালিকা
+            <?php if (!empty($filter_status)): ?>
+                (ফিল্টার: <?php echo htmlspecialchars(ucfirst($filter_status)); ?>)
+                <a href="manage_quizzes.php" class="ms-2 badge bg-light text-dark text-decoration-none">ফিল্টার মুছুন</a>
+            <?php endif; ?>
         </div>
         <div class="card-body">
             <?php if (!empty($quizzes)): ?>
@@ -181,10 +178,10 @@ if ($stmt_quizzes) {
                             <th>শিরোনাম</th>
                             <th>স্ট্যাটাস</th>
                             <th>সময় (মিনিট)</th>
-                            <th>প্রশ্ন সংখ্যা</th>
+                            <th>প্রশ্ন</th>
                             <th>লাইভ শুরু</th>
                             <th>লাইভ শেষ</th>
-                            <th>তৈরির তারিখ</th>
+                            <th>তৈরি</th>
                             <th>একশন</th>
                         </tr>
                     </thead>
@@ -195,7 +192,6 @@ if ($stmt_quizzes) {
                             <td><?php echo htmlspecialchars($quiz['title']); ?></td>
                             <td>
                                 <?php
-                                    // Determine actual display status based on live dates for 'live' quizzes
                                     $display_status = $quiz['status'];
                                     $status_class = 'secondary'; 
                                     $status_text = 'ড্রাফট';
@@ -212,14 +208,7 @@ if ($stmt_quizzes) {
                                         } else {
                                             $display_status = 'live';
                                         }
-                                    } elseif ($quiz['status'] == 'upcoming' && !empty($quiz['live_start_datetime']) && time() > strtotime($quiz['live_start_datetime'])) {
-                                        // If it was 'upcoming' but start time has passed, and not explicitly ended, it might be considered 'live' or 'archived' depending on end_time.
-                                        // For simplicity, this logic primarily relies on the `status` field and adjusts for 'live' quizzes becoming 'archived'.
-                                        // For an 'upcoming' quiz that has passed its start time, it's better to manually change its status to 'live' via admin panel.
-                                        // However, we can add a small visual cue or logic if needed.
-                                        // For now, we stick to the calculated display_status based primarily on current 'live' status logic.
                                     }
-
 
                                     if ($display_status == 'upcoming') { $status_class = 'info'; $status_text = 'আপকামিং'; }
                                     elseif ($display_status == 'live') { $status_class = 'success'; $status_text = 'লাইভ'; }
@@ -231,27 +220,22 @@ if ($stmt_quizzes) {
                             </td>
                             <td><?php echo $quiz['duration_minutes']; ?></td>
                             <td><?php echo $quiz['question_count']; ?></td>
-                            <td><?php echo $quiz['live_start_datetime'] ? format_datetime($quiz['live_start_datetime']) : 'N/A'; ?></td>
-                            <td><?php echo $quiz['live_end_datetime'] ? format_datetime($quiz['live_end_datetime']) : 'N/A'; ?></td>
+                            <td><?php echo $quiz['live_start_datetime'] ? format_datetime($quiz['live_start_datetime'], "d M Y, h:i A") : 'N/A'; ?></td>
+                            <td><?php echo $quiz['live_end_datetime'] ? format_datetime($quiz['live_end_datetime'], "d M Y, h:i A") : 'N/A'; ?></td>
                             <td><?php echo format_datetime($quiz['created_at'], "d M Y"); ?></td>
                             <td>
-                                <a href="edit_quiz.php?id=<?php echo $quiz['id']; ?>" class="btn btn-sm btn-info mb-1" title="এডিট করুন">এডিট</a>
-                                <a href="duplicate_quiz.php?quiz_id_to_duplicate=<?php echo $quiz['id']; ?>" class="btn btn-sm btn-warning mb-1" onclick="return confirm('আপনি কি নিশ্চিতভাবে এই কুইজটি ডুপ্লিকেট করতে চান?');" title="ডুপ্লিকেট করুন">ডুপ্লিকেট</a>
-                                <a href="manage_quizzes.php?action=delete&quiz_id=<?php echo $quiz['id']; ?>&status_filter=<?php echo urlencode($filter_status); ?>" class="btn btn-sm btn-danger mb-1" onclick="return confirm('আপনি কি নিশ্চিতভাবে এই কুইজটি এবং এর সাথে সম্পর্কিত সকল প্রশ্ন, অপশন ও উত্তর ডিলিট করতে চান?');" title="ডিলিট করুন">ডিলিট</a>
-                                 <a href="view_quiz_attempts.php?quiz_id=<?php echo $quiz['id']; ?>" class="btn btn-sm btn-success mb-1" title="ফলাফল ও অংশগ্রহণকারী দেখুন">ফলাফল </a>
-                                <a href="../quiz_page.php?id=<?php echo $quiz['id']; ?>" target="_blank" class="btn btn-sm btn-outline-secondary mb-1" title="কুইজটি দেখুন">দেখুন</a>
-                                
-                                <?php
-                                    $quiz_public_link = rtrim((isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] === 'on' ? "https" : "http") . "://" . $_SERVER['HTTP_HOST'] . dirname(dirname($_SERVER['PHP_SELF'])), '/') . '/quiz_page.php?id=' . $quiz['id'];
-                                ?>
-                                <button class="btn btn-sm btn-outline-success mb-1 copy-quiz-link-btn" data-link="<?php echo htmlspecialchars($quiz_public_link); ?>" title="কুইজের লিংক কপি করুন">
-                                    <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" fill="currentColor" class="bi bi-clipboard me-1" viewBox="0 0 16 16">
-                                      <path d="M4 1.5H3a2 2 0 0 0-2 2V14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V3.5a2 2 0 0 0-2-2h-1v1h1a1 1 0 0 1 1 1V14a1 1 0 0 1-1 1H3a1 1 0 0 1-1-1V3.5a1 1 0 0 1 1-1h1z"/>
-                                      <path d="M9.5 1a.5.5 0 0 1 .5.5v1a.5.5 0 0 1-.5.5h-3a.5.5 0 0 1-.5-.5v-1a.5.5 0 0 1 .5-.5zm-3-1A1.5 1.5 0 0 0 5 1.5v1A1.5 1.5 0 0 0 6.5 4h3A1.5 1.5 0 0 0 11 2.5v-1A1.5 1.5 0 0 0 9.5 0z"/>
-                                    </svg>
-                                    লিংক
-                                </button>
-                                </td>
+                                <div class="btn-group" role="group" aria-label="Quiz Actions">
+                                    <a href="edit_quiz.php?id=<?php echo $quiz['id']; ?>" class="btn btn-sm btn-info" title="এডিট করুন">এডিট</a>
+                                    <a href="duplicate_quiz.php?quiz_id_to_duplicate=<?php echo $quiz['id']; ?>" class="btn btn-sm btn-warning" onclick="return confirm('আপনি কি নিশ্চিতভাবে এই কুইজটি ডুপ্লিকেট করতে চান?');" title="ডুপ্লিকেট করুন">ডুপ্লিকেট</a>
+                                    <a href="manage_quizzes.php?action=delete&quiz_id=<?php echo $quiz['id']; ?>&status_filter=<?php echo urlencode($filter_status); ?>" class="btn btn-sm btn-danger" onclick="return confirm('আপনি কি নিশ্চিতভাবে এই কুইজটি এবং এর সাথে সম্পর্কিত সকল প্রশ্ন, অপশন ও উত্তর ডিলিট করতে চান?');" title="ডিলিট করুন">ডিলিট</a>
+                                    <a href="view_quiz_attempts.php?quiz_id=<?php echo $quiz['id']; ?>" class="btn btn-sm btn-success" title="ফলাফল ও অংশগ্রহণকারী দেখুন">ফলাফল</a>
+                                    <a href="../quiz_page.php?id=<?php echo $quiz['id']; ?>" target="_blank" class="btn btn-sm btn-outline-secondary" title="কুইজটি দেখুন">দেখুন</a>
+                                    <?php
+                                        $quiz_public_link = rtrim((isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] === 'on' ? "https" : "http") . "://" . $_SERVER['HTTP_HOST'] . dirname(dirname($_SERVER['PHP_SELF'])), '/') . '/quiz_page.php?id=' . $quiz['id'];
+                                    ?>
+                                    <button class="btn btn-sm btn-outline-primary copy-quiz-link-btn" data-link="<?php echo htmlspecialchars($quiz_public_link); ?>" title="কুইজের লিংক কপি করুন">লিংক</button>
+                                </div>
+                            </td>
                         </tr>
                         <?php endforeach; ?>
                     </tbody>
@@ -277,19 +261,19 @@ document.addEventListener('DOMContentLoaded', function() {
         button.addEventListener('click', function() {
             const linkToCopy = this.dataset.link;
             navigator.clipboard.writeText(linkToCopy).then(() => {
-                const originalContent = this.innerHTML;
-                this.innerHTML = `
-                    <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" fill="currentColor" class="bi bi-check-lg me-1" viewBox="0 0 16 16">
-                      <path d="M12.736 3.97a.733.733 0 0 1 1.047 0c.286.289.29.756.01 1.05L7.88 12.01a.733.733 0 0 1-1.065.02L3.217 8.384a.757.757 0 0 1 0-1.06.733.733 0 0 1 1.047 0l3.052 3.093 5.4-6.425z"/>
-                    </svg>
-                    কপি হয়েছে!`;
-                this.classList.remove('btn-outline-success');
-                this.classList.add('btn-success');
+                const originalText = this.textContent; // Only text content for simplicity
+                this.textContent = 'কপি হয়েছে!';
+                const originalClasses = Array.from(this.classList);
+                this.classList.remove('btn-outline-primary');
+                this.classList.add('btn-primary');
                 
                 setTimeout(() => {
-                    this.innerHTML = originalContent;
-                    this.classList.remove('btn-success');
-                    this.classList.add('btn-outline-success');
+                    this.textContent = originalText;
+                    this.classList.remove('btn-primary');
+                    originalClasses.forEach(cls => { if(cls !== 'copy-quiz-link-btn' && cls !== 'btn' && cls !== 'btn-sm') this.classList.add(cls) });
+                     this.classList.add('btn-outline-primary');
+
+
                 }, 2000);
             }).catch(err => {
                 console.error('লিংক কপি করতে সমস্যা হয়েছে: ', err);
