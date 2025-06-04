@@ -41,7 +41,7 @@ if ($result_quiz_info->num_rows === 1) {
 }
 $stmt_quiz_info->close();
 
-// Handle Cancel/Reinstate Attempt Action
+// Handle Cancel/Reinstate/Delete Attempt Action
 if (isset($_GET['action']) && isset($_GET['attempt_id'])) {
     $action = $_GET['action'];
     $attempt_id_to_manage = intval($_GET['attempt_id']);
@@ -84,6 +84,37 @@ if (isset($_GET['action']) && isset($_GET['attempt_id'])) {
             $_SESSION['flash_message'] = "ডাটাবেস সমস্যা (পুনঃস্থাপন প্রস্তুতি)।";
             $_SESSION['flash_message_type'] = "danger";
         }
+    } elseif ($action == 'delete_attempt') {
+        // START: Delete Attempt Logic
+        $conn->begin_transaction();
+        try {
+            // 1. Delete from user_answers
+            $sql_delete_answers = "DELETE FROM user_answers WHERE attempt_id = ?";
+            $stmt_delete_answers = $conn->prepare($sql_delete_answers);
+            if (!$stmt_delete_answers) throw new Exception("ব্যবহারকারীর উত্তর মোছার জন্য প্রস্তুতিতে সমস্যা: " . $conn->error);
+            $stmt_delete_answers->bind_param("i", $attempt_id_to_manage);
+            if (!$stmt_delete_answers->execute()) throw new Exception("ব্যবহারকারীর উত্তরগুলো মুছতে সমস্যা হয়েছে: " . $stmt_delete_answers->error);
+            $stmt_delete_answers->close();
+
+            // 2. Delete from quiz_attempts
+            $sql_delete_attempt_record = "DELETE FROM quiz_attempts WHERE id = ? AND quiz_id = ?";
+            $stmt_delete_attempt_record = $conn->prepare($sql_delete_attempt_record);
+            if (!$stmt_delete_attempt_record) throw new Exception("অংশগ্রহণের রেকর্ড মোছার জন্য প্রস্তুতিতে সমস্যা: " . $conn->error);
+            $stmt_delete_attempt_record->bind_param("ii", $attempt_id_to_manage, $quiz_id);
+            if (!$stmt_delete_attempt_record->execute()) throw new Exception("অংশগ্রহণের রেকর্ডটি মুছতে সমস্যা হয়েছে: " . $stmt_delete_attempt_record->error);
+            $stmt_delete_attempt_record->close();
+            
+            $conn->commit();
+            $_SESSION['flash_message'] = "অংশগ্রহণটি (ID: {$attempt_id_to_manage}) এবং এর সাথে সম্পর্কিত উত্তরগুলো সফলভাবে ডিলিট করা হয়েছে।";
+            $_SESSION['flash_message_type'] = "success";
+
+        } catch (Exception $e) {
+            $conn->rollback();
+            $_SESSION['flash_message'] = "অংশগ্রহণটি ডিলিট করার সময় একটি ত্রুটি ঘটেছে: " . $e->getMessage();
+            $_SESSION['flash_message_type'] = "danger";
+            error_log("Attempt deletion error for attempt ID {$attempt_id_to_manage}: " . $e->getMessage());
+        }
+        // END: Delete Attempt Logic
     }
     header("Location: view_quiz_attempts.php?quiz_id=" . $quiz_id);
     exit;
@@ -282,19 +313,25 @@ require_once 'includes/header.php'; // header.php uses $page_title
                                     $last_time = $attempt['time_taken_seconds'];
                                 }
                                 $row_class = '';
-                                // $status_text_for_print = ''; // Removed as it's not used in this version
+                                
+                                $action_buttons_html = ''; // Start with empty action buttons
 
                                 if ($attempt['is_cancelled']) {
                                     $row_class = 'table-danger opacity-75';
                                     $status_text = '<span class="badge bg-danger">বাতিলকৃত</span>';
-                                    $action_button = '<a href="view_quiz_attempts.php?quiz_id='.$quiz_id.'&action=reinstate_attempt&attempt_id='.$attempt['attempt_id'].'" class="btn btn-sm btn-warning mb-1 no-print" onclick="return confirm(\'আপনি কি নিশ্চিতভাবে এই অংশগ্রহণটি পুনঃবিবেচনা করতে চান?\');">পুনঃবিবেচনা করুন</a>';
+                                    $action_buttons_html = '<a href="view_quiz_attempts.php?quiz_id='.$quiz_id.'&action=reinstate_attempt&attempt_id='.$attempt['attempt_id'].'" class="btn btn-sm btn-warning mb-1 no-print" onclick="return confirm(\'আপনি কি নিশ্চিতভাবে এই অংশগ্রহণটি পুনঃবিবেচনা করতে চান?\');" title="পুনঃবিবেচনা করুন">পুনঃবিবেচনা</a>';
                                 } else {
                                     if ($attempt['score'] !== null && $highest_score !== null && $attempt['score'] == $highest_score && $attempt['score'] > 0) {
                                         $row_class = 'table-success';
                                     }
                                     $status_text = '<span class="badge bg-success">সক্রিয়</span>';
-                                    $action_button = '<a href="view_quiz_attempts.php?quiz_id='.$quiz_id.'&action=cancel_attempt&attempt_id='.$attempt['attempt_id'].'" class="btn btn-sm btn-danger mb-1 no-print" onclick="return confirm(\'আপনি কি নিশ্চিতভাবে এই অংশগ্রহণটি বাতিল করতে চান? বাতিল করলে স্কোর মুছে যাবে এবং র‍্যাংকিং-এ দেখানো হবে না।\');">বাতিল করুন</a>';
+                                    $action_buttons_html = '<a href="view_quiz_attempts.php?quiz_id='.$quiz_id.'&action=cancel_attempt&attempt_id='.$attempt['attempt_id'].'" class="btn btn-sm btn-danger mb-1 no-print" onclick="return confirm(\'আপনি কি নিশ্চিতভাবে এই অংশগ্রহণটি বাতিল করতে চান? বাতিল করলে স্কোর মুছে যাবে এবং র‍্যাংকিং-এ দেখানো হবে না।\');" title="বাতিল করুন">বাতিল</a>';
                                 }
+                                
+                                // Add "Delete Attempt" button
+                                $action_buttons_html .= ' <a href="view_quiz_attempts.php?quiz_id='.$quiz_id.'&action=delete_attempt&attempt_id='.$attempt['attempt_id'].'" class="btn btn-sm btn-outline-danger mb-1 no-print" onclick="return confirm(\'আপনি কি নিশ্চিতভাবে এই অংশগ্রহণ এবং এর সম্পর্কিত সকল উত্তর স্থায়ীভাবে ডিলিট করতে চান? এই কাজটি ফেরানো যাবে না।\');" title="অংশগ্রহণ ডিলিট করুন">ডিলিট</a>';
+                                $action_buttons_html .= ' <a href="../results.php?attempt_id='.$attempt['attempt_id'].'&quiz_id='.$quiz_id.'" target="_blank" class="btn btn-sm btn-outline-info mb-1 no-print" title="উত্তর দেখুন">উত্তর দেখুন</a>';
+
 
                                 $ip_display = !empty($attempt['ip_address']) ? htmlspecialchars($attempt['ip_address']) : 'N/A';
                                 $ip_warning_icon = '';
@@ -321,8 +358,7 @@ require_once 'includes/header.php'; // header.php uses $page_title
                                 <td class="no-print device-details"><?php echo $device_browser_info_screen; ?></td>
                                 <td class="no-print"><?php echo $status_text; ?></td>
                                 <td class="no-print">
-                                    <?php echo $action_button; ?>
-                                    <a href="../results.php?attempt_id=<?php echo $attempt['attempt_id']; ?>&quiz_id=<?php echo $quiz_id; ?>" target="_blank" class="btn btn-sm btn-outline-info mb-1 no-print" title="উত্তর দেখুন">উত্তর দেখুন</a>
+                                    <?php echo $action_buttons_html; ?>
                                 </td>
                             </tr>
                             <?php endforeach; ?>
