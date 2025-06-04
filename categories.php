@@ -24,26 +24,26 @@ if ($result) {
     error_log("Error fetching categories: " . $conn->error);
 }
 
-// হালকা এবং সফট্ গ্র্যাডিয়েন্ট কালারের উদাহরণ
-$gradient_colors = [
-    "linear-gradient(135deg, #e0c3fc 0%, #8ec5fc 100%)", // ল্যাভেন্ডার থেকে আকাশি
-    "linear-gradient(135deg, #fddb92 0%, #d1fdff 100%)", // হালকা পীচ থেকে হালকা সায়ান
-    "linear-gradient(135deg, #a1c4fd 0%, #c2e9fb 100%)", // আকাশি থেকে আরও হালকা আকাশি
-    "linear-gradient(135deg, #ffecd2 0%, #fcb69f 100%)", // খুব হালকা পীচ থেকে স্যালমন
-    "linear-gradient(135deg, #d4fc79 0%, #96e6a1 100%)", // হালকা সবুজ থেকে সবুজ
-    "linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%)", // অফ-হোয়াইট থেকে হালকা ধূসর-নীল
-    "linear-gradient(135deg, #fdfbfb 0%, #ebedee 100%)", // প্রায় সাদা
-    "linear-gradient(135deg, #fff1eb 0%, #ace0f9 100%)", // হালকা কমলা আভা থেকে হালকা নীল
-    "linear-gradient(135deg, #ede574 0%, #e1f5c4 100%)", // হালকা হলুদ থেকে হালকা সবুজ-হলুদ
-    "linear-gradient(135deg, #f8f9d2 0%, #e2d1c3 100%)", // হালকা ক্রিম থেকে ফ্যাকাশে বাদামী
-    "linear-gradient(135deg, #c1dfc4 0%, #deecdd 100%)", // ফ্যাকাশে সবুজ
-    "linear-gradient(135deg, #f3e7e9 0%, #e3eeff 100%)"  // খুব হালকা গোলাপী থেকে খুব হালকা নীল
+// হালকা সলিড কালারের উদাহরণ (আপনি এগুলো পরিবর্তন করতে পারেন)
+$solid_colors = [
+    "#e7f5ff", // খুব হালকা নীল
+    "#e0f7fa", // খুব হালকা সায়ান
+    "#e8f5e9", // খুব হালকা সবুজ
+    "#fffde7", // খুব হালকা হলুদ
+    "#fce4ec", // খুব হালকা গোলাপী
+    "#f3e5f5", // খুব হালকা পার্পল (ল্যাভেন্ডার)
+    "#fff8e1", // খুব হালকা কমলা (ক্রিম)
+    "#f1f8e9", // আরও একটি হালকা সবুজ
+    "#e3f2fd", // আরও একটি হালকা নীল
+    "#ffebee", // খুব হালকা লাল/গোলাপী
+    "#fafafa", // প্রায় সাদা (হালকা ধূসর)
+    "#e0e0e0", // খুব হালকা ধূসর
 ];
-$num_colors = count($gradient_colors);
+$num_colors = count($solid_colors);
 
 $page_specific_styles = "
     .category-card {
-        border: 1px solid var(--bs-border-color-translucent); /* হালকা বর্ডার যোগ করা হলো */
+        border: 1px solid var(--bs-border-color-translucent); 
         border-radius: 0.75rem;
         transition: all 0.3s ease-in-out;
         display: flex;
@@ -51,84 +51,73 @@ $page_specific_styles = "
         height: 100%;
         text-align: center;
         padding: 1.5rem;
-        color: var(--bs-body-color); /* টেক্সটের রঙ পরিবর্তন করে ডিফল্ট করা হলো */
+        color: var(--bs-body-color); 
         overflow: hidden;
         position: relative;
     }
-    /* হালকা গ্র্যাডিয়েন্টের জন্য ::before ওভারলে বাদ দেওয়া যেতে পারে বা আরও হালকা করা যেতে পারে */
-    /* .category-card::before {
-        content: '';
-        position: absolute;
-        top: 0; left: 0; right: 0; bottom: 0;
-        background-color: rgba(0,0,0,0.03); 
-        border-radius: 0.75rem;
-        z-index: 1;
-    } */
-    .category-card > * {
-        position: relative;
-        z-index: 2;
-    }
 
     .category-card:hover {
-        box-shadow: 0 0.75rem 1.5rem rgba(0, 0, 0, 0.1); /* শ্যাডো একটু কমানো হলো */
-        transform: translateY(-5px) scale(1.01); /* হোভার ইফেক্ট একটু কমানো হলো */
+        box-shadow: 0 0.5rem 1.25rem rgba(0, 0, 0, 0.12); /* শ্যাডো সামান্য পরিবর্তন */
+        transform: translateY(-6px); /* হোভার ইফেক্ট */
     }
     body.dark-mode .category-card {
-        color: var(--bs-body-color); /* ডার্ক মোডেও টেক্সটের রঙ পরিবর্তন */
+        color: var(--bs-body-color); 
         border: 1px solid var(--bs-border-color);
+        /* ডার্ক মোডে কার্ডের ব্যাকগ্রাউন্ড কালার CSS ভেরিয়েবল থেকে নেওয়া ভালো, 
+           নয়তো PHP থেকে আসা লাইট কালারগুলো ডার্ক মোডে বেমানান লাগতে পারে। 
+           আপাতত PHP থেকে আসা কালারই ব্যবহৃত হবে। 
+           যদি ডার্ক মোডে ভিন্ন কালার চান, তাহলে CSS এ ক্লাস দিয়ে করা ভালো। */
     }
     body.dark-mode .category-card:hover {
-        box-shadow: 0 0.75rem 1.5rem rgba(255, 255, 255, 0.08);
+        box-shadow: 0 0.5rem 1.25rem rgba(255, 255, 255, 0.1);
     }
 
     .category-card .card-icon {
-        font-size: 2.8rem; /* আইকন সাইজ সামান্য কমানো */
+        font-size: 2.8rem; 
         margin-bottom: 1rem;
-        color: var(--bs-primary); /* আইকনের রঙ প্রাইমারি রাখা হলো */
+        color: var(--bs-primary); 
     }
     body.dark-mode .category-card .card-icon {
         color: var(--bs-primary-text-emphasis);
     }
    
     .category-card .card-title {
-        font-size: 1.25rem; /* টাইটেল সাইজ আগের মতো */
+        font-size: 1.25rem; 
         font-weight: 600; 
-        color: var(--bs-emphasis-color); /* টেক্সটের রঙ পরিবর্তন */
+        color: var(--bs-emphasis-color); 
         margin-bottom: 0.5rem;
-        text-shadow: none; /* টেক্সট শ্যাডো বাদ দেওয়া হলো */
     }
     .category-card .category-description-placeholder {
         margin-bottom: 1rem;
         flex-grow: 1;
         min-height: 20px; 
         font-size: 0.9rem;
-        color: var(--bs-secondary-color); /* বিবরণের রঙ পরিবর্তন */
+        color: var(--bs-secondary-color); 
     }
     .category-card .question-count {
         font-size: 0.9rem;
-        color: var(--bs-tertiary-color); /* প্রশ্ন সংখ্যার রঙ পরিবর্তন */
+        color: var(--bs-tertiary-color); 
         margin-bottom: 1.25rem;
     }
     .category-card .btn-practice { 
-        background-color: var(--bs-primary); /* বাটনকে প্রাইমারি বাটন করা হলো */
+        background-color: var(--bs-primary); 
         border: none;
-        color: #fff; /* সাদা টেক্সট */
+        color: #fff; 
         font-weight: 500;
         transition: background-color 0.2s ease, transform 0.2s ease;
     }
     .category-card .btn-practice:hover {
-        background-color: var(--bs-link-hover-color); /* Bootstrap এর ডিফল্ট hover color */
+        background-color: var(--bs-link-hover-color); 
         color: #fff;
         transform: translateY(-1px);
     }
     body.dark-mode .category-card .btn-practice {
-        background-color: var(--bs-primary);
+        background-color: var(--bs-primary); /* ডার্ক মোডেও একই রকম বাটন রাখতে পারেন */
         color: #fff;
     }
     body.dark-mode .category-card .btn-practice:hover {
         background-color: var(--bs-link-hover-color);
     }
-
 
     .page-header-custom {
         background: linear-gradient(135deg, var(--secondary-bg-color) 0%, var(--tertiary-bg-color) 100%);
@@ -191,10 +180,11 @@ require_once 'includes/header.php';
     <?php if (!empty($categories)): ?>
         <div class="row row-cols-2 row-cols-sm-2 row-cols-md-3 row-cols-lg-4 g-4">
             <?php foreach ($categories as $index => $category): 
-                $current_gradient = $gradient_colors[$index % $num_colors];
+                // সলিড কালার নির্ধারণ
+                $current_solid_color = $solid_colors[$index % $num_colors];
             ?>
                 <div class="col">
-                    <div class="category-card" style="background: <?php echo $current_gradient; ?>;">
+                    <div class="category-card" style="background-color: <?php echo $current_solid_color; ?>;">
                         <?php if (!empty($category['icon_class'])): ?>
                             <div class="card-icon"><i class="<?php echo htmlspecialchars($category['icon_class']); ?>"></i></div>
                         <?php else: ?>
