@@ -2,8 +2,8 @@
 // practice_quiz.php
 $page_title = "অনুশীলন কুইজ";
 $base_url = '';
-require_once 'includes/db_connect.php';
-require_once 'includes/functions.php';
+require_once '../includes/db_connect.php';
+require_once '../includes/functions.php';
 
 $category_id = isset($_REQUEST['category_id']) ? intval($_REQUEST['category_id']) : 0;
 $category_name = "";
@@ -69,17 +69,25 @@ if ($stmt_cat) {
     exit;
 }
 
-// Fetch total number of questions in this category
-$sql_q_count = "SELECT COUNT(id) as total_q FROM questions WHERE category_id = ?";
+// Fetch total number of questions in this category (considering both direct and junction table links)
+$sql_q_count = "
+    SELECT COUNT(DISTINCT q.id) as total_q
+    FROM questions q
+    LEFT JOIN question_categories qc ON q.id = qc.question_id
+    WHERE (q.category_id = ? AND q.quiz_id IS NOT NULL) OR (qc.category_id = ? AND q.quiz_id IS NULL)
+";
 $stmt_q_count = $conn->prepare($sql_q_count);
 if($stmt_q_count){
-    $stmt_q_count->bind_param("i", $category_id);
+    $stmt_q_count->bind_param("ii", $category_id, $category_id);
     $stmt_q_count->execute();
-    $total_questions_in_category = $stmt_q_count->get_result()->fetch_assoc()['total_q'];
+    $total_questions_in_category_result = $stmt_q_count->get_result()->fetch_assoc();
+    $total_questions_in_category = $total_questions_in_category_result ? $total_questions_in_category_result['total_q'] : 0;
     $stmt_q_count->close();
 } else {
     error_log("Failed to prepare question count statement: " . $conn->error);
+     $total_questions_in_category = 0; // Default to 0 if query fails
 }
+
 
 if ($total_questions_in_category == 0 && $start_quiz) {
     $_SESSION['flash_message'] = "দুঃখিত, \"" . htmlspecialchars($category_name) . "\" ক্যাটাগরিতে অনুশীলনের জন্য কোনো প্রশ্ন এখনো যোগ করা হয়নি।";
@@ -99,11 +107,23 @@ if ($start_quiz) {
     
     $num_questions_to_load = $num_questions_to_show;
 
-
-    $sql_questions = "SELECT id, question_text, image_url, explanation FROM questions WHERE category_id = ? ORDER BY RAND() LIMIT ?";
+    // Updated SQL to fetch questions from both quiz-specific and manual (category-specific) sources
+    $sql_questions = "
+        (SELECT q.id, q.question_text, q.image_url, q.explanation
+         FROM questions q
+         INNER JOIN question_categories qc ON q.id = qc.question_id
+         WHERE qc.category_id = ? AND q.quiz_id IS NULL) 
+        UNION
+        (SELECT q.id, q.question_text, q.image_url, q.explanation
+         FROM questions q
+         WHERE q.category_id = ? AND q.quiz_id IS NOT NULL)
+        ORDER BY RAND()
+        LIMIT ?
+    ";
     $stmt_questions = $conn->prepare($sql_questions);
+
     if ($stmt_questions) {
-        $stmt_questions->bind_param("ii", $category_id, $num_questions_to_load);
+        $stmt_questions->bind_param("iii", $category_id, $category_id, $num_questions_to_load);
         $stmt_questions->execute();
         $result_questions = $stmt_questions->get_result();
 
@@ -155,7 +175,7 @@ $page_specific_styles = "
     .timer-display.critical { color: var(--bs-danger); }
     .settings-card { max-width: 600px; margin: 2rem auto; }
 ";
-require_once 'includes/header.php';
+require_once '../includes/header.php';
 ?>
 
 <div class="container" id="quizInterfaceContainer">
@@ -375,5 +395,5 @@ document.addEventListener('DOMContentLoaded', function() {
 
 <?php
 if ($conn) { $conn->close(); }
-require_once 'includes/footer.php';
+require_once '../includes/footer.php';
 ?>
