@@ -74,12 +74,18 @@ if ($stmt_cat) {
 $sql_q_count = "
     SELECT COUNT(DISTINCT q.id) as total_q
     FROM questions q
-    LEFT JOIN question_categories qc ON q.id = qc.question_id
-    WHERE (q.category_id = ? AND q.quiz_id IS NOT NULL) OR (qc.category_id = ? AND q.quiz_id IS NULL)
+    INNER JOIN question_categories qc ON q.id = qc.question_id
+    LEFT JOIN quizzes qz ON q.quiz_id = qz.id -- ম্যানুয়াল প্রশ্নের জন্য quiz_id NULL হতে পারে, তাই LEFT JOIN
+    WHERE qc.category_id = ? -- যে ক্যাটাগরির জন্য গণনা করা হচ্ছে
+      AND (
+        q.quiz_id IS NULL -- এটি একটি ম্যানুয়াল প্রশ্ন
+        OR
+        (q.quiz_id IS NOT NULL AND qz.status = 'archived') -- অথবা এটি একটি আর্কাইভ কুইজের প্রশ্ন
+      )
 ";
 $stmt_q_count = $conn->prepare($sql_q_count);
 if($stmt_q_count){
-    $stmt_q_count->bind_param("ii", $category_id, $category_id);
+    $stmt_q_count->bind_param("i", $category_id); // এখন একটি মাত্র প্যারামিটার বাইন্ড হবে
     if ($stmt_q_count->execute()) {
         $result_q_count_obj = $stmt_q_count->get_result();
         if ($result_q_count_obj) {
@@ -119,14 +125,22 @@ if ($start_quiz) {
     $num_questions_to_load = $num_questions_to_show;
 
     $sql_questions = "
-        (SELECT q.id, q.question_text, q.image_url, q.explanation
-         FROM questions q
-         INNER JOIN question_categories qc ON q.id = qc.question_id
-         WHERE qc.category_id = ? AND q.quiz_id IS NULL) 
-        UNION
-        (SELECT q.id, q.question_text, q.image_url, q.explanation
-         FROM questions q
-         WHERE q.category_id = ? AND q.quiz_id IS NOT NULL)
+        (
+            -- এই ক্যাটাগরির সাথে যুক্ত ম্যানুয়াল প্রশ্ন
+            SELECT q.id, q.question_text, q.image_url, q.explanation
+            FROM questions q
+            INNER JOIN question_categories qc ON q.id = qc.question_id
+            WHERE qc.category_id = ? AND q.quiz_id IS NULL
+        )
+        UNION -- DISTINCT প্রশ্নগুলো একত্রিত করার জন্য UNION ব্যবহার করা হচ্ছে
+        (
+            -- এই ক্যাটাগরির সাথে যুক্ত আর্কাইভ কুইজের প্রশ্ন
+            SELECT q.id, q.question_text, q.image_url, q.explanation
+            FROM questions q
+            INNER JOIN question_categories qc ON q.id = qc.question_id
+            INNER JOIN quizzes qz ON q.quiz_id = qz.id
+            WHERE qc.category_id = ? AND q.quiz_id IS NOT NULL AND qz.status = 'archived'
+        )
         ORDER BY RAND()
         LIMIT ?
     ";
