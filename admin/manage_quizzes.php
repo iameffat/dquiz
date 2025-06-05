@@ -7,13 +7,17 @@ require_once '../includes/functions.php';
 
 define('QUESTION_IMAGE_UPLOAD_DIR_MANAGE', '../uploads/question_images/');
 
-// Handle Delete Action (Your existing delete logic remains here - unchanged)
+// Handle Delete Action
 if (isset($_GET['action']) && $_GET['action'] == 'delete' && isset($_GET['quiz_id'])) {
+    // Password check will be handled by JavaScript before this point
+    // If an attacker bypasses JS, they could still delete without password.
+    // For higher security, password should be verified server-side here.
+    // For this request, we are relying on the client-side JS check.
+
     $quiz_id_to_delete = intval($_GET['quiz_id']);
     
     $conn->begin_transaction();
     try {
-        // ... (আপনার ডিলিট কোড যেমন ছিল) ...
         $sql_get_images = "SELECT image_url FROM questions WHERE quiz_id = ?";
         $stmt_get_images = $conn->prepare($sql_get_images);
         $stmt_get_images->bind_param("i", $quiz_id_to_delete);
@@ -91,13 +95,13 @@ $filter_status = isset($_GET['status_filter']) ? $_GET['status_filter'] : '';
 if (!empty($filter_status) && in_array($filter_status, ['draft', 'upcoming', 'live', 'archived'])) {
     if ($filter_status === 'archived') {
         $where_clauses[] = "(q.status = ? OR (q.status = 'live' AND q.live_end_datetime IS NOT NULL AND q.live_end_datetime < NOW()))";
-        $params[] = 'archived'; // Keep original status for query parameter
+        $params[] = 'archived'; 
         $types .= "s";
     } elseif ($filter_status === 'live') {
         $where_clauses[] = "q.status = ? AND (q.live_start_datetime IS NULL OR q.live_start_datetime <= NOW()) AND (q.live_end_datetime IS NULL OR q.live_end_datetime >= NOW())";
         $params[] = 'live';
         $types .= "s";
-    } else { // For 'draft' and 'upcoming'
+    } else { 
         $where_clauses[] = "q.status = ?";
         $params[] = $filter_status;
         $types .= "s";
@@ -225,15 +229,19 @@ if ($stmt_quizzes) {
                             <td><?php echo format_datetime($quiz['created_at'], "d M Y"); ?></td>
                             <td>
                                <div class="btn-group" role="group" aria-label="Quiz Actions">
-    <a href="edit_quiz.php?id=<?php echo $quiz['id']; ?>" class="btn btn-sm btn-info me-1" title="এডিট করুন">এডিট</a>
-    <a href="duplicate_quiz.php?quiz_id_to_duplicate=<?php echo $quiz['id']; ?>" class="btn btn-sm btn-warning me-1" onclick="return confirm('আপনি কি নিশ্চিতভাবে এই কুইজটি ডুপ্লিকেট করতে চান?');" title="ডুপ্লিকেট করুন">ডুপ্লিকেট</a>
-    <a href="manage_quizzes.php?action=delete&quiz_id=<?php echo $quiz['id']; ?>&status_filter=<?php echo urlencode($filter_status); ?>" class="btn btn-sm btn-danger me-1" onclick="return confirm('আপনি কি নিশ্চিতভাবে এই কুইজটি এবং এর সাথে সম্পর্কিত সকল প্রশ্ন, অপশন ও উত্তর ডিলিট করতে চান?');" title="ডিলিট করুন">ডিলিট</a>
-    <a href="view_quiz_attempts.php?quiz_id=<?php echo $quiz['id']; ?>" class="btn btn-sm btn-success me-1" title="ফলাফল ও অংশগ্রহণকারী দেখুন">ফলাফল</a>
-    <a href="../quiz_page.php?id=<?php echo $quiz['id']; ?>" target="_blank" class="btn btn-sm btn-outline-secondary me-1" title="কুইজটি দেখুন">দেখুন</a>
-    <?php
-        $quiz_public_link = rtrim((isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] === 'on' ? "https" : "http") . "://" . $_SERVER['HTTP_HOST'] . dirname(dirname($_SERVER['PHP_SELF'])), '/') . '/quiz_page.php?id=' . $quiz['id'];
-    ?>
-    <button class="btn btn-sm btn-outline-primary copy-quiz-link-btn" data-link="<?php echo htmlspecialchars($quiz_public_link); ?>" title="কুইজের লিংক কপি করুন">লিংক</button> </div>
+                                    <a href="edit_quiz.php?id=<?php echo $quiz['id']; ?>" class="btn btn-sm btn-info me-1" title="এডিট করুন">এডিট</a>
+                                    <a href="duplicate_quiz.php?quiz_id_to_duplicate=<?php echo $quiz['id']; ?>" class="btn btn-sm btn-warning me-1" onclick="return confirm('আপনি কি নিশ্চিতভাবে এই কুইজটি ডুপ্লিকেট করতে চান?');" title="ডুপ্লিকেট করুন">ডুপ্লিকেট</a>
+                                    
+                                    <button type="button" class="btn btn-sm btn-danger me-1" 
+                                            onclick="confirmDeleteWithPassword(event, '<?php echo $quiz['id']; ?>', '<?php echo htmlspecialchars(urlencode($filter_status), ENT_QUOTES, 'UTF-8'); ?>')" 
+                                            title="ডিলিট করুন">ডিলিট</button>
+                                    
+                                    <a href="view_quiz_attempts.php?quiz_id=<?php echo $quiz['id']; ?>" class="btn btn-sm btn-success me-1" title="ফলাফল ও অংশগ্রহণকারী দেখুন">ফলাফল</a>
+                                    <a href="../quiz_page.php?id=<?php echo $quiz['id']; ?>" target="_blank" class="btn btn-sm btn-outline-secondary me-1" title="কুইজটি দেখুন">দেখুন</a>
+                                    <?php
+                                        $quiz_public_link = rtrim((isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] === 'on' ? "https" : "http") . "://" . $_SERVER['HTTP_HOST'] . dirname(dirname($_SERVER['PHP_SELF'])), '/') . '/quiz_page.php?id=' . $quiz['id'];
+                                    ?>
+                                    <button class="btn btn-sm btn-outline-primary copy-quiz-link-btn" data-link="<?php echo htmlspecialchars($quiz_public_link); ?>" title="কুইজের লিংক কপি করুন">লিংক</button>
                                 </div>
                             </td>
                         </tr>
@@ -255,13 +263,37 @@ if ($stmt_quizzes) {
 </div>
 
 <script>
+function confirmDeleteWithPassword(event, quizId, filterStatus) {
+    event.preventDefault(); // Prevent default link behavior if it was a link initially
+    
+    const adminPassword = prompt("এই কুইজটি ডিলিট করার জন্য এডমিন পাসওয়ার্ড দিন:", "");
+
+    if (adminPassword === null) { // User clicked cancel
+        return false;
+    }
+
+    if (adminPassword === "1234") {
+        const confirmDelete = confirm("আপনি কি নিশ্চিতভাবে এই কুইজটি এবং এর সাথে সম্পর্কিত সকল প্রশ্ন, অপশন ও উত্তর ডিলিট করতে চান?");
+        if (confirmDelete) {
+            let deleteUrl = `manage_quizzes.php?action=delete&quiz_id=${quizId}`;
+            if (filterStatus) {
+                deleteUrl += `&status_filter=${filterStatus}`;
+            }
+            window.location.href = deleteUrl;
+        }
+    } else {
+        alert("পাসওয়ার্ড সঠিক নয়। ডিলিট বাতিল করা হয়েছে।");
+    }
+    return false; // Ensure default action is prevented
+}
+
 document.addEventListener('DOMContentLoaded', function() {
     const copyButtons = document.querySelectorAll('.copy-quiz-link-btn');
     copyButtons.forEach(button => {
         button.addEventListener('click', function() {
             const linkToCopy = this.dataset.link;
             navigator.clipboard.writeText(linkToCopy).then(() => {
-                const originalText = this.textContent; // Only text content for simplicity
+                const originalText = this.textContent; 
                 this.textContent = 'কপি হয়েছে!';
                 const originalClasses = Array.from(this.classList);
                 this.classList.remove('btn-outline-primary');
@@ -272,8 +304,6 @@ document.addEventListener('DOMContentLoaded', function() {
                     this.classList.remove('btn-primary');
                     originalClasses.forEach(cls => { if(cls !== 'copy-quiz-link-btn' && cls !== 'btn' && cls !== 'btn-sm') this.classList.add(cls) });
                      this.classList.add('btn-outline-primary');
-
-
                 }, 2000);
             }).catch(err => {
                 console.error('লিংক কপি করতে সমস্যা হয়েছে: ', err);
