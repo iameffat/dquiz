@@ -144,7 +144,7 @@ if (!isset($_SESSION["loggedin"]) || $_SESSION["loggedin"] !== true) {
             }
         } elseif ($quiz['status'] == 'archived') {
             $can_take_quiz = true; // Archived quizzes can be taken for practice by logged-in users
-            $access_message = "এটি একটি আর্কাইভ কুইজ। আপনি অনুশীলনের জন্য অংশগ্রহণ করতে পারেন।";
+            // $access_message = "এটি একটি আর্কাইভ কুইজ। আপনি অনুশীলনের জন্য অংশগ্রহণ করতে পারেন।"; // Optional: Set if you want specific msg for archived
         }
     }
 
@@ -186,18 +186,16 @@ if (!isset($_SESSION["loggedin"]) || $_SESSION["loggedin"] !== true) {
         $quiz_duration_seconds = $quiz['duration_minutes'] * 60;
 
         if ($total_questions === 0) {
-            // If, after all checks, a "takable" quiz has no questions.
-            // Admins might see this during setup. For users, it's an issue.
             if ($user_role !== 'admin' && $quiz['status'] !== 'archived') {
-                $can_take_quiz = false; // Override: cannot take a live/upcoming quiz with no questions
+                $can_take_quiz = false; 
                 $access_message = "দুঃখিত, এই কুইজে এখনো কোনো প্রশ্ন যোগ করা হয়নি।";
             } elseif ($user_role === 'admin' || $quiz['status'] === 'archived') {
                 $access_message = ($user_role === 'admin') ? "অ্যাডমিন ভিউ: এই কুইজে কোনো প্রশ্ন যোগ করা হয়নি।" : "এই কুইজে অনুশীলনের জন্য কোনো প্রশ্ন পাওয়া যায়নি।";
-                $can_take_quiz = false; // Cannot take if no questions, even for practice/admin
+                $can_take_quiz = false; 
             }
         }
 
-        if ($can_take_quiz) { // Re-check $can_take_quiz after question count check
+        if ($can_take_quiz) { 
             $start_time = date('Y-m-d H:i:s');
             $user_ip_address = $_SERVER['REMOTE_ADDR'] ?? 'UNKNOWN';
             $user_agent_string = isset($_SERVER['HTTP_USER_AGENT']) ? $_SERVER['HTTP_USER_AGENT'] : 'N/A';
@@ -215,7 +213,7 @@ if (!isset($_SESSION["loggedin"]) || $_SESSION["loggedin"] !== true) {
             $stmt_start_attempt->bind_param("iisssss", $user_id, $quiz_id, $start_time, $user_ip_address, $user_agent_string, $browser_name, $os_platform);
             if ($stmt_start_attempt->execute()) {
                 $attempt_id = $stmt_start_attempt->insert_id;
-                $show_quiz_interface = true; // Quiz can be shown
+                $show_quiz_interface = true; 
             } else {
                 error_log("Execute failed for start attempt: (" . $stmt_start_attempt->errno . ") " . $stmt_start_attempt->error);
                 $_SESSION['flash_message'] = "কুইজ শুরু করতে সমস্যা হয়েছে। অনুগ্রহ করে আবার চেষ্টা করুন। (Error: QPSE1)";
@@ -266,6 +264,7 @@ require_once 'includes/header.php'; // HTML <head> and navbar are outputted here
                     <p class="text-danger fw-bold">আপনি কি উপরের সকল নিয়মের সাথে একমত এবং কুইজ শুরু করতে প্রস্তুত?</p>
                 </div>
                 <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" onclick="window.location.href='quizzes.php';">সম্মত নই (ফিরে যান)</button>
                     <button type="button" class="btn btn-primary" id="agreeAndStartQuiz" data-bs-dismiss="modal">সম্মত ও শুরু করুন</button>
                 </div>
             </div>
@@ -284,7 +283,10 @@ require_once 'includes/header.php'; // HTML <head> and navbar are outputted here
         <form id="quizForm" action="results.php" method="post">
             <input type="hidden" name="quiz_id" value="<?php echo $quiz_id; ?>">
             <input type="hidden" name="attempt_id" value="<?php echo $attempt_id; ?>">
-            <?php foreach ($questions as $index => $question): ?>
+            <?php 
+            $bengali_options_map = ['ক', 'খ', 'গ', 'ঘ', 'ঙ', 'চ']; // যদি ৪টির বেশি অপশন থাকে তার জন্য অতিরিক্ত অক্ষর
+            foreach ($questions as $index => $question): 
+            ?>
             <div class="card question-card mb-4 shadow-sm" id="question_<?php echo $question['id']; ?>" data-question-id="<?php echo $question['id']; ?>">
                 <div class="card-header">
                     <h5 class="card-title mb-0">প্রশ্ন <?php echo $index + 1; ?>: <?php echo nl2br(escape_html($question['question_text'])); ?></h5>
@@ -295,7 +297,9 @@ require_once 'includes/header.php'; // HTML <head> and navbar are outputted here
                             <img src="<?php echo $base_url . escape_html($question['image_url']); ?>" alt="প্রশ্ন সম্পর্কিত ছবি" class="img-fluid question-image">
                         </div>
                     <?php endif; ?>
-                    <?php foreach ($question['options'] as $opt_index => $option): ?>
+                    <?php foreach ($question['options'] as $opt_index => $option): 
+                        $option_prefix = isset($bengali_options_map[$opt_index]) ? $bengali_options_map[$opt_index] . '. ' : '';
+                    ?>
                     <div class="form-check question-option-wrapper mb-2">
                         <input class="form-check-input question-option-radio" type="radio"
                                name="answers[<?php echo $question['id']; ?>]"
@@ -303,7 +307,7 @@ require_once 'includes/header.php'; // HTML <head> and navbar are outputted here
                                value="<?php echo $option['id']; ?>"
                                data-question-id="<?php echo $question['id']; ?>">
                         <label class="form-check-label w-100 p-2 rounded border" for="option_<?php echo $option['id']; ?>">
-                            <?php echo escape_html($option['option_text']); ?>
+                            <?php echo $option_prefix . escape_html($option['option_text']); ?>
                         </label>
                     </div>
                     <?php endforeach; ?>
@@ -358,7 +362,11 @@ require_once 'includes/header.php'; // HTML <head> and navbar are outputted here
                         $status_display_text = 'আপকামিং'; $status_text_class = 'text-info';
                         if ($quiz_info_for_display['live_start_datetime']) { $status_display_text .= ' (শুরু: ' . format_datetime($quiz_info_for_display['live_start_datetime']) . ')';}
                     } elseif ($quiz_info_for_display['status'] == 'archived') {
-                        $status_display_text = 'আর্কাইভড' . (($user_id && $user_role !== 'admin') ? ' (অনুশীলনের জন্য উপলব্ধ)' : ''); $status_text_class = 'text-secondary';
+                        $status_display_text = 'আর্কাইভড';
+                         if (isset($_SESSION["loggedin"]) && $_SESSION["loggedin"] === true && (!isset($user_role) || $user_role !== 'admin')) {
+                             $status_display_text .= ' (অনুশীলনের জন্য উপলব্ধ)';
+                         }
+                        $status_text_class = 'text-secondary';
                     } elseif ($quiz_info_for_display['status'] == 'draft') {
                         $status_display_text = 'ড্রাফট (শীঘ্রই আসছে)'; $status_text_class = 'text-warning';
                     } else { $status_display_text = ucfirst($quiz_info_for_display['status']); }
@@ -383,12 +391,12 @@ require_once 'includes/header.php'; // HTML <head> and navbar are outputted here
 
 <script>
 document.addEventListener('DOMContentLoaded', function() {
-    const quizForm = document.getElementById('quizForm'); // This will be null if quiz interface is not shown
+    const quizForm = document.getElementById('quizForm'); 
     const warningModalElement = document.getElementById('quizWarningModal');
     const agreeAndStartButton = document.getElementById('agreeAndStartQuiz');
     const mainQuizContainer = document.getElementById('quizContainer');
     const timerProgressBar = document.querySelector('.timer-progress-bar');
-    const totalQuestionsJS = <?php echo $total_questions; ?>; // Will be 0 if quiz interface is not shown
+    const totalQuestionsJS = <?php echo $total_questions; ?>; 
 
     let quizLogicInitialized = false;
 
@@ -398,13 +406,12 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 
     function initializeQuizFunctionalities() {
-        if (quizLogicInitialized || !quizForm) return; // Ensure quizForm exists
+        if (quizLogicInitialized || !quizForm) return; 
         quizLogicInitialized = true;
         applyBlurToBackground(false);
 
         const bodyElement = document.body;
         bodyElement.classList.add('disable-text-selection');
-        // Disable copy, paste, cut and context menu
         bodyElement.addEventListener('copy', function(e) { e.preventDefault(); });
         bodyElement.addEventListener('paste', function(e) { e.preventDefault(); });
         bodyElement.addEventListener('cut', function(e) { e.preventDefault(); });
@@ -425,24 +432,23 @@ document.addEventListener('DOMContentLoaded', function() {
             else if (timeLeft <= 0) {
                 timerDisplay.classList.remove('critical');
                 timerDisplay.textContent = "সময় শেষ!";
-                if (quizForm && !quizForm.dataset.submitted) { // Check if already submitted by other means
-                    quizForm.dataset.submitted = 'true'; // Mark as submitted
+                if (quizForm && !quizForm.dataset.submitted) { 
+                    quizForm.dataset.submitted = 'true'; 
                     quizForm.submit();
                 }
                 if(timerInterval) clearInterval(timerInterval);
             }
-             if (timeLeft > 0) timeLeft--; else timeLeft = 0; // Ensure timeLeft doesn't go negative
+             if (timeLeft > 0) timeLeft--; else timeLeft = 0; 
         }
         
-        // Start timer only if there are questions and a time limit
         if (totalQuestionsJS > 0 && timeLeft > 0) {
-            updateTimerDisplay(); // Initial display
+            updateTimerDisplay(); 
             timerInterval = setInterval(updateTimerDisplay, 1000);
-        } else if (totalQuestionsJS > 0 && timeLeft <= 0) { // No time limit (timeLeft was initialized to 0 or less if duration_minutes was 0)
-             if(timerDisplay) timerDisplay.textContent = "সময়: সীমাহীন";
+        } else if (totalQuestionsJS > 0 && timeLeft <= 0) { 
+             if(timerDisplay) timerDisplay.textContent = "সময়:সীমাহীন";
              if(progressIndicator) progressIndicator.textContent = `উত্তর: 0/${totalQuestionsJS}`;
         }
-        else { // No questions
+        else { 
             if(timerDisplay) timerDisplay.textContent = "কোনো প্রশ্ন নেই";
             if(progressIndicator) progressIndicator.textContent = "উত্তর: 0/0";
             const submitButton = quizForm ? quizForm.querySelector('button[type="submit"]') : null;
@@ -458,27 +464,24 @@ document.addEventListener('DOMContentLoaded', function() {
             radiosInThisGroup.forEach(radio => {
                 radio.addEventListener('change', function() {
                     if (this.checked && !answeredQuestionLocks.has(questionId)) {
-                        // Remove 'selected' class from all labels in this question
                         const allLabelsInQuestion = questionCard.querySelectorAll('.question-option-wrapper label');
                         allLabelsInQuestion.forEach(lbl => {
                             lbl.classList.remove('selected-option-display', 'border-primary', 'border-2');
-                            lbl.style.opacity = '1'; // Reset opacity if needed
+                            lbl.style.opacity = '1'; 
                         });
 
-                        // Add 'selected' class to the currently selected label
                         const parentWrapper = this.closest('.question-option-wrapper');
                         if (parentWrapper) {
                             const labelForRadio = parentWrapper.querySelector('label');
                             if (labelForRadio) {
                                 labelForRadio.classList.add('selected-option-display', 'border-primary', 'border-2');
-                                labelForRadio.style.opacity = '1'; // Make sure selected is fully opaque
+                                labelForRadio.style.opacity = '1'; 
                             }
                         }
                         
                         answeredQuestionLocks.add(questionId);
                         if(progressIndicator) progressIndicator.textContent = `উত্তর: ${answeredQuestionLocks.size}/${totalQuestionsJS}`;
 
-                        // Disable other options and dim them
                         radiosInThisGroup.forEach(otherRadioInGroup => {
                             const otherLabel = otherRadioInGroup.closest('.question-option-wrapper').querySelector('label');
                             if (otherRadioInGroup !== this) {
@@ -487,7 +490,7 @@ document.addEventListener('DOMContentLoaded', function() {
                                     otherLabel.style.opacity = '0.6';
                                     otherLabel.style.cursor = 'default';
                                 }
-                            } else { // For the selected one
+                            } else { 
                                  if(otherLabel) otherLabel.style.cursor = 'default';
                             }
                         });
@@ -498,36 +501,28 @@ document.addEventListener('DOMContentLoaded', function() {
         if (window.history.replaceState) { window.history.replaceState(null, null, window.location.href); }
     }
 
-    // Modal logic
     if (warningModalElement && agreeAndStartButton && totalQuestionsJS > 0 && <?php echo json_encode($show_quiz_interface); ?>) {
         const warningModal = new bootstrap.Modal(warningModalElement);
         warningModal.show();
-        applyBlurToBackground(true); // Blur background when modal is shown
+        applyBlurToBackground(true); 
 
         agreeAndStartButton.addEventListener('click', function() {
-            // Modal is dismissed by data-bs-dismiss, then 'hidden.bs.modal' fires
-            // Functionalities will be initialized in the 'hidden.bs.modal' event listener
+            initializeQuizFunctionalities(); // Initialize when user agrees
+            // Modal dismisses via data-bs-dismiss, then hidden.bs.modal will remove blur
         });
 
-        warningModalElement.addEventListener('hidden.bs.modal', function () {
-             applyBlurToBackground(false); // Remove blur when modal is hidden
-            if (!quizLogicInitialized && document.body.contains(warningModalElement)) {
-                // If user closed modal without clicking "Agree", redirect or handle as "not agreed"
-                // Check if agreeAndStartButton was the one causing dismiss, if not, then user cancelled
-                // This is tricky, a simpler way is to check if quizLogicInitialized after modal hide
-                if (!quizLogicInitialized) { // If agree was not clicked
-                    window.location.href = 'quizzes.php'; 
-                }
+        warningModalElement.addEventListener('hidden.bs.modal', function (event) {
+             applyBlurToBackground(false); 
+            // Check if quiz logic was initialized (meaning "Agree" was clicked)
+            // If not, and the modal was closed by other means (e.g., Escape key, backdrop click, close button)
+            if (!quizLogicInitialized) {
+                window.location.href = 'quizzes.php'; 
             }
         });
-         agreeAndStartButton.addEventListener('click', function() {
-            initializeQuizFunctionalities();
-        });
-
-    } else if (totalQuestionsJS > 0 && <?php echo json_encode($show_quiz_interface); ?>) { // If no modal needed (e.g. admin or direct start)
+    } else if (totalQuestionsJS > 0 && <?php echo json_encode($show_quiz_interface); ?>) { 
         initializeQuizFunctionalities();
-    } else if (<?php echo json_encode($show_quiz_interface); ?>) { // Quiz interface should be shown, but no questions
-         applyBlurToBackground(false); // No blur needed if no quiz interface
+    } else if (<?php echo json_encode($show_quiz_interface); ?>) { 
+         applyBlurToBackground(false); 
          const bodyElement = document.body;
          bodyElement.classList.add('disable-text-selection');
          bodyElement.addEventListener('contextmenu', function(e) { e.preventDefault(); });
@@ -537,15 +532,13 @@ document.addEventListener('DOMContentLoaded', function() {
          const submitButton = quizForm ? quizForm.querySelector('button[type="submit"]') : null;
          if(submitButton) {
              submitButton.disabled = true;
-             submitButton.textContent = "কোনো প্রশ্ন নেই"; // Change button text or hide
-             // submitButton.style.display = 'none';
+             submitButton.textContent = "কোনো প্রশ্ন নেই";
          }
     }
 });
 </script>
 
 <?php
-// Close connection and include footer
 if ($conn) {
     $conn->close();
 }
