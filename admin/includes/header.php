@@ -52,10 +52,18 @@ $current_admin_base_url = isset($admin_base_url) ? $admin_base_url : '';
             overflow-y: auto;
             transition: width 0.3s ease, left 0.3s ease, background-color 0.3s ease, color 0.3s ease;
         }
+        .admin-sidebar .nav-link .bi { /* Icon style */
+            margin-right: 8px;
+            width: 1.1em; /* Consistent icon width */
+            height: 1.1em; /* Consistent icon height */
+            vertical-align: text-bottom; /* Align icon better with text */
+        }
         .admin-sidebar a { 
             color: var(--admin-sidebar-text-color); 
             text-decoration: none; display: block; padding: 10px 15px; 
             transition: color 0.3s ease, background-color 0.3s ease;
+            display: flex; /* For aligning icon and text */
+            align-items: center; /* For aligning icon and text */
         }
         .admin-sidebar a:hover, .admin-sidebar a.active { 
             color: var(--admin-sidebar-hover-text-color); 
@@ -107,11 +115,16 @@ $current_admin_base_url = isset($admin_base_url) ? $admin_base_url : '';
 
         @media (max-width: 767.98px) {
             body { display: block; }
-            .admin-sidebar { position: static; width: 100%; height: auto; min-height: 0; bottom: auto; display: flex; flex-direction: column; padding-bottom: 10px; }
-            .admin-sidebar .nav { flex-direction: column; }
+            .admin-sidebar { position: static; width: 100%; height: auto; min-height: 0; bottom: auto; /*display: flex;*/ flex-direction: column; padding-bottom: 10px; }
+            .admin-sidebar .nav { flex-direction: column; } /* Ensure nav items stack */
             .admin-sidebar h4 { text-align: center; }
             .admin-page-wrapper { margin-left: 0; width: 100%; }
             .admin-header { position: static; }
+             /* For mobile, ensure the toggler button is visible if you add one */
+            .admin-sidebar-toggler { display: block; /* or flex */ text-align: center; padding: 10px; background-color: #333; color: white; cursor: pointer; }
+            /* Hide nav by default on mobile if using a toggler */
+            /* .admin-sidebar .nav { display: none; } */
+            /* .admin-sidebar.open .nav { display: flex; } */
         }
 
         .admin-question-image-preview {
@@ -171,47 +184,55 @@ $current_admin_base_url = isset($admin_base_url) ? $admin_base_url : '';
     <ul class="nav flex-column">
         <li class="nav-item">
             <a class="nav-link <?php echo (basename($_SERVER['PHP_SELF']) == 'index.php') ? 'active' : ''; ?>" href="<?php echo $current_admin_base_url; ?>index.php">
+                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-house-door-fill" viewBox="0 0 16 16"><path d="M6.5 14.5v-3.505c0-.245.25-.495.5-.495h2c.25 0 .5.25.5.5v3.5a.5.5 0 0 0 .5.5h4a.5.5 0 0 0 .5-.5v-7a.5.5 0 0 0-.146-.354L13 5.793V2.5a.5.5 0 0 0-.5-.5h-1a.5.5 0 0 0-.5.5v1.293L8.354 1.146a.5.5 0 0 0-.708 0l-6 6A.5.5 0 0 0 1.5 7.5v7a.5.5 0 0 0 .5.5h4a.5.5 0 0 0 .5-.5z"/></svg>
                 ড্যাশবোর্ড
             </a>
         </li>
         <li class="nav-item">
             <a class="nav-link <?php echo (basename($_SERVER['PHP_SELF']) == 'manage_quizzes.php' || basename($_SERVER['PHP_SELF']) == 'add_quiz.php' || basename($_SERVER['PHP_SELF']) == 'edit_quiz.php') ? 'active' : ''; ?>" href="<?php echo $current_admin_base_url; ?>manage_quizzes.php">
+                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-list-check" viewBox="0 0 16 16"><path fill-rule="evenodd" d="M5 11.5a.5.5 0 0 1 .5-.5h9a.5.5 0 0 1 0 1h-9a.5.5 0 0 1-.5-.5m0-4a.5.5 0 0 1 .5-.5h9a.5.5 0 0 1 0 1h-9a.5.5 0 0 1-.5-.5m0-4a.5.5 0 0 1 .5-.5h9a.5.5 0 0 1 0 1h-9a.5.5 0 0 1-.5-.5M3.854 2.146a.5.5 0 0 1 0 .708l-1.5 1.5a.5.5 0 0 1-.708 0l-.5-.5a.5.5 0 1 1 .708-.708L2 3.293l1.146-1.147a.5.5 0 0 1 .708 0M2.5 7a.5.5 0 0 0 0 1h.5a.5.5 0 0 0 0-1zM3.854 6.146a.5.5 0 0 1 0 .708l-1.5 1.5a.5.5 0 0 1-.708 0l-.5-.5a.5.5 0 0 1 .708-.708L2 7.293l1.146-1.147a.5.5 0 0 1 .708 0m0 4a.5.5 0 0 1 0 .708l-1.5 1.5a.5.5 0 0 1-.708 0l-.5-.5a.5.5 0 0 1 .708-.708L2 11.293l1.146-1.147a.5.5 0 0 1 .708 0"/></svg>
                 কুইজ ম্যানেজমেন্ট
             </a>
         </li>
          <li class="nav-item">
-            <a class="nav-link <?php echo (basename($_SERVER['PHP_SELF']) == 'manage_manual_questions.php') ? 'active' : ''; ?>" href="<?php echo $current_admin_base_url; ?>manage_manual_questions.php">
-                ম্যানুয়াল প্রশ্ন ম্যানেজমেন্ট
+            <a class="nav-link <?php echo (basename($_SERVER['PHP_SELF']) == 'manage_manual_questions.php' || basename($_SERVER['PHP_SELF']) == 'add_manual_question.php' || basename($_SERVER['PHP_SELF']) == 'edit_manual_question.php') ? 'active' : ''; ?>" href="<?php echo $current_admin_base_url; ?>manage_manual_questions.php">
+                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-patch-question-fill" viewBox="0 0 16 16"><path d="M5.933.87a2.89 2.89 0 0 1 4.134 0l.622.638.89-.011a2.89 2.89 0 0 1 2.924 2.924l-.01.89.638.622a2.89 2.89 0 0 1 0 4.134l-.638.622.011.89a2.89 2.89 0 0 1-2.924 2.924l-.89-.01-.622.638a2.89 2.89 0 0 1-4.134 0l-.622-.638-.89.01a2.89 2.89 0 0 1-2.924-2.924l.01-.89-.638-.622a2.89 2.89 0 0 1 0-4.134l.638-.622-.011-.89a2.89 2.89 0 0 1 2.924-2.924l.89.01zM7.002 11a1 1 0 1 0 2 0 1 1 0 0 0-2 0m1.602-2.027c.04-.534.198-.815.846-1.26.674-.475 1.05-1.09 1.05-1.971 0-.923-.756-1.539-1.691-1.539S6.31 4.23 6.31 5.153h1.021c0-.59.441-1.002 1.123-1.002.65 0 1.002.322 1.002.88 0 .54-.37.91-.984 1.32-.652.433-1.03.938-1.03 1.705z"/></svg>
+                ম্যানুয়াল প্রশ্ন
             </a>
         </li>
         <li class="nav-item">
-    <a class="nav-link <?php echo (basename($_SERVER['PHP_SELF']) == 'manage_categories.php') ? 'active' : ''; ?>" href="<?php echo $current_admin_base_url; ?>manage_categories.php">
-        ক্যাটাগরি ম্যানেজমেন্ট
-    </a>
-</li>
+            <a class="nav-link <?php echo (basename($_SERVER['PHP_SELF']) == 'manage_categories.php') ? 'active' : ''; ?>" href="<?php echo $current_admin_base_url; ?>manage_categories.php">
+                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-tags-fill" viewBox="0 0 16 16"><path d="M2 2a1 1 0 0 1 1-1h4.586a1 1 0 0 1 .707.293l7 7a1 1 0 0 1 0 1.414l-4.586 4.586a1 1 0 0 1-1.414 0l-7-7A1 1 0 0 1 2 6.586zm4.5-1a.5.5 0 1 0 0 1 .5.5 0 0 0 0-1"/><path d="M1.293 7.793A1 1 0 0 1 1 7.086V2a1 1 0 0 0-1 1v4.586a1 1 0 0 0 .293.707l7 7a1 1 0 0 0 1.414 0l.043-.043z"/></svg>
+                ক্যাটাগরি ম্যানেজমেন্ট
+            </a>
+        </li>
         <li class="nav-item">
             <a class="nav-link <?php echo (basename($_SERVER['PHP_SELF']) == 'manage_study_materials.php' || basename($_SERVER['PHP_SELF']) == 'add_study_material.php' || basename($_SERVER['PHP_SELF']) == 'edit_study_material.php') ? 'active' : ''; ?>" href="<?php echo $current_admin_base_url; ?>manage_study_materials.php">
+                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-book-half" viewBox="0 0 16 16"><path d="M8.5 2.687c.654-.689 1.782-.886 3.112-.752 1.234.124 2.503.523 3.388.893v9.923c-.918-.35-2.107-.692-3.287-.81-1.094-.111-2.278-.039-3.213.492zM8 1.783C7.015.936 5.587.81 4.287.94c-1.514.153-3.042.672-3.994 1.105A.5.5 0 0 0 0 2.5v11a.5.5 0 0 0 .707.455c.882-.4 2.303-.881 3.68-1.02 1.409-.142 2.59.087 3.223.877a.5.5 0 0 0 .78 0c.633-.79 1.814-1.019 3.222-.877 1.378.139 2.8.62 3.681 1.02A.5.5 0 0 0 16 13.5v-11a.5.5 0 0 0-.293-.455c-.952-.433-2.48-.952-3.994-1.105C10.413.809 8.985.936 8 1.783"/></svg>
                 স্টাডি ম্যাটেরিয়ালস
             </a>
         </li>
         <li class="nav-item">
             <a class="nav-link <?php echo (basename($_SERVER['PHP_SELF']) == 'manage_users.php' || basename($_SERVER['PHP_SELF']) == 'edit_user.php' || basename($_SERVER['PHP_SELF']) == 'send_email.php') ? 'active' : ''; ?>" href="<?php echo $current_admin_base_url; ?>manage_users.php">
+                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-people-fill" viewBox="0 0 16 16"><path d="M7 14s-1 0-1-1 1-4 5-4 5 3 5 4-1 1-1 1zm4-6a3 3 0 1 0 0-6 3 3 0 0 0 0 6m-5.784 6A2.24 2.24 0 0 1 5 13c0-1.355.68-2.75 1.936-3.72A6.3 6.3 0 0 0 5 9c-4 0-5 3-5 4s1 1 1 1zM4.5 8a2.5 2.5 0 1 0 0-5 2.5 2.5 0 0 0 0 5"/></svg>
                 ইউজার ম্যানেজমেন্ট
             </a>
         </li>
         <li class="nav-item">
             <a class="nav-link <?php echo (basename($_SERVER['PHP_SELF']) == 'settings.php') ? 'active' : ''; ?>" href="<?php echo $current_admin_base_url; ?>settings.php">
+                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-gear-fill" viewBox="0 0 16 16"><path d="M9.405 1.05c-.413-1.4-2.397-1.4-2.81 0l-.1.34a1.464 1.464 0 0 1-2.105.872l-.31-.17c-1.283-.698-2.686.705-1.987 1.987l.169.311c.446.82.023 1.841-.872 2.105l-.34.1c-1.4.413-1.4 2.397 0 2.81l.34.1a1.464 1.464 0 0 1 .872 2.105l-.17.31c-.698 1.283.705 2.686 1.987 1.987l.311-.169a1.464 1.464 0 0 1 2.105.872l.1.34c.413 1.4 2.397 1.4 2.81 0l.1-.34a1.464 1.464 0 0 1 2.105-.872l.31.17c1.283.698 2.686-.705 1.987-1.987l-.169-.311a1.464 1.464 0 0 1 .872-2.105l.34-.1c1.4-.413-1.4-2.397 0-2.81l-.34-.1a1.464 1.464 0 0 1-.872-2.105l.17-.31c.698-1.283-.705-2.686-1.987-1.987l-.311.169a1.464 1.464 0 0 1-2.105-.872zM8 10.93a2.929 2.929 0 1 1 0-5.86 2.929 2.929 0 0 1 0 5.858z"/></svg>
                 সাইট সেটিংস
             </a>
         </li>
-        <li class="nav-item mt-auto">
-            <a class="nav-link" href="<?php echo $current_admin_base_url; ?>../index.php" target="_blank">সাইট দেখুন</a>
+        <li class="nav-item mt-auto"> <a class="nav-link" href="<?php echo $current_admin_base_url; ?>../index.php" target="_blank">
+                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-box-arrow-up-right" viewBox="0 0 16 16"><path fill-rule="evenodd" d="M8.636 3.5a.5.5 0 0 0-.5-.5H1.5A1.5 1.5 0 0 0 0 4.5v10A1.5 1.5 0 0 0 1.5 16h10a1.5 1.5 0 0 0 1.5-1.5V7.864a.5.5 0 0 0-1 0V14.5a.5.5 0 0 1-.5.5h-10a.5.5 0 0 1-.5-.5v-10a.5.5 0 0 1 .5-.5h6.636a.5.5 0 0 0 .5-.5"/><path fill-rule="evenodd" d="M16 .5a.5.5 0 0 0-.5-.5h-5a.5.5 0 0 0 0 1h3.793L6.146 9.146a.5.5 0 1 0 .708.708L15 1.707V5.5a.5.5 0 0 0 1 0z"/></svg>
+                সাইট দেখুন
+            </a>
         </li>
     </ul>
 </div>
 
 <div class="admin-page-wrapper">
-
     <div class="admin-header d-flex justify-content-between align-items-center">
         <div>
             <h5><?php echo isset($page_title) ? $page_title : 'ড্যাশবোর্ড'; ?></h5>
