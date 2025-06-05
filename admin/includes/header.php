@@ -180,8 +180,8 @@ $current_admin_base_url = isset($admin_base_url) ? $admin_base_url : '';
             </a>
         </li>
          <li class="nav-item">
-            <a class="nav-link <?php echo (basename($_SERVER['PHP_SELF']) == 'add_manual_question.php') ? 'active' : ''; ?>" href="<?php echo $current_admin_base_url; ?>add_manual_question.php">
-                ম্যানুয়াল প্রশ্ন যোগ
+            <a class="nav-link <?php echo (basename($_SERVER['PHP_SELF']) == 'manage_manual_questions.php') ? 'active' : ''; ?>" href="<?php echo $current_admin_base_url; ?>manage_manual_questions.php">
+                ম্যানুয়াল প্রশ্ন ম্যানেজমেন্ট
             </a>
         </li>
         <li class="nav-item">
