@@ -141,9 +141,14 @@ if ($result_study_materials_home && $result_study_materials_home->num_rows > 0) 
 
 $home_categories = [];
 // icon_class কলামটি এখন আর এখানে আনার দরকার নেই, কারণ আমরা সেটি ব্যবহার করছি না
-$sql_home_cat = "SELECT c.id, c.name, COUNT(q.id) as question_count 
+// প্রশ্ন গণনার জন্য SQL আপডেট করা হয়েছে
+$sql_home_cat = "SELECT c.id, c.name, 
+                        (SELECT COUNT(DISTINCT q.id) 
+                         FROM questions q 
+                         LEFT JOIN question_categories qc ON q.id = qc.question_id
+                         WHERE q.category_id = c.id OR qc.category_id = c.id
+                        ) as question_count
                  FROM categories c
-                 LEFT JOIN questions q ON c.id = q.category_id 
                  GROUP BY c.id, c.name
                  HAVING question_count > 0
                  ORDER BY question_count DESC, c.name ASC 
@@ -479,9 +484,8 @@ require_once 'includes/header.php';
                         <h5 class="card-title"><?php echo htmlspecialchars($material['title']); ?></h5>
                         <div class="quiz-description-display"> 
                             <?php 
-                            if (!empty($material['description'])) {
-                                $desc_plain_sm = strip_tags($material['description']); 
-                                echo htmlspecialchars(mb_substr($desc_plain_sm, 0, 100) . (mb_strlen($desc_plain_sm) > 100 ? '...' : ''));
+                            if (!empty(trim(strip_tags($material['description'])))) {
+                                echo $material['description']; 
                             } else {
                                 echo '<p class="text-muted fst-italic" style="margin-bottom: 0;"><em>কোনো বিবরণ নেই।</em></p>';
                             }
