@@ -192,7 +192,7 @@ require_once 'includes/header.php';
 
 <div class="container mt-5 mb-5">
     <div class="row">
-        <div class="col-md-4"> {/* প্রোফাইল তথ্য বাম পাশে */}
+        <div class="col-md-4">
             <div class="card shadow-sm mb-4">
                 <div class="card-header bg-primary text-white">
                     <h4 class="mb-0">প্রোফাইল তথ্য</h4>
@@ -212,7 +212,7 @@ require_once 'includes/header.php';
             </div>
         </div>
 
-        <div class="col-md-8"> {/* কুইজের ইতিহাস ডান পাশে */}
+        <div class="col-md-8">
             <div class="card shadow-sm mb-4"> 
                 <div class="card-header bg-success text-white">
                     <h4 class="mb-0">আমার কুইজের ইতিহাস</h4>
@@ -257,7 +257,7 @@ require_once 'includes/header.php';
     </div> 
 
     <div class="row">
-        <div class="col-md-12"> {/* এই সেকশনটি পুরো প্রস্থ জুড়ে থাকবে */}
+        <div class="col-md-12">
              <?php if (!empty($live_quizzes_profile_simple) || !empty($upcoming_quizzes_profile_simple) || !empty($archived_quizzes_profile_simple)): ?>
             <div class="other-quizzes-section">
                 <h4>আপনার জন্য কুইজ</h4>
@@ -285,7 +285,7 @@ require_once 'includes/header.php';
                         <?php foreach ($upcoming_quizzes_profile_simple as $quiz): ?>
                             <li class="list-group-item">
                                 <span class="quiz-title" title="<?php echo escape_html($quiz['title']); ?>"><?php echo escape_html(mb_strimwidth($quiz['title'], 0, 35, "...")); // Adjusted width ?></span>
-                                <div> {/* Wrapper for button and badge */}
+                                <div>
                                     <button class="btn btn-info btn-sm-custom" disabled>শীঘ্রই আসছে</button>
                                     <?php if ($quiz['live_start_datetime']): ?>
                                         <span class="badge bg-light text-dark ms-1" title="শুরুর তারিখ ও সময়"><small><?php echo format_datetime($quiz['live_start_datetime'], "d M, h:i A"); ?></small></span>
