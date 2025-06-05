@@ -6,17 +6,19 @@ require_once 'includes/db_connect.php';
 require_once 'includes/functions.php';
 
 $categories = [];
-// SQL কুয়েরি আপডেট করা হয়েছে: description এবং icon_class বাদ দেওয়া হয়েছে
+// SQL কোয়েরি আপডেট করা হয়েছে: description এবং icon_class বাদ দেওয়া হয়েছে
 // এবং প্রশ্ন গণনার জন্য question_categories জাংশন টেবিলও অন্তর্ভুক্ত করা হয়েছে
-$sql = "SELECT c.id, c.name, 
-               (SELECT COUNT(DISTINCT q.id) 
-                FROM questions q 
-                LEFT JOIN question_categories qc ON q.id = qc.question_id
-                WHERE q.category_id = c.id OR qc.category_id = c.id
+// এবং শুধুমাত্র ম্যানুয়াল বা আর্কাইভ কুইজের প্রশ্ন গণনা করা হচ্ছে
+$sql = "SELECT c.id, c.name,
+               (SELECT COUNT(DISTINCT q.id)
+                FROM questions q
+                INNER JOIN question_categories qc ON q.id = qc.question_id
+                LEFT JOIN quizzes qz ON q.quiz_id = qz.id -- ম্যানুয়াল প্রশ্নের জন্য (quiz_id IS NULL) এবং কুইজের স্ট্যাটাস চেক করার জন্য
+                WHERE qc.category_id = c.id AND (q.quiz_id IS NULL OR qz.status = 'archived')
                ) as question_count
         FROM categories c
-        GROUP BY c.id, c.name  -- Group by c.id and c.name is still needed
-        HAVING question_count > 0 
+        GROUP BY c.id, c.name  -- প্রশ্ন গণনার জন্য GROUP BY clause এ c.name ও যুক্ত করা হলো
+        HAVING question_count > 0
         ORDER BY c.name ASC";
 
 $result = $conn->query($sql);
@@ -36,7 +38,7 @@ if ($result) {
 }
 
 $page_specific_styles = "
-    .home-category-card { 
+    .home-category-card {
         background-color: var(--bs-tertiary-bg);
         border: 1px solid var(--bs-border-color);
         border-radius: 0.75rem;
@@ -53,20 +55,20 @@ $page_specific_styles = "
         box-shadow: 0 0.5rem 1rem rgba(0,0,0,0.1);
     }
     .home-category-icon {
-        width: 60px; 
+        width: 60px;
         height: 60px;
         border-radius: 50%;
-        background-color: var(--bs-primary); 
-        color: white; 
+        background-color: var(--bs-primary);
+        color: white;
         display: flex;
         align-items: center;
         justify-content: center;
-        font-size: 1.75rem; 
+        font-size: 1.75rem;
         font-weight: bold;
         margin: 0 auto 1rem auto;
-        line-height: 1; 
+        line-height: 1;
     }
-    .home-category-card .card-title { 
+    .home-category-card .card-title {
         font-size: 1.15rem;
         font-weight: 600;
         color: var(--bs-emphasis-color);
@@ -77,7 +79,7 @@ $page_specific_styles = "
         color: var(--bs-secondary-color);
         margin-bottom: 1rem;
     }
-    .home-category-card .btn { 
+    .home-category-card .btn {
         font-size: 0.9rem;
     }
 
@@ -90,7 +92,7 @@ $page_specific_styles = "
     }
     body.dark-mode .home-category-icon {
         background-color: var(--bs-primary-text-emphasis);
-        color: var(--bs-dark-bg-subtle); 
+        color: var(--bs-dark-bg-subtle);
     }
     body.dark-mode .home-category-card .card-title {
         color: var(--bs-light-text-emphasis);
@@ -118,18 +120,18 @@ $page_specific_styles = "
         font-size: 1.1rem;
     }
     
-    @media (max-width: 575.98px) { 
+    @media (max-width: 575.98px) {
         .home-category-card {
             padding: 1rem;
         }
         .home-category-icon {
-            width: 50px; 
+            width: 50px;
             height: 50px;
             font-size: 1.5rem;
             margin-bottom: 0.75rem;
         }
         .home-category-card .card-title {
-            font-size: 1.05rem; 
+            font-size: 1.05rem;
         }
         .home-category-card .btn {
             font-size: 0.85rem;
@@ -161,23 +163,19 @@ require_once 'includes/header.php';
 
     <?php if (!empty($categories)): ?>
         <div class="row row-cols-2 row-cols-sm-2 row-cols-md-3 row-cols-lg-4 g-4">
-            <?php foreach ($categories as $index => $category): 
+            <?php foreach ($categories as $index => $category):
                 // নামের প্রথম অক্ষর
                 $category_initial = mb_substr(trim($category['name']), 0, 1, "UTF-8");
                 if (empty($category_initial) || !preg_match('/\p{L}/u', $category_initial)) {
                     $category_initial = "?";
                 }
-                // ডাইনামিক সলিড কালার (যদি ব্যবহার করতে চান)
-                // $solid_colors অ্যারেটি (যা আগের উত্তরে ছিল) এখানে আবার যোগ করতে পারেন 
-                // এবং $current_solid_color = $solid_colors[$index % count($solid_colors)]; ব্যবহার করতে পারেন
-                // <div class="home-category-card" style="background-color: <?php echo $current_solid_color;
             ?>
                 <div class="col">
-                    <div class="home-category-card"> 
+                    <div class="home-category-card">
                         <div class="home-category-icon">
                             <?php echo htmlspecialchars(strtoupper($category_initial)); ?>
                         </div>
-                        <div> 
+                        <div>
                             <h5 class="card-title"><?php echo htmlspecialchars($category['name']); ?></h5>
                             <p class="question-count">(<?php echo $category['question_count']; ?> টি প্রশ্ন)</p>
                         </div>
