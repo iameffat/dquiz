@@ -8,13 +8,15 @@ require_once '../includes/functions.php';
 $errors = [];
 $success_message = "";
 
-// Define QUESTION_IMAGE_UPLOAD_DIR if not already defined (it's in add_quiz.php)
+// Define QUESTION_IMAGE_UPLOAD_DIR if not already defined
 if (!defined('QUESTION_IMAGE_UPLOAD_DIR')) {
     define('QUESTION_IMAGE_UPLOAD_DIR', '../uploads/question_images/');
 }
 if (!is_dir(QUESTION_IMAGE_UPLOAD_DIR)) {
     if (!mkdir(QUESTION_IMAGE_UPLOAD_DIR, 0777, true) && !is_dir(QUESTION_IMAGE_UPLOAD_DIR)) {
-        $errors[] = "ছবি আপলোডের জন্য ডিরেক্টরি তৈরি করা যায়নি: " . QUESTION_IMAGE_UPLOAD_DIR;
+        // This error should ideally be handled more gracefully, e.g., by disabling image uploads
+        // For now, we'll add it to the $errors array, which will be displayed if it occurs.
+        $errors[] = "ছবি আপলোডের জন্য ডিরেক্টরি তৈরি করা যায়নি বা পারমিশন নেই: " . QUESTION_IMAGE_UPLOAD_DIR;
     }
 }
 
@@ -42,15 +44,22 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['save_manual_question']
     if (empty($selected_category_ids)) {
         $errors[] = "কমপক্ষে একটি ক্যাটাগরি নির্বাচন করতে হবে।";
     }
-    if (count(array_filter(array_map('trim', $options_texts_from_form))) < 2) {
-        $errors[] = "কমপক্ষে দুটি অপশনের লেখা থাকতে হবে।";
+    
+    $valid_options_count = 0;
+    foreach($options_texts_from_form as $opt_text_check) {
+        if (!empty(trim($opt_text_check))) {
+            $valid_options_count++;
+        }
     }
+    if ($valid_options_count < 2) {
+         $errors[] = "কমপক্ষে দুটি অপশনের লেখা থাকতে হবে।";
+    }
+
     if ($correct_option_form_index < 0 || $correct_option_form_index >= count($options_texts_from_form) || empty(trim($options_texts_from_form[$correct_option_form_index])) ) {
         $errors[] = "সঠিক উত্তর নির্বাচন করা হয়নি অথবা নির্বাচিত সঠিক অপশনটি খালি।";
     }
     
     $q_image_url_for_db = NULL;
-    // Image upload validation (similar to add_quiz.php)
     if (isset($_FILES['question_image_url']['name']) && $_FILES['question_image_url']['error'] == UPLOAD_ERR_OK) {
         $file_name_check = $_FILES['question_image_url']['name'];
         $file_size_check = $_FILES['question_image_url']['size'];
@@ -80,9 +89,10 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['save_manual_question']
                 $safe_extensions = ['jpg', 'jpeg', 'png', 'gif', 'webp'];
 
                 if (!in_array($file_ext, $safe_extensions)) {
+                    // This check is a bit redundant due to MIME type check, but good for robustness
                     throw new Exception("অবৈধ ফাইল এক্সটেনশন (" . htmlspecialchars($file_ext) . ")।");
                 }
-                // Using time() and uniqid() for image name to avoid conflicts, similar to add_quiz.php but without quiz_id
+                
                 $new_file_name = "manual_q_img_" . time() . "_" . uniqid('', true) . "." . $file_ext;
                 $upload_path = QUESTION_IMAGE_UPLOAD_DIR . $new_file_name;
 
@@ -97,9 +107,10 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['save_manual_question']
                 }
             }
 
-            // Insert into questions table (quiz_id is NULL, order_number can be 0 or 1 for manual questions)
-            // For manual questions, category_id in the `questions` table itself will be NULL,
-            // as categories are handled by the junction table `question_categories`.
+            // Insert into questions table.
+            // quiz_id and category_id in the 'questions' table are explicitly NULL for these manual questions.
+            // Categories are managed via the 'question_categories' junction table.
+            // order_number is set to 0 by default for manual questions, can be adjusted if specific ordering is needed later.
             $sql_question = "INSERT INTO questions (quiz_id, question_text, image_url, explanation, order_number, category_id) VALUES (NULL, ?, ?, ?, 0, NULL)";
             $stmt_question = $conn->prepare($sql_question);
             if (!$stmt_question) throw new Exception("প্রশ্ন স্টেটমেন্ট প্রস্তুত করতে সমস্যা: " . $conn->error);
@@ -107,7 +118,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['save_manual_question']
             $stmt_question->bind_param("sss", $question_text, $q_image_url_for_db, $question_explanation);
             if (!$stmt_question->execute()) {
                 if($q_image_url_for_db && file_exists(QUESTION_IMAGE_UPLOAD_DIR . basename($q_image_url_for_db))) {
-                    unlink(QUESTION_IMAGE_UPLOAD_DIR . basename($q_image_url_for_db)); // Delete uploaded image if question save fails
+                    unlink(QUESTION_IMAGE_UPLOAD_DIR . basename($q_image_url_for_db));
                 }
                 throw new Exception("প্রশ্ন সংরক্ষণ করতে সমস্যা হয়েছে: " . $stmt_question->error);
             }
@@ -117,7 +128,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['save_manual_question']
             // Insert options
             foreach ($options_texts_from_form as $opt_form_idx => $opt_text) {
                 $option_text_trimmed = trim($opt_text);
-                if (empty($option_text_trimmed)) continue;
+                if (empty($option_text_trimmed)) continue; 
                 $is_correct = ($opt_form_idx == $correct_option_form_index) ? 1 : 0;
 
                 $sql_option = "INSERT INTO options (question_id, option_text, is_correct) VALUES (?, ?, ?)";
@@ -136,12 +147,11 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['save_manual_question']
                 $stmt_q_cat = $conn->prepare($sql_q_cat);
                 if (!$stmt_q_cat) throw new Exception("প্রশ্ন-ক্যাটাগরি স্টেটমেন্ট প্রস্তুত করতে সমস্যা: " . $conn->error);
                 
-                foreach ($selected_category_ids as $cat_id) {
+                foreach ($selected_category_ids as $cat_id_val) {
+                    $cat_id = intval($cat_id_val); // Ensure it's an integer
                     $stmt_q_cat->bind_param("ii", $question_id, $cat_id);
                     if (!$stmt_q_cat->execute()) {
-                        // If a specific category link fails, maybe log it or add to a partial success message
-                        // For simplicity, we'll let it throw an exception to rollback all if one fails
-                         throw new Exception("প্রশ্ন-ক্যাটাগরি লিংক সংরক্ষণ করতে সমস্যা (ID: {$cat_id}): " . $stmt_q_cat->error);
+                         throw new Exception("প্রশ্ন-ক্যাটাগরি লিংক সংরক্ষণ করতে সমস্যা (ক্যাটাগরি ID: {$cat_id}): " . $stmt_q_cat->error);
                     }
                 }
                 $stmt_q_cat->close();
@@ -150,7 +160,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['save_manual_question']
             $conn->commit();
             $_SESSION['flash_message'] = "প্রশ্ন সফলভাবে সংরক্ষণ করা হয়েছে।";
             $_SESSION['flash_message_type'] = "success";
-            header("Location: add_manual_question.php"); // Redirect to same page to add more or show success
+            header("Location: add_manual_question.php"); 
             exit;
 
         } catch (Exception $e) {
@@ -165,7 +175,10 @@ require_once 'includes/header.php';
 <style>
     /* For multi-select */
     .select2-container--bootstrap-5 .select2-selection--multiple .select2-selection__rendered {
-        white-space: normal !important;
+        white-space: normal !important; /* Allow selected items to wrap */
+    }
+     .select2-container--bootstrap-5 .select2-selection--multiple .select2-selection__choice {
+        margin-top: 0.3rem !important; /* Adjust vertical spacing of choices */
     }
     .select2-container--bootstrap-5 .select2-dropdown {
         border-color: var(--bs-border-color);
@@ -179,16 +192,19 @@ require_once 'includes/header.php';
         color: white;
     }
     body.dark-mode .select2-container--bootstrap-5 .select2-selection--multiple {
-        background-color: var(--bs-tertiary-bg-rgb) !important;
+        background-color: var(--bs-secondary-bg) !important; /* Dark mode background for select2 */
         border-color: var(--bs-border-color) !important;
     }
     body.dark-mode .select2-container--bootstrap-5 .select2-selection--multiple .select2-selection__choice {
-        background-color: var(--bs-secondary-bg-subtle) !important;
+        background-color: var(--bs-tertiary-bg) !important; /* Dark mode choice background */
         border-color: var(--bs-border-color) !important;
         color: var(--bs-body-color) !important;
     }
     body.dark-mode .select2-container--bootstrap-5 .select2-selection--multiple .select2-selection__choice__remove {
         color: var(--bs-body-color) !important;
+    }
+     body.dark-mode .select2-container--bootstrap-5 .select2-selection--multiple .select2-selection__choice__remove:hover {
+        color: var(--bs-danger) !important; /* Or another highlight color */
     }
     /* Suggestions Box Styles from add_quiz.php */
     .suggestions-container {
@@ -293,7 +309,7 @@ document.addEventListener('DOMContentLoaded', function () {
         width: '100%'
     });
 
-    // Suggestion logic (copied from add_quiz.php)
+    // Suggestion logic (copied from add_quiz.php / edit_quiz.php)
     let suggestionDebounceTimeout;
     function fetchSuggestions(inputValue, inputType, suggestionsContainerEl, inputFieldEl) {
         if (inputValue.length < 2) {
@@ -335,11 +351,11 @@ document.addEventListener('DOMContentLoaded', function () {
                 const item = document.createElement('div');
                 item.classList.add('suggestion-item');
                 item.textContent = suggestionText;
-                item.addEventListener('mousedown', function (e) {
-                    e.preventDefault();
+                item.addEventListener('mousedown', function (e) { // Use mousedown to fire before blur
+                    e.preventDefault(); // Prevent blur from hiding suggestions before click registers
                     inputFieldEl.value = suggestionText;
                     containerEl.innerHTML = ''; containerEl.style.display = 'none';
-                    inputFieldEl.focus();
+                    inputFieldEl.focus(); // Re-focus the input field
                 });
                 containerEl.appendChild(item);
             });
@@ -348,7 +364,8 @@ document.addEventListener('DOMContentLoaded', function () {
             containerEl.style.display = 'none';
         }
     }
-
+    
+    // Setup for question text
     const questionTextarea = document.getElementById('question_text');
     const suggestionsContainerQuestion = document.getElementById('suggestions_q_text');
     if (questionTextarea && suggestionsContainerQuestion) {
@@ -357,10 +374,12 @@ document.addEventListener('DOMContentLoaded', function () {
         questionTextarea.addEventListener('focus', function () { if(this.value.length >=2) fetchSuggestions(this.value, 'question', suggestionsContainerQuestion, this);});
     }
 
+    // Setup for option inputs
     const optionInputs = document.querySelectorAll('.option-input-suggest');
     optionInputs.forEach((optInput, index) => {
+        // Ensure the suggestion container ID matches what's in the HTML
         const suggestionsContainerOption = document.getElementById(`suggestions_opt_${index}`);
-        if (suggestionsContainerOption) {
+        if (optInput && suggestionsContainerOption) {
             optInput.addEventListener('input', function () { fetchSuggestions(this.value, 'option', suggestionsContainerOption, this); });
             optInput.addEventListener('blur', function () { setTimeout(() => { suggestionsContainerOption.style.display = 'none'; }, 150); });
             optInput.addEventListener('focus', function () { if(this.value.length >=2) fetchSuggestions(this.value, 'option', suggestionsContainerOption, this);});
