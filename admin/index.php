@@ -15,10 +15,8 @@ $sql_total_users = "SELECT COUNT(id) as total FROM users WHERE role='user'";
 $result_total_users = $conn->query($sql_total_users);
 $total_users = ($result_total_users && $result_total_users->num_rows > 0) ? $result_total_users->fetch_assoc()['total'] : 0;
 
-// --- New Data Fetching ---
-
 // 1. Total Quiz Attempts
-$sql_total_attempts = "SELECT COUNT(id) as total FROM quiz_attempts WHERE end_time IS NOT NULL"; // Assuming end_time means completed
+$sql_total_attempts = "SELECT COUNT(id) as total FROM quiz_attempts WHERE end_time IS NOT NULL";
 $result_total_attempts = $conn->query($sql_total_attempts);
 $total_attempts = ($result_total_attempts && $result_total_attempts->num_rows > 0) ? $result_total_attempts->fetch_assoc()['total'] : 0;
 
@@ -47,7 +45,6 @@ $sql_total_study_materials = "SELECT COUNT(id) as total FROM study_materials";
 $result_total_study_materials = $conn->query($sql_total_study_materials);
 $total_study_materials = ($result_total_study_materials && $result_total_study_materials->num_rows > 0) ? $result_total_study_materials->fetch_assoc()['total'] : 0;
 
-// ****** নতুন তথ্য যুক্ত করা হচ্ছে ******
 // 7. Total Categories
 $sql_total_categories = "SELECT COUNT(id) as total FROM categories";
 $result_total_categories = $conn->query($sql_total_categories);
@@ -57,7 +54,18 @@ $total_categories = ($result_total_categories && $result_total_categories->num_r
 $sql_total_manual_questions = "SELECT COUNT(id) as total FROM questions WHERE quiz_id IS NULL";
 $result_total_manual_questions = $conn->query($sql_total_manual_questions);
 $total_manual_questions = ($result_total_manual_questions && $result_total_manual_questions->num_rows > 0) ? $result_total_manual_questions->fetch_assoc()['total'] : 0;
-// ****** নতুন তথ্য যুক্ত করা শেষ ******
+
+// ****** আরও নতুন দুটি তথ্য যুক্ত করা হচ্ছে ******
+// 9. Total Questions in Quizzes (quiz_id IS NOT NULL)
+$sql_total_quiz_questions = "SELECT COUNT(id) as total FROM questions WHERE quiz_id IS NOT NULL";
+$result_total_quiz_questions = $conn->query($sql_total_quiz_questions);
+$total_quiz_questions = ($result_total_quiz_questions && $result_total_quiz_questions->num_rows > 0) ? $result_total_quiz_questions->fetch_assoc()['total'] : 0;
+
+// 10. Active/Ongoing Quiz Attempts (end_time IS NULL)
+$sql_active_attempts = "SELECT COUNT(id) as total FROM quiz_attempts WHERE end_time IS NULL";
+$result_active_attempts = $conn->query($sql_active_attempts);
+$active_attempts_count = ($result_active_attempts && $result_active_attempts->num_rows > 0) ? $result_active_attempts->fetch_assoc()['total'] : 0;
+// ****** আরও নতুন দুটি তথ্য যুক্ত করা শেষ ******
 
 ?>
 
@@ -108,7 +116,7 @@ $total_manual_questions = ($result_total_manual_questions && $result_total_manua
                 <div class="card-body">
                     <div class="row no-gutters align-items-center">
                         <div class="col mr-2">
-                            <div class="text-xs font-weight-bold text-info text-uppercase mb-1">মোট কুইজ এটেম্পট</div>
+                            <div class="text-xs font-weight-bold text-info text-uppercase mb-1">মোট কুইজ এটেম্পট (সম্পন্ন)</div>
                             <div class="h5 mb-0 font-weight-bold text-gray-800"><?php echo $total_attempts; ?> টি</div>
                         </div>
                         <div class="col-auto">
@@ -237,6 +245,38 @@ $total_manual_questions = ($result_total_manual_questions && $result_total_manua
                 </div>
             </div>
         </div>
+
+        <div class="col-xl-3 col-md-6 mb-4">
+            <div class="card border-left-purple shadow h-100 py-2"> <div class="card-body">
+                    <div class="row no-gutters align-items-center">
+                        <div class="col mr-2">
+                            <div class="text-xs font-weight-bold text-purple text-uppercase mb-1">কুইজে থাকা মোট প্রশ্ন</div>
+                            <div class="h5 mb-0 font-weight-bold text-gray-800"><?php echo $total_quiz_questions; ?> টি</div>
+                        </div>
+                        <div class="col-auto">
+                            <i class="fas fa-tasks fa-2x text-gray-300"></i>
+                        </div>
+                    </div>
+                    <a href="manage_quizzes.php" class="stretched-link text-decoration-none"><small class="text-muted">কুইজগুলো দেখুন &rarr;</small></a>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-xl-3 col-md-6 mb-4">
+            <div class="card border-left-orange shadow h-100 py-2"> <div class="card-body">
+                    <div class="row no-gutters align-items-center">
+                        <div class="col mr-2">
+                            <div class="text-xs font-weight-bold text-orange text-uppercase mb-1">চলমান কুইজ সেশন</div>
+                            <div class="h5 mb-0 font-weight-bold text-gray-800"><?php echo $active_attempts_count; ?> টি</div>
+                        </div>
+                        <div class="col-auto">
+                            <i class="fas fa-hourglass-half fa-2x text-gray-300"></i>
+                        </div>
+                    </div>
+                     <a href="manage_quizzes.php" class="stretched-link text-decoration-none"><small class="text-muted">সেশন বিস্তারিত দেখতে কুইজ ম্যানেজমেন্টে যান</small></a>
+                </div>
+            </div>
+        </div>
         </div>
 
     <div class="row mt-3">
@@ -264,13 +304,17 @@ $total_manual_questions = ($result_total_manual_questions && $result_total_manua
     .card.border-left-danger { border-left: .25rem solid #e74a3b!important; }
     .card.border-left-secondary { border-left: .25rem solid #858796!important; }
     .card.border-left-dark { border-left: .25rem solid #5a5c69!important; }
+    /* নতুন রঙ যুক্ত করা হলো */
+    .card.border-left-purple { border-left: .25rem solid #6f42c1!important; } /* পার্পেল */
+    .text-purple { color: #6f42c1!important; }
+    .card.border-left-orange { border-left: .25rem solid #fd7e14!important; } /* কমলা */
+    .text-orange { color: #fd7e14!important; }
 
 
     .text-xs { font-size: .8rem; }
     .text-gray-300 { color: #dddfeb!important; }
-    /* Ensure text-gray-800 is legible in dark mode if it's not handled by theme switcher CSS */
     body:not(.dark-mode) .text-gray-800 { color: #5a5c69!important; }
-    body.dark-mode .text-gray-800 { color: var(--body-color)!important; } /* Use body color for dark mode */
+    body.dark-mode .text-gray-800 { color: var(--body-color)!important; }
 
     .shadow { box-shadow: 0 .15rem 1.75rem 0 rgba(58,59,69,.15)!important; }
     .h-100 { height: 100%!important; }
@@ -282,11 +326,8 @@ $total_manual_questions = ($result_total_manual_questions && $result_total_manua
     .mb-1 { margin-bottom: .25rem!important; }
     .mb-0 { margin-bottom: 0!important; }
     .font-weight-bold { font-weight: 700!important; }
-    /* Font Awesome icons (ensure you have Font Awesome linked in header.php for these to work) */
-    /* Alternatively, use Bootstrap Icons or SVG if preferred */
-    .fa-list, .fa-users, .fa-file-alt, .fa-question-circle, .fa-broadcast-tower, .fa-pencil-ruler, .fa-archive, .fa-book-open, .fa-tags, .fa-file-signature {
-        /* Basic styling if you use Font Awesome classes directly */
-    }
+    /* Font Awesome icons */
+    /* .fa-list, .fa-users, ..., .fa-tags, .fa-file-signature, .fa-tasks, .fa-hourglass-half */
 </style>
 <?php
 if (isset($conn) && $conn instanceof mysqli) {
