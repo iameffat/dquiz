@@ -6,7 +6,7 @@ require_once 'includes/auth_check.php';
 require_once '../includes/functions.php';
 
 $quiz_id = isset($_GET['quiz_id']) ? intval($_GET['quiz_id']) : 0;
-$admin_base_url = ''; // যেহেতু এই ফাইলটি admin ফোল্ডারের রুটে আছে
+$admin_base_url = '';
 
 if ($quiz_id <= 0) {
     $_SESSION['flash_message'] = "অবৈধ কুইজ ID.";
@@ -15,32 +15,36 @@ if ($quiz_id <= 0) {
     exit;
 }
 
-// Fetch quiz details
+// Fetch quiz details (অপরিবর্তিত)
 $quiz_info = null;
 $sql_quiz_info = "SELECT id, title FROM quizzes WHERE id = ?";
 $stmt_quiz_info = $conn->prepare($sql_quiz_info);
-if (!$stmt_quiz_info) {
+// ... (বাকি কোড অপরিবর্তিত) ...
+if ($stmt_quiz_info) {
+    $stmt_quiz_info->bind_param("i", $quiz_id);
+    $stmt_quiz_info->execute();
+    $result_quiz_info = $stmt_quiz_info->get_result();
+    if ($result_quiz_info->num_rows === 1) {
+        $quiz_info = $result_quiz_info->fetch_assoc();
+        $page_title = "ফলাফল: " . htmlspecialchars($quiz_info['title']);
+    } else {
+        $_SESSION['flash_message'] = "কুইজ (ID: {$quiz_id}) খুঁজে পাওয়া যায়নি।";
+        $_SESSION['flash_message_type'] = "danger";
+        header("Location: manage_quizzes.php");
+        exit;
+    }
+    $stmt_quiz_info->close();
+} else {
     error_log("Quiz info prepare failed: " . $conn->error);
     $_SESSION['flash_message'] = "একটি অপ্রত্যাশিত ত্রুটি ঘটেছে।";
     $_SESSION['flash_message_type'] = "danger";
     header("Location: manage_quizzes.php");
     exit;
 }
-$stmt_quiz_info->bind_param("i", $quiz_id);
-$stmt_quiz_info->execute();
-$result_quiz_info = $stmt_quiz_info->get_result();
-if ($result_quiz_info->num_rows === 1) {
-    $quiz_info = $result_quiz_info->fetch_assoc();
-    $page_title = "ফলাফল: " . htmlspecialchars($quiz_info['title']);
-} else {
-    $_SESSION['flash_message'] = "কুইজ (ID: {$quiz_id}) খুঁজে পাওয়া যায়নি।";
-    $_SESSION['flash_message_type'] = "danger";
-    header("Location: manage_quizzes.php");
-    exit;
-}
-$stmt_quiz_info->close();
 
-// Handle Cancel/Reinstate/Delete Attempt Action (এই অংশ অপরিবর্তিত থাকবে)
+
+// Handle Cancel/Reinstate/Delete Attempt Action (অপরিবর্তিত)
+// ... (সম্পূর্ণ ডিলিট/ক্যানসেল/রিইনস্টেট লজিক এখানে থাকবে) ...
 if (isset($_GET['action']) && isset($_GET['attempt_id'])) {
     $action = $_GET['action'];
     $attempt_id_to_manage = intval($_GET['attempt_id']);
@@ -113,16 +117,16 @@ if (isset($_GET['action']) && isset($_GET['attempt_id'])) {
 }
 
 
-// Fetch all completed attempts for this quiz
+// Fetch all completed attempts for this quiz (অপরিবর্তিত)
 $attempts_data = [];
 $ip_counts = [];
-
+// ... (SQL কোড অপরিবর্তিত) ...
 $sql_attempts = "
     SELECT
         qa.id as attempt_id,
         qa.user_id,
         u.name as user_name,
-        u.email as user_email, -- ইমেইল যুক্ত করা হলো
+        u.email as user_email,
         qa.score,
         qa.time_taken_seconds,
         qa.submitted_at,
@@ -154,6 +158,9 @@ if ($stmt_attempts) {
     error_log("Attempts fetch prepare failed: " . $conn->error);
 }
 
+
+// Find highest score (অপরিবর্তিত)
+// ... (কোড অপরিবর্তিত) ...
 $highest_score = null;
 if (!empty($attempts_data)) {
     $non_cancelled_scores = [];
@@ -167,7 +174,8 @@ if (!empty($attempts_data)) {
     }
 }
 
-// Function to mask email for privacy print
+// Function to mask email (অপরিবর্তিত)
+// ... (কোড অপরিবর্তিত) ...
 function mask_email_for_print($email) {
     if (empty($email) || strpos($email, '@') === false) {
         return 'N/A';
@@ -182,7 +190,6 @@ function mask_email_for_print($email) {
     }
     return $masked_user . '@' . $domain;
 }
-
 
 require_once 'includes/header.php';
 ?>
@@ -241,23 +248,19 @@ require_once 'includes/header.php';
         a[href]:after {
             content: none !important;
         }
-        .print-only-email, .print-only-name { display: none; } /* Default print: hide both */
+        .print-only-email, .print-only-name { display: none; }
 
-        /* Conditional display based on print mode */
-        body.print-privacy .print-only-email { display: table-cell !important; } /* Show email in privacy mode */
-        body:not(.print-privacy) .print-only-name { display: table-cell !important; } /* Show name in normal print */
+        body.print-privacy .print-only-email { display: table-cell !important; }
+        body:not(.print-privacy) .print-only-name { display: table-cell !important; }
 
-        /* Hide name column in privacy print, and email column in normal print */
         body.print-privacy .participant-col-print-name { display: none !important; }
         body:not(.print-privacy) .participant-col-print-email { display: none !important; }
 
-        /* Page break for table rows */
         .table tbody tr {
-            page-break-inside: avoid;
+            page-break-inside: avoid; /* একটি সারির মধ্যে পেজব্রেক না করার চেষ্টা করবে */
         }
-        .page-break-after {
-            page-break-after: always;
-        }
+        /* নিচের page-break-after ক্লাসটি আর PHP থেকে সরাসরি যুক্ত করা হবে না */
+        /* .page-break-after { page-break-after: always; } */
     }
     .ip-alert-icon {
         cursor: help;
@@ -351,9 +354,10 @@ require_once 'includes/header.php';
                             $last_score = -INF;
                             $last_time = -INF;
                             $display_rank = 0;
-                            $row_counter = 0; // পেজব্রেকের জন্য কাউন্টার
+                            // $row_counter = 0; // পেজব্রেকের জন্য কাউন্টার আর প্রয়োজন নেই
+
                             foreach ($attempts_data as $index => $attempt):
-                                $row_counter++;
+                                // $row_counter++; // এই লাইনটির আর প্রয়োজন নেই
                                 if (!$attempt['is_cancelled'] && $attempt['score'] !== null) {
                                     $rank++;
                                     if ($attempt['score'] != $last_score || $attempt['time_taken_seconds'] != $last_time) {
@@ -398,16 +402,18 @@ require_once 'includes/header.php';
                                 if (!empty($attempt['os_platform'])) { $device_browser_info_screen .= ($device_browser_info_screen ? ' <small class="text-muted">(' . htmlspecialchars($attempt['os_platform']) . ')</small>' : htmlspecialchars($attempt['os_platform'])); }
                                 if (empty($device_browser_info_screen)) { $device_browser_info_screen = 'N/A'; }
 
-                                // পেজব্রেকের জন্য ক্লাস যুক্ত করা
-                                if ($row_counter % 25 == 0 && $row_counter < count($attempts_data)) {
-                                    $row_class .= ' page-break-after';
-                                }
+                                // পেজব্রেকের জন্য ক্লাস যুক্ত করার কোড সরানো হয়েছে
+                                // if ($row_counter % 25 == 0 && $row_counter < count($attempts_data)) {
+                                //     $row_class .= ' page-break-after';
+                                // }
                             ?>
                             <tr class="<?php echo trim($row_class); ?>">
                                 <td><?php echo (!$attempt['is_cancelled'] && $attempt['score'] !== null) ? $display_rank : 'N/A'; ?></td>
-                                <td class="participant-col-print-name print-only-name"> <?php echo htmlspecialchars($attempt['user_name']); ?> (ID: <?php echo $attempt['user_id']; ?>)
+                                <td class="participant-col-print-name print-only-name">
+                                    <?php echo htmlspecialchars($attempt['user_name']); ?> (ID: <?php echo $attempt['user_id']; ?>)
                                 </td>
-                                <td class="participant-col-print-email print-only-email" style="display:none;"> <?php echo htmlspecialchars(mask_email_for_print($attempt['user_email'])); ?> (ID: <?php echo $attempt['user_id']; ?>)
+                                <td class="participant-col-print-email print-only-email" style="display:none;">
+                                    <?php echo htmlspecialchars(mask_email_for_print($attempt['user_email'])); ?> (ID: <?php echo $attempt['user_id']; ?>)
                                 </td>
                                 <td><?php echo $attempt['score'] !== null ? number_format($attempt['score'], 2) : 'N/A'; ?></td>
                                 <td><?php echo $attempt['time_taken_seconds'] ? format_seconds_to_hms($attempt['time_taken_seconds']) : 'N/A'; ?></td>
@@ -435,34 +441,27 @@ require_once 'includes/header.php';
         const printTitleElement = document.querySelector('h1.print-title');
         const bodyElement = document.body;
 
-        // ক্লাস যুক্ত/সরে ফেলার আগে প্রিন্ট টাইটেল দেখান
         if (printTitleElement) {
             printTitleElement.style.display = 'block';
         }
 
-        // প্রিন্ট মোড অনুযায়ী ক্লাস সেট করুন
         if (printMode === 'email') {
             bodyElement.classList.add('print-privacy');
-            // নাম কলাম হাইড করুন, ইমেইল কলাম দেখান
             document.querySelectorAll('.participant-col-print-name').forEach(el => el.style.display = 'none');
             document.querySelectorAll('.participant-col-print-email').forEach(el => el.style.display = 'table-cell');
-        } else { // 'name' or default
+        } else { 
             bodyElement.classList.remove('print-privacy');
-            // ইমেইল কলাম হাইড করুন, নাম কলাম দেখান
             document.querySelectorAll('.participant-col-print-email').forEach(el => el.style.display = 'none');
             document.querySelectorAll('.participant-col-print-name').forEach(el => el.style.display = 'table-cell');
         }
         
         window.print();
 
-        // প্রিন্টের পর ডিফল্ট অবস্থায় ফিরিয়ে আনুন (ঐচ্ছিক, কারণ @media print স্টাইল শুধু প্রিন্টের সময় কাজ করে)
-        // তবে, যদি জাভাস্ক্রিপ্ট দিয়ে সরাসরি স্টাইল পরিবর্তন করেন, তাহলে এটি দরকার
         setTimeout(() => {
             if (printTitleElement) { printTitleElement.style.display = 'none'; }
-            // যদি স্ক্রিনেও কলাম লুকাতে চান, তাহলে এখানে আগের অবস্থায় ফিরিয়ে আনার কোড লিখুন
-            // bodyElement.classList.remove('print-privacy');
-            // document.querySelectorAll('.participant-col-print-name').forEach(el => el.style.display = ''); // Reset to default
-            // document.querySelectorAll('.participant-col-print-email').forEach(el => el.style.display = 'none'); // Reset to default
+            // Reset to default view after print dialog if needed (usually CSS @media print handles this)
+            // document.querySelectorAll('.participant-col-print-name').forEach(el => el.style.display = ''); 
+            // document.querySelectorAll('.participant-col-print-email').forEach(el => el.style.display = 'none');
         }, 500); 
     }
 </script>
