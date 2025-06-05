@@ -1,17 +1,16 @@
 <?php
-// results.php
+// $page_title is set after fetching quiz details
 $base_url = ''; // Root directory
 require_once 'includes/db_connect.php';
 require_once 'includes/functions.php';
 
 // Check if user is logged in
 if (!isset($_SESSION["loggedin"]) || $_SESSION["loggedin"] !== true) {
-    $redirect_url = 'quizzes.php'; // Default redirect
-    $attempt_id_get = isset($_GET['attempt_id']) ? intval($_GET['attempt_id']) : (isset($_POST['attempt_id']) ? intval($_POST['attempt_id']) : null);
-    $quiz_id_get = isset($_GET['quiz_id']) ? intval($_GET['quiz_id']) : (isset($_POST['quiz_id']) ? intval($_POST['quiz_id']) : null);
-
-    if ($attempt_id_get && $quiz_id_get) {
-        $redirect_url = 'results.php?attempt_id=' . $attempt_id_get . '&quiz_id=' . $quiz_id_get;
+    $redirect_url = 'quizzes.php';
+    if (isset($_GET['attempt_id']) && isset($_GET['quiz_id'])) {
+        $redirect_url = 'results.php?attempt_id=' . intval($_GET['attempt_id']) . '&quiz_id=' . intval($_GET['quiz_id']);
+    } elseif (isset($_POST['attempt_id']) && isset($_POST['quiz_id'])) {
+         $redirect_url = 'results.php?attempt_id=' . intval($_POST['attempt_id']) . '&quiz_id=' . intval($_POST['quiz_id']);
     }
     $_SESSION['redirect_url_user'] = $redirect_url;
     header("location: login.php");
@@ -21,25 +20,24 @@ if (!isset($_SESSION["loggedin"]) || $_SESSION["loggedin"] !== true) {
 $user_id = $_SESSION['user_id']; // User ID from session
 $quiz_id = 0;
 $attempt_id = 0;
-
-$total_score = 0;
+$total_score = 0; 
 $total_questions_in_quiz = 0;
 $time_taken_seconds = null;
 $feedback_message = "";
 $feedback_class = "";
 $quiz_info_result = null;
 $review_questions = [];
-$page_title = "কুইজের ফলাফল";
+$page_title = "কুইজের ফলাফল"; 
 
-// Chart data variables
+// New variables for chart data
 $correct_answers_count_for_chart = 0;
 $incorrect_answers_count_for_chart = 0;
 $unanswered_questions_count_for_chart = 0;
 
+
 // Function to fetch and prepare result display data
 function prepare_results_data($conn, $current_attempt_id, $current_quiz_id, $current_user_id) {
-    // Make chart variables global so this function can set them
-    global $correct_answers_count_for_chart, $incorrect_answers_count_for_chart, $unanswered_questions_count_for_chart;
+    global $correct_answers_count_for_chart, $incorrect_answers_count_for_chart, $unanswered_questions_count_for_chart; // Make global to set them
 
     $display_data = [
         'success' => false,
@@ -53,56 +51,34 @@ function prepare_results_data($conn, $current_attempt_id, $current_quiz_id, $cur
         'quiz_info_result' => null,
         'review_questions' => [],
         'page_title' => "কুইজের ফলাফল",
-        'correct_answers_count' => 0,
-        'incorrect_answers_count_raw' => 0,
-        'unanswered_questions_count' => 0
+        'correct_answers_count' => 0, // For chart
+        'incorrect_answers_count_raw' => 0, // For chart
+        'unanswered_questions_count' => 0 // For chart
     ];
 
     // Fetch attempt details
-    $sql_attempt = "SELECT score, time_taken_seconds, user_id, end_time FROM quiz_attempts WHERE id = ? AND quiz_id = ?";
+    $sql_attempt = "SELECT score, time_taken_seconds, user_id FROM quiz_attempts WHERE id = ? AND quiz_id = ?";
     $stmt_attempt = $conn->prepare($sql_attempt);
     if (!$stmt_attempt) {
-        error_log("Prepare failed for attempt details: (" . $conn->errno . ") " . $conn->error);
-        $_SESSION['flash_message'] = "ফলাফল দেখাতে ডেটাবেস সমস্যা হয়েছে। (E101)";
+        $_SESSION['flash_message'] = "ফলাফল দেখাতে ডেটাবেস সমস্যা হয়েছে। (Attempt Prepare)";
         $_SESSION['flash_message_type'] = "danger";
         return $display_data;
     }
     $stmt_attempt->bind_param("ii", $current_attempt_id, $current_quiz_id);
-    if (!$stmt_attempt->execute()) {
-        error_log("Execute failed for attempt details: (" . $stmt_attempt->errno . ") " . $stmt_attempt->error);
-        $stmt_attempt->close();
-        $_SESSION['flash_message'] = "ফলাফল দেখাতে ডেটাবেস সমস্যা হয়েছে। (E102)";
-        $_SESSION['flash_message_type'] = "danger";
-        return $display_data;
-    }
+    $stmt_attempt->execute();
     $result_attempt = $stmt_attempt->get_result();
 
     if ($result_attempt->num_rows === 1) {
         $attempt_data = $result_attempt->fetch_assoc();
 
-        // Security check: Ensure the logged-in user owns this attempt, or is an admin
-        if (!(isset($_SESSION['role']) && $_SESSION['role'] === 'admin') && $attempt_data['user_id'] != $current_user_id) {
+        if (isset($_SESSION['role']) && $_SESSION['role'] === 'admin') {
+            // Admin can view any result
+        } elseif ($attempt_data['user_id'] != $current_user_id) {
             $_SESSION['flash_message'] = "আপনি এই কুইজের ফলাফল দেখার জন্য অনুমোদিত নন।";
             $_SESSION['flash_message_type'] = "warning";
-            // To prevent further execution and potential redirect loop, return data with success=false
-            // The calling script will handle the redirect to quizzes.php
-            return $display_data;
-        }
-        
-        // Check if the quiz was actually completed
-        if ($attempt_data['end_time'] === null && $attempt_data['score'] === null && !($_SESSION['role'] === 'admin')) {
-            // Quiz was started but not finished, redirect to quiz page with attempt ID if not admin
-            $_SESSION['flash_message'] = "আপনি এই কুইজটি এখনো সম্পন্ন করেননি। অনুগ্রহ করে কুইজটি সম্পন্ন করুন।";
-            $_SESSION['flash_message_type'] = "info";
-             // For safety, we might not want to redirect to quiz_page.php if it's live and time is up.
-             // Instead, maybe show a message on results.php or redirect to quizzes.php
-             // For now, let's assume if it's not finished, it should be retakable from quiz_page
-             // This logic might need refinement based on business rules for unfinished attempts.
-            // Let's make it redirect to quizzes.php to avoid taking an unfinished quiz again automatically
             header("Location: quizzes.php");
             exit;
         }
-
 
         $display_data['total_score'] = $attempt_data['score'];
         $display_data['time_taken_seconds'] = $attempt_data['time_taken_seconds'];
@@ -113,37 +89,31 @@ function prepare_results_data($conn, $current_attempt_id, $current_quiz_id, $cur
                           WHERE q.id = ?
                           GROUP BY q.id";
         $stmt_quiz_info = $conn->prepare($quiz_info_sql);
-        if (!$stmt_quiz_info) {
-            error_log("Prepare failed for quiz info: (" . $conn->errno . ") " . $conn->error);
-            $_SESSION['flash_message'] = "ফলাফল দেখাতে ডেটাবেস সমস্যা হয়েছে। (E103)";
-            $_SESSION['flash_message_type'] = "danger";
-            return $display_data;
+         if (!$stmt_quiz_info) {
+             $_SESSION['flash_message'] = "ফলাফল দেখাতে ডেটাবেস সমস্যা হয়েছে। (QuizInfo Prepare)";
+             $_SESSION['flash_message_type'] = "danger";
+             return $display_data;
         }
         $stmt_quiz_info->bind_param("i", $current_quiz_id);
-        if (!$stmt_quiz_info->execute()) {
-            error_log("Execute failed for quiz info: (" . $stmt_quiz_info->errno . ") " . $stmt_quiz_info->error);
-            $stmt_quiz_info->close();
-            $_SESSION['flash_message'] = "ফলাফল দেখাতে ডেটাবেস সমস্যা হয়েছে। (E104)";
-            $_SESSION['flash_message_type'] = "danger";
-            return $display_data;
-        }
+        $stmt_quiz_info->execute();
         $quiz_info_res = $stmt_quiz_info->get_result()->fetch_assoc();
         $stmt_quiz_info->close();
 
         if ($quiz_info_res) {
             $display_data['quiz_info_result'] = $quiz_info_res;
             $display_data['page_title'] = "ফলাফল: " . htmlspecialchars($quiz_info_res['title']);
-            $display_data['total_questions_in_quiz'] = (int)$quiz_info_res['total_questions'];
+            $display_data['total_questions_in_quiz'] = $quiz_info_res['total_questions'];
         } else {
-            $_SESSION['flash_message'] = "কুইজের তথ্য পাওয়া যায়নি। (E105)";
+            $_SESSION['flash_message'] = "কুইজের তথ্য পাওয়া যায়নি।";
             $_SESSION['flash_message_type'] = "warning";
             return $display_data;
         }
-        
+
         // Fetch answer stats for chart
         $sql_answer_stats = "SELECT
                                 SUM(CASE WHEN is_correct = 1 THEN 1 ELSE 0 END) as correct_count,
-                                SUM(CASE WHEN is_correct = 0 AND selected_option_id IS NOT NULL THEN 1 ELSE 0 END) as incorrect_count
+                                SUM(CASE WHEN is_correct = 0 AND selected_option_id IS NOT NULL THEN 1 ELSE 0 END) as incorrect_count,
+                                SUM(CASE WHEN selected_option_id IS NULL THEN 1 ELSE 0 END) as unanswered_count
                              FROM user_answers
                              WHERE attempt_id = ?";
         $stmt_answer_stats = $conn->prepare($sql_answer_stats);
@@ -156,24 +126,23 @@ function prepare_results_data($conn, $current_attempt_id, $current_quiz_id, $cur
             $display_data['correct_answers_count'] = intval($result_answer_stats['correct_count'] ?? 0);
             $display_data['incorrect_answers_count_raw'] = intval($result_answer_stats['incorrect_count'] ?? 0);
             
+            // Ensure total consistency for unanswered
             $answered_count = $display_data['correct_answers_count'] + $display_data['incorrect_answers_count_raw'];
             $display_data['unanswered_questions_count'] = $display_data['total_questions_in_quiz'] - $answered_count;
-            
-            if ($display_data['unanswered_questions_count'] < 0) { // Safety check
-                $display_data['unanswered_questions_count'] = 0;
+            if ($display_data['unanswered_questions_count'] < 0) {
+                $display_data['unanswered_questions_count'] = 0; // Safety check
             }
 
-            // Set global chart variables
+            // Set global variables for chart (needed for cases where extract might not cover them before script)
             $correct_answers_count_for_chart = $display_data['correct_answers_count'];
             $incorrect_answers_count_for_chart = $display_data['incorrect_answers_count_raw'];
             $unanswered_questions_count_for_chart = $display_data['unanswered_questions_count'];
 
         } else {
-            error_log("Prepare failed for answer stats: (" . $conn->errno . ") " . $conn->error);
-            // Initialize chart data to 0 or based on total questions if statement fails
-            $correct_answers_count_for_chart = 0;
-            $incorrect_answers_count_for_chart = 0;
-            $unanswered_questions_count_for_chart = $display_data['total_questions_in_quiz'];
+            // Error preparing statement, initialize to 0 or handle
+            $display_data['correct_answers_count'] = 0;
+            $display_data['incorrect_answers_count_raw'] = 0;
+            $display_data['unanswered_questions_count'] = $display_data['total_questions_in_quiz'];
         }
 
 
@@ -203,35 +172,24 @@ function prepare_results_data($conn, $current_attempt_id, $current_quiz_id, $cur
         ";
         $stmt_review = $conn->prepare($sql_review);
         if (!$stmt_review) {
-            error_log("Prepare failed for review questions: (" . $conn->errno . ") " . $conn->error);
-            $_SESSION['flash_message'] = "ফলাফল পর্যালোচনা প্রস্তুত করতে সমস্যা হয়েছে। (E106)";
+            $_SESSION['flash_message'] = "ফলাফল পর্যালোচনা প্রস্তুত করতে সমস্যা হয়েছে। (Review Prepare)";
             $_SESSION['flash_message_type'] = "danger";
             return $display_data;
         }
         $stmt_review->bind_param("ii", $current_attempt_id, $current_quiz_id);
-        if (!$stmt_review->execute()) {
-             error_log("Execute failed for review questions: (" . $stmt_review->errno . ") " . $stmt_review->error);
-            $stmt_review->close();
-            $_SESSION['flash_message'] = "ফলাফল পর্যালোচনা করতে সমস্যা হয়েছে। (E107)";
-             $_SESSION['flash_message_type'] = "danger";
-            return $display_data;
-        }
+        $stmt_review->execute();
         $result_review = $stmt_review->get_result();
         while ($row = $result_review->fetch_assoc()) {
             $options_array = [];
             if (!empty($row['all_options_details'])) {
                 $options_parts = explode('||', $row['all_options_details']);
                 foreach($options_parts as $opt_part) {
-                    // Ensure enough parts exist before trying to access them
-                    $exploded_opt = explode('::', $opt_part, 3);
-                    if (count($exploded_opt) === 3) {
-                        list($opt_id, $opt_text, $opt_is_correct) = $exploded_opt;
-                        $options_array[] = [
-                            'id' => $opt_id,
-                            'text' => $opt_text,
-                            'is_correct' => $opt_is_correct
-                        ];
-                    }
+                    list($opt_id, $opt_text, $opt_is_correct) = explode('::', $opt_part, 3);
+                    $options_array[] = [
+                        'id' => $opt_id,
+                        'text' => $opt_text,
+                        'is_correct' => $opt_is_correct
+                    ];
                 }
             }
             $row['options_list'] = $options_array;
@@ -241,17 +199,27 @@ function prepare_results_data($conn, $current_attempt_id, $current_quiz_id, $cur
         $display_data['success'] = true;
 
     } else {
-        $_SESSION['flash_message'] = "কুইজের প্রচেষ্টা খুঁজে পাওয়া যায়নি। (E108)";
+        $_SESSION['flash_message'] = "কুইজের প্রচেষ্টা খুঁজে পাওয়া যায়নি ।";
         $_SESSION['flash_message_type'] = "warning";
     }
     $stmt_attempt->close();
     return $display_data;
 }
 
+
+// Handles quiz submission
 if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['quiz_id']) && isset($_POST['attempt_id'])) {
     $quiz_id = intval($_POST['quiz_id']);
     $attempt_id = intval($_POST['attempt_id']);
-    
+    // ... (rest of your POST handling code remains largely the same) ...
+    // Ensure that after successful commit and before redirect/display:
+    // $results_display_data = prepare_results_data($conn, $attempt_id, $quiz_id, $user_id);
+    // if ($results_display_data['success']) {
+    //     extract($results_display_data); // This will make $correct_answers_count etc. available
+    // }
+    // ...
+
+    // Calculate time taken
     $end_time_dt = new DateTime();
     $end_time = $end_time_dt->format('Y-m-d H:i:s');
     $time_taken_seconds = null;
@@ -277,7 +245,8 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['quiz_id']) && isset($_
     $stmt_all_q_count->execute();
     $total_questions_in_quiz_from_db = $stmt_all_q_count->get_result()->fetch_assoc()['total_q'];
     $stmt_all_q_count->close();
-    $total_questions_in_quiz = (int)$total_questions_in_quiz_from_db;
+    $total_questions_in_quiz = $total_questions_in_quiz_from_db;
+
 
     $conn->begin_transaction();
     try {
@@ -286,9 +255,8 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['quiz_id']) && isset($_
                                   JOIN options o ON q.id = o.question_id
                                   WHERE q.quiz_id = ?";
         $stmt_qo = $conn->prepare($sql_questions_options);
-        if(!$stmt_qo) throw new Exception("Statement preparation failed (questions_options): " . $conn->error);
         $stmt_qo->bind_param("i", $quiz_id);
-        if(!$stmt_qo->execute()) throw new Exception("Statement execution failed (questions_options): " . $stmt_qo->error);
+        $stmt_qo->execute();
         $qo_results = $stmt_qo->get_result();
         $correct_options_map = []; 
         $all_questions_map = [];   
@@ -315,20 +283,17 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['quiz_id']) && isset($_
                 }
             }
             
-            $stmt_insert_answer_final = null;
             if ($selected_option_id === null) { 
                  $stmt_insert_answer_final = $conn->prepare("INSERT INTO user_answers (attempt_id, question_id, selected_option_id, is_correct) VALUES (?, ?, NULL, ?)");
-                 if(!$stmt_insert_answer_final) throw new Exception("ব্যবহারকারীর উত্তর সংরক্ষণ স্টেটমেন্ট প্রস্তুত করতে সমস্যা হয়েছে (NULL): " . $conn->error);
+                 if(!$stmt_insert_answer_final) throw new Exception("ব্যবহারকারীর উত্তর সংরক্ষণ स्टेटमेंट প্রস্তুত করতে সমস্যা হয়েছে (NULL): " . $conn->error);
                  $stmt_insert_answer_final->bind_param("iii", $attempt_id, $question_id_loop, $is_correct_answer_for_db);
             } else { 
                  $stmt_insert_answer_final = $conn->prepare("INSERT INTO user_answers (attempt_id, question_id, selected_option_id, is_correct) VALUES (?, ?, ?, ?)");
-                 if(!$stmt_insert_answer_final) throw new Exception("ব্যবহারকারীর উত্তর সংরক্ষণ স্টেটমেন্ট প্রস্তুত করতে সমস্যা হয়েছে: " . $conn->error);
+                 if(!$stmt_insert_answer_final) throw new Exception("ব্যবহারকারীর উত্তর সংরক্ষণ स्टेटमेंट প্রস্তুত করতে সমস্যা হয়েছে: " . $conn->error);
                  $stmt_insert_answer_final->bind_param("iiii", $attempt_id, $question_id_loop, $selected_option_id, $is_correct_answer_for_db);
             }
             if (!$stmt_insert_answer_final->execute()) {
-                $error_to_throw = $stmt_insert_answer_final->error;
-                $stmt_insert_answer_final->close();
-                throw new Exception("ব্যবহারকারীর উত্তর সংরক্ষণ করতে সমস্যা হয়েছে (প্রশ্ন ID: $question_id_loop): " . $error_to_throw);
+                throw new Exception("ব্যবহারকারীর উত্তর সংরক্ষণ করতে সমস্যা হয়েছে (প্রশ্ন ID: $question_id_loop): " . $stmt_insert_answer_final->error);
             }
             $stmt_insert_answer_final->close();
         }
@@ -339,26 +304,24 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['quiz_id']) && isset($_
 
         $sql_update_attempt = "UPDATE quiz_attempts SET score = ?, end_time = ?, time_taken_seconds = ?, submitted_at = NOW() WHERE id = ? AND user_id = ?";
         $stmt_update_attempt = $conn->prepare($sql_update_attempt);
-        if(!$stmt_update_attempt) throw new Exception("Statement preparation failed (update_attempt): " . $conn->error);
         $stmt_update_attempt->bind_param("dsiii", $total_score, $end_time, $time_taken_seconds, $attempt_id, $user_id);
         if (!$stmt_update_attempt->execute()) {
-             $error_to_throw = $stmt_update_attempt->error;
-             $stmt_update_attempt->close();
-             throw new Exception("কুইজের চেষ্টা আপডেট করতে সমস্যা হয়েছে: " . $error_to_throw);
+             throw new Exception("কুইজের চেষ্টা আপডেট করতে সমস্যা হয়েছে: " . $stmt_update_attempt->error);
         }
         $stmt_update_attempt->close();
+
         $conn->commit();
 
+        // After commit, fetch all data for display using the common function
         $results_display_data = prepare_results_data($conn, $attempt_id, $quiz_id, $user_id);
         if ($results_display_data['success']) {
             extract($results_display_data); 
+            // Set global chart variables explicitly after extract for POST case
             $correct_answers_count_for_chart = $results_display_data['correct_answers_count'];
             $incorrect_answers_count_for_chart = $results_display_data['incorrect_answers_count_raw'];
             $unanswered_questions_count_for_chart = $results_display_data['unanswered_questions_count'];
+
         } else {
-            // Fallback if prepare_results_data fails after POST
-            $_SESSION['flash_message'] = $_SESSION['flash_message'] ?? "ফলাফল দেখাতে একটি সমস্যা হয়েছে। (E109)";
-            $_SESSION['flash_message_type'] = $_SESSION['flash_message_type'] ?? "danger";
             header("Location: quizzes.php");
             exit;
         }
@@ -373,6 +336,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['quiz_id']) && isset($_
     }
 
 } elseif ($_SERVER["REQUEST_METHOD"] == "GET" && isset($_GET['attempt_id']) && isset($_GET['quiz_id'])) {
+    // This part is for viewing results of a previously completed quiz
     $attempt_id = intval($_GET['attempt_id']);
     $quiz_id = intval($_GET['quiz_id']);
 
@@ -387,14 +351,16 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['quiz_id']) && isset($_
 
     if ($results_display_data['success']) {
         extract($results_display_data);
+        // Global chart variables are already set inside prepare_results_data
     } else {
         if (!isset($_SESSION['flash_message'])) {
-             $_SESSION['flash_message'] = "ফলাফল দেখাতে একটি সমস্যা হয়েছে। (E110)";
+             $_SESSION['flash_message'] = "ফলাফল দেখাতে একটি সমস্যা হয়েছে।";
              $_SESSION['flash_message_type'] = "danger";
         }
         header("Location: quizzes.php"); 
         exit;
     }
+
 } else {
     $_SESSION['flash_message'] = "অবৈধ অনুরোধ।";
     $_SESSION['flash_message_type'] = "warning";
@@ -405,32 +371,131 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['quiz_id']) && isset($_
 // header.php must be included AFTER $page_title is set
 require_once 'includes/header.php';
 ?>
-<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script> <?php // Chart.js CDN ?>
 
 <style>
+/* Print specific styles - unchanged */
 @media print {
-    body * { visibility: hidden; }
-    #printableArea, #printableArea * { visibility: visible; }
-    #printableArea { position: absolute; left: 0; top: 0; width: 100%; }
-    .card-header, .card-body { border: none !important; box-shadow: none !important; }
-    .list-group-item { border: 1px solid #eee !important; }
-    .badge { border: 1px solid #ccc; padding: 0.3em 0.5em; background-color: #fff !important; color: #000 !important; }
-    .text-success-emphasis { color: #0f5132 !important; } .text-danger-emphasis { color: #581c24 !important; } .text-warning-emphasis { color: #664d03 !important; }
-    .btn, .alert:not(.print-header-message), footer, header, .navbar, .footer, .text-center.mt-4, #quizResultChartContainer { display: none !important; }
-    .print-header { visibility: visible; text-align: center; margin-bottom: 20px; font-size: 1.4rem; font-weight: bold; width: 100%; }
-    .print-header-message { visibility: visible; display: block !important; }
-    .answer-review { column-count: 2; column-gap: 20px; font-size: 10pt; }
-    .question-image-review { max-height: 120px; margin-bottom: 5px; }
-    .answer-review .card { page-break-inside: avoid; break-inside: avoid-column; width: 100%; margin-bottom: 15px !important; font-size: inherit; border: 1px solid #ddd !important; }
-    .answer-review .card-header, .answer-review .card-body { padding: 0.5rem !important; font-size: inherit; border: none !important; }
-    .answer-review .list-group-item { padding: 0.3rem 0.5rem !important; font-size: 0.9em; border: 1px solid #eee !important; }
-    .answer-review .card-header strong { font-size: 1.1em; }
-    .answer-review .mt-3.p-2.bg-light.border.rounded {  padding: 0.3rem !important; font-size: 0.9em; margin-top: 0.5rem !important; background-color: #f8f9fa !important; border: 1px solid #ddd !important; }
-    #printableArea > h3.mt-4.mb-3 { display: none !important; }
-    .container.mt-5 > .card.shadow-sm > .card-body.p-4 > .text-center.my-3:has(button) { display: none !important; }
+    /* ... your existing print styles ... */
+    body * {
+        visibility: hidden;
+    }
+    #printableArea, #printableArea * {
+        visibility: visible;
+    }
+    #printableArea {
+        position: absolute;
+        left: 0;
+        top: 0;
+        width: 100%;
+    }
+    .card-header, .card-body {
+        border: none !important;
+        box-shadow: none !important;
+    }
+    .list-group-item {
+        border: 1px solid #eee !important; /* Add border for clarity in print */
+    }
+     .badge { /* Basic badge styling for print */
+        border: 1px solid #ccc;
+        padding: 0.3em 0.5em;
+        background-color: #fff !important; /* Remove background colors for print */
+        color: #000 !important; /* Ensure text is black */
+    }
+     .badge.bg-success-subtle, .badge.bg-danger-subtle, .badge.bg-warning-subtle {
+        border: 1px solid #ccc !important; /* Consistent border */
+    }
+    .text-success-emphasis { color: #0f5132 !important; }
+    .text-danger-emphasis { color: #581c24 !important; }
+    .text-warning-emphasis { color: #664d03 !important; }
+
+    .btn, .alert:not(.print-header-message), .timer-progress-bar, footer, header, .navbar, .footer,
+    .feedback-message, 
+    .text-center.mb-4:has(h3), 
+    .text-center.mb-4:has(a.btn-info), 
+    hr,
+    .card.shadow-sm > .card-header.bg-light, 
+    .card.shadow-sm > .card-body.p-4 > hr, 
+    .card.shadow-sm > .card-body.p-4 > .text-center.mt-4,
+    #quizResultChartContainer /* Hide chart container in print */
+     {
+        display: none !important;
+    }
+
+    .print-header {
+        visibility: visible;
+        text-align: center;
+        margin-bottom: 20px;
+        font-size: 1.4rem; 
+        font-weight: bold;
+        width: 100%;
+    }
+    .print-header-message {
+        visibility: visible;
+        display: block !important; 
+    }
+    .answer-review {
+        column-count: 2;
+        column-gap: 20px;
+        font-size: 10pt; 
+    }
+    .question-image-review {
+        max-height: 120px; 
+        margin-bottom: 5px;
+    }
+    .answer-review .card {
+        page-break-inside: avoid;
+        break-inside: avoid-column;
+        width: 100%; 
+        margin-bottom: 15px !important;
+        font-size: inherit; 
+        border: 1px solid #ddd !important; 
+    }
+    .answer-review .card-header, .answer-review .card-body {
+        padding: 0.5rem !important;
+        font-size: inherit;
+        border: none !important; 
+    }
+    .answer-review .list-group-item {
+        padding: 0.3rem 0.5rem !important;
+        font-size: 0.9em; 
+        border: 1px solid #eee !important; 
+    }
+    .answer-review .card-header strong {
+        font-size: 1.1em;
+    }
+    .answer-review .mt-3.p-2.bg-light.border.rounded { 
+        padding: 0.3rem !important;
+        font-size: 0.9em;
+        margin-top: 0.5rem !important;
+        background-color: #f8f9fa !important;
+        border: 1px solid #ddd !important;
+    }
+    #printableArea > h3.mt-4.mb-3 { 
+        display: none !important;
+    }
+    .container.mt-5 > .card.shadow-sm > .card-body.p-4 > .text-center.my-3:has(button) { 
+        display: none !important;
+    }
 }
-.question-image-review {  max-width: 100%; height: auto; max-height: 200px; margin-bottom: 10px; border-radius: 4px; display: block; margin-left: auto; margin-right: auto; border: 1px solid #eee; padding: 3px; }
-#quizResultChartContainer { max-width: 450px; height: 300px; margin: 20px auto; }
+.question-image-review { 
+    max-width: 100%;
+    height: auto;
+    max-height: 200px;
+    margin-bottom: 10px;
+    border-radius: 4px;
+    display: block;
+    margin-left: auto;
+    margin-right: auto;
+    border: 1px solid #eee;
+    padding: 3px;
+}
+/* Style for chart container */
+#quizResultChartContainer {
+    max-width: 450px; /* Adjust as needed */
+    height: 300px;    /* Adjust as needed */
+    margin: 20px auto;
+}
 </style>
 
 <div class="container mt-5">
@@ -464,7 +529,11 @@ require_once 'includes/header.php';
                             if ($now < $live_end) {
                                 $show_ranking_now = false;
                             }
-                        } catch (Exception $e) { /* Invalid date format */ }
+                        } catch (Exception $e) {
+                            // Invalid date format
+                        }
+                    } else {
+                         $show_ranking_now = true; 
                     }
                 }
                 
@@ -500,42 +569,38 @@ require_once 'includes/header.php';
                                     <?php
                                     $user_correct_for_this_q = false;
                                     $correct_option_id_for_this_q = null;
-                                    if (is_array($question['options_list'])) { // Check if options_list is an array
-                                        foreach ($question['options_list'] as $option) {
-                                            if ($option['is_correct'] == 1) {
-                                                $correct_option_id_for_this_q = $option['id'];
-                                                break;
-                                            }
+                                    foreach ($question['options_list'] as $option) {
+                                        if ($option['is_correct'] == 1) {
+                                            $correct_option_id_for_this_q = $option['id'];
+                                            break;
                                         }
                                     }
                                     if ($question['user_selected_option_id'] !== null && $question['user_selected_option_id'] == $correct_option_id_for_this_q) {
                                         $user_correct_for_this_q = true;
                                     }
                                     ?>
-                                    <?php if (is_array($question['options_list'])): ?>
-                                        <?php foreach ($question['options_list'] as $option): ?>
-                                            <?php
-                                            $option_class = 'list-group-item';
-                                            $option_label = '';
-                                            if ($option['id'] == $question['user_selected_option_id']) {
-                                                if ($option['is_correct'] == 1) {
-                                                    $option_class .= ' correct-user-answer'; 
-                                                    $option_label = ' <span class="badge bg-success-subtle text-success-emphasis rounded-pill">আপনার সঠিক উত্তর</span>';
-                                                } else {
-                                                    $option_class .= ' incorrect-user-answer';
-                                                    $option_label = ' <span class="badge bg-danger-subtle text-danger-emphasis rounded-pill">আপনার ভুল উত্তর</span>';
-                                                }
-                                            } elseif ($option['is_correct'] == 1) {
-                                                $option_class .= ' actual-correct-answer';
-                                                $option_label = ' <span class="badge bg-warning-subtle text-warning-emphasis rounded-pill">সঠিক উত্তর</span>';
+                                    <?php foreach ($question['options_list'] as $option): ?>
+                                        <?php
+                                        $option_class = 'list-group-item';
+                                        $option_label = '';
+                                        if ($option['id'] == $question['user_selected_option_id']) {
+                                            if ($option['is_correct'] == 1) {
+                                                $option_class .= ' correct-user-answer'; 
+                                                $option_label = ' <span class="badge bg-success-subtle text-success-emphasis rounded-pill">আপনার সঠিক উত্তর</span>';
+                                            } else {
+                                                $option_class .= ' incorrect-user-answer';
+                                                $option_label = ' <span class="badge bg-danger-subtle text-danger-emphasis rounded-pill">আপনার ভুল উত্তর</span>';
                                             }
-                                            ?>
-                                        <li class="<?php echo $option_class; ?>">
-                                            <?php echo htmlspecialchars($option['text']); ?>
-                                            <?php echo $option_label; ?>
-                                        </li>
-                                        <?php endforeach; ?>
-                                    <?php endif; ?>
+                                        } elseif ($option['is_correct'] == 1) {
+                                            $option_class .= ' actual-correct-answer';
+                                            $option_label = ' <span class="badge bg-warning-subtle text-warning-emphasis rounded-pill">সঠিক উত্তর</span>';
+                                        }
+                                        ?>
+                                    <li class="<?php echo $option_class; ?>">
+                                        <?php echo htmlspecialchars($option['text']); ?>
+                                        <?php echo $option_label; ?>
+                                    </li>
+                                    <?php endforeach; ?>
                                 </ul>
                                 <?php if ($question['user_selected_option_id'] === null && !$user_correct_for_this_q) : ?>
                                      <p class="mt-2 mb-0 text-warning print-header-message">আপনি এই প্রশ্নের উত্তর দেননি।</p>
@@ -577,23 +642,25 @@ document.addEventListener('DOMContentLoaded', function() {
         const totalQuestionsForChart = <?php echo $total_questions_in_quiz; ?>;
 
         let finalUnanswered = unansweredQuestions;
+         // Ensure sum of parts equals total for chart display
         if (totalQuestionsForChart > 0 && (correctAnswers + incorrectAnswers + unansweredQuestions) !== totalQuestionsForChart) {
             finalUnanswered = totalQuestionsForChart - (correctAnswers + incorrectAnswers);
             if (finalUnanswered < 0) finalUnanswered = 0;
         }
         
+        // Ensure chart is only rendered if there are questions
         if (totalQuestionsForChart > 0) {
             new Chart(ctx, {
-                type: 'pie',
+                type: 'pie', // আপনি 'bar' ও ব্যবহার করতে পারেন
                 data: {
                     labels: ['সঠিক উত্তর', 'ভুল উত্তর', 'উত্তর দেননি'],
                     datasets: [{
                         label: 'ফলাফলের পরিসংখ্যান',
                         data: [correctAnswers, incorrectAnswers, finalUnanswered],
                         backgroundColor: [
-                            'rgba(75, 192, 192, 0.7)',
-                            'rgba(255, 99, 132, 0.7)',
-                            'rgba(201, 203, 207, 0.7)'
+                            'rgba(75, 192, 192, 0.7)',  // সবুজ (সঠিক)
+                            'rgba(255, 99, 132, 0.7)',   // লাল (ভুল)
+                            'rgba(201, 203, 207, 0.7)'   // ধূসর (উত্তর দেননি)
                         ],
                         borderColor: [
                             'rgba(75, 192, 192, 1)',
@@ -609,33 +676,49 @@ document.addEventListener('DOMContentLoaded', function() {
                     plugins: {
                         legend: {
                             position: 'top',
-                             labels: { font: { family: 'SolaimanLipi, Noto Sans Bengali, sans-serif' }}
+                             labels: {
+                                font: {
+                                    family: 'SolaimanLipi, Noto Sans Bengali, sans-serif'
+                                }
+                            }
                         },
                         title: {
                             display: true,
                             text: 'কুইজের পরিসংখ্যান',
-                            font: { size: 16, family: 'SolaimanLipi, Noto Sans Bengali, sans-serif' }
+                            font: {
+                                size: 16,
+                                family: 'SolaimanLipi, Noto Sans Bengali, sans-serif'
+                            }
                         },
                         tooltip: {
                             callbacks: {
                                 label: function(context) {
-                                    let label = context.label || ''; if (label) { label += ': '; }
+                                    let label = context.label || '';
+                                    if (label) {
+                                        label += ': ';
+                                    }
                                     if (context.parsed !== null) {
                                         label += context.parsed;
                                         if (totalQuestionsForChart > 0) {
                                             const percentage = ((context.parsed / totalQuestionsForChart) * 100).toFixed(1);
                                             label += ` (${percentage}%)`;
                                         }
-                                    } return label;
+                                    }
+                                    return label;
                                 }
                             },
-                             bodyFont: { family: 'SolaimanLipi, Noto Sans Bengali, sans-serif'},
-                            titleFont: { family: 'SolaimanLipi, Noto Sans Bengali, sans-serif'}
+                             bodyFont: {
+                                family: 'SolaimanLipi, Noto Sans Bengali, sans-serif'
+                            },
+                            titleFont: {
+                                 family: 'SolaimanLipi, Noto Sans Bengali, sans-serif'
+                            }
                         }
                     }
                 }
             });
         } else {
+            // যদি কোনো প্রশ্ন না থাকে, তাহলে চার্ট কন্টেইনার বা ক্যানভাস হাইড করুন
             const chartContainer = document.getElementById('quizResultChartContainer');
             if(chartContainer) {
                 chartContainer.innerHTML = '<p class="text-muted text-center">ফলাফল পরিসংখ্যান দেখানোর জন্য কোনো প্রশ্ন ছিল না।</p>';
