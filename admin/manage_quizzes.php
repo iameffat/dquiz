@@ -266,7 +266,7 @@ if ($stmt_quizzes) {
 function confirmDeleteWithPassword(event, quizId, filterStatus) {
     event.preventDefault(); // Prevent default link behavior if it was a link initially
     
-    const adminPassword = prompt("এই কুইজটি ডিলিট করার জন্য এডমিন পাসওয়ার্ড দিন:", "");
+    const adminPassword = prompt("এই কুইজটি ডিলিট করার জন্য এডমিন পাসওয়ার্ড দিন (1234):", "");
 
     if (adminPassword === null) { // User clicked cancel
         return false;
