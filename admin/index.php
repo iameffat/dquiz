@@ -22,7 +22,7 @@ $sql_total_attempts = "SELECT COUNT(id) as total FROM quiz_attempts WHERE end_ti
 $result_total_attempts = $conn->query($sql_total_attempts);
 $total_attempts = ($result_total_attempts && $result_total_attempts->num_rows > 0) ? $result_total_attempts->fetch_assoc()['total'] : 0;
 
-// 2. Total Questions in the system
+// 2. Total Questions in the system (all questions)
 $sql_total_questions_system = "SELECT COUNT(id) as total FROM questions";
 $result_total_questions_system = $conn->query($sql_total_questions_system);
 $total_questions_system = ($result_total_questions_system && $result_total_questions_system->num_rows > 0) ? $result_total_questions_system->fetch_assoc()['total'] : 0;
@@ -42,12 +42,22 @@ $sql_archived_quizzes = "SELECT COUNT(id) as total FROM quizzes WHERE status='ar
 $result_archived_quizzes = $conn->query($sql_archived_quizzes);
 $archived_quizzes_count = ($result_archived_quizzes && $result_archived_quizzes->num_rows > 0) ? $result_archived_quizzes->fetch_assoc()['total'] : 0;
 
-// ****** নতুন কোড শুরু ******
 // 6. Total Study Materials
 $sql_total_study_materials = "SELECT COUNT(id) as total FROM study_materials";
 $result_total_study_materials = $conn->query($sql_total_study_materials);
 $total_study_materials = ($result_total_study_materials && $result_total_study_materials->num_rows > 0) ? $result_total_study_materials->fetch_assoc()['total'] : 0;
-// ****** নতুন কোড শেষ ******
+
+// ****** নতুন তথ্য যুক্ত করা হচ্ছে ******
+// 7. Total Categories
+$sql_total_categories = "SELECT COUNT(id) as total FROM categories";
+$result_total_categories = $conn->query($sql_total_categories);
+$total_categories = ($result_total_categories && $result_total_categories->num_rows > 0) ? $result_total_categories->fetch_assoc()['total'] : 0;
+
+// 8. Total Manual Questions (quiz_id IS NULL)
+$sql_total_manual_questions = "SELECT COUNT(id) as total FROM questions WHERE quiz_id IS NULL";
+$result_total_manual_questions = $conn->query($sql_total_manual_questions);
+$total_manual_questions = ($result_total_manual_questions && $result_total_manual_questions->num_rows > 0) ? $result_total_manual_questions->fetch_assoc()['total'] : 0;
+// ****** নতুন তথ্য যুক্ত করা শেষ ******
 
 ?>
 
@@ -105,7 +115,8 @@ $total_study_materials = ($result_total_study_materials && $result_total_study_m
                             <i class="fas fa-file-alt fa-2x text-gray-300"></i>
                         </div>
                     </div>
-                    </div>
+                     <a href="manage_quizzes.php" class="stretched-link text-decoration-none"><small class="text-muted">এটেম্পট বিস্তারিত দেখতে কুইজ ম্যানেজমেন্টে যান</small></a>
+                </div>
             </div>
         </div>
 
@@ -114,7 +125,7 @@ $total_study_materials = ($result_total_study_materials && $result_total_study_m
                 <div class="card-body">
                     <div class="row no-gutters align-items-center">
                         <div class="col mr-2">
-                            <div class="text-xs font-weight-bold text-warning text-uppercase mb-1">মোট প্রশ্ন সংখ্যা</div>
+                            <div class="text-xs font-weight-bold text-warning text-uppercase mb-1">মোট প্রশ্ন সংখ্যা (সকল)</div>
                             <div class="h5 mb-0 font-weight-bold text-gray-800"><?php echo $total_questions_system; ?> টি</div>
                         </div>
                         <div class="col-auto">
@@ -192,6 +203,40 @@ $total_study_materials = ($result_total_study_materials && $result_total_study_m
                 </div>
             </div>
         </div>
+        
+        <div class="col-xl-3 col-md-6 mb-4">
+            <div class="card border-left-info shadow h-100 py-2">
+                <div class="card-body">
+                    <div class="row no-gutters align-items-center">
+                        <div class="col mr-2">
+                            <div class="text-xs font-weight-bold text-info text-uppercase mb-1">মোট ক্যাটাগরি</div>
+                            <div class="h5 mb-0 font-weight-bold text-gray-800"><?php echo $total_categories; ?> টি</div>
+                        </div>
+                        <div class="col-auto">
+                            <i class="fas fa-tags fa-2x text-gray-300"></i>
+                        </div>
+                    </div>
+                    <a href="manage_categories.php" class="stretched-link text-decoration-none"><small class="text-muted">ক্যাটাগরি ম্যানেজ করুন &rarr;</small></a>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-xl-3 col-md-6 mb-4">
+            <div class="card border-left-primary shadow h-100 py-2">
+                <div class="card-body">
+                    <div class="row no-gutters align-items-center">
+                        <div class="col mr-2">
+                            <div class="text-xs font-weight-bold text-primary text-uppercase mb-1">ম্যানুয়াল প্রশ্ন</div>
+                            <div class="h5 mb-0 font-weight-bold text-gray-800"><?php echo $total_manual_questions; ?> টি</div>
+                        </div>
+                        <div class="col-auto">
+                            <i class="fas fa-file-signature fa-2x text-gray-300"></i>
+                        </div>
+                    </div>
+                    <a href="manage_manual_questions.php" class="stretched-link text-decoration-none"><small class="text-muted">ম্যানুয়াল প্রশ্ন দেখুন &rarr;</small></a>
+                </div>
+            </div>
+        </div>
         </div>
 
     <div class="row mt-3">
@@ -200,7 +245,10 @@ $total_study_materials = ($result_total_study_materials && $result_total_study_m
             <div class="list-group">
                 <a href="manage_quizzes.php" class="list-group-item list-group-item-action">সকল কুইজ পরিচালনা করুন</a>
                 <a href="add_quiz.php" class="list-group-item list-group-item-action">নতুন কুইজ যোগ করুন</a>
-                <a href="manage_study_materials.php" class="list-group-item list-group-item-action">স্টাডি ম্যাটেরিয়ালস পরিচালনা করুন</a> <a href="manage_users.php" class="list-group-item list-group-item-action">ইউজার পরিচালনা করুন</a>
+                <a href="manage_manual_questions.php" class="list-group-item list-group-item-action">ম্যানুয়াল প্রশ্ন পরিচালনা করুন</a>
+                <a href="manage_categories.php" class="list-group-item list-group-item-action">ক্যাটাগরি পরিচালনা করুন</a>
+                <a href="manage_study_materials.php" class="list-group-item list-group-item-action">স্টাডি ম্যাটেরিয়ালস পরিচালনা করুন</a>
+                <a href="manage_users.php" class="list-group-item list-group-item-action">ইউজার পরিচালনা করুন</a>
                 <a href="settings.php" class="list-group-item list-group-item-action">সাইট সেটিংস</a>
             </div>
         </div>
@@ -220,7 +268,10 @@ $total_study_materials = ($result_total_study_materials && $result_total_study_m
 
     .text-xs { font-size: .8rem; }
     .text-gray-300 { color: #dddfeb!important; }
-    .text-gray-800 { color: #5a5c69!important; }
+    /* Ensure text-gray-800 is legible in dark mode if it's not handled by theme switcher CSS */
+    body:not(.dark-mode) .text-gray-800 { color: #5a5c69!important; }
+    body.dark-mode .text-gray-800 { color: var(--body-color)!important; } /* Use body color for dark mode */
+
     .shadow { box-shadow: 0 .15rem 1.75rem 0 rgba(58,59,69,.15)!important; }
     .h-100 { height: 100%!important; }
     .py-2 { padding-top: .5rem!important; padding-bottom: .5rem!important; }
@@ -231,6 +282,11 @@ $total_study_materials = ($result_total_study_materials && $result_total_study_m
     .mb-1 { margin-bottom: .25rem!important; }
     .mb-0 { margin-bottom: 0!important; }
     .font-weight-bold { font-weight: 700!important; }
+    /* Font Awesome icons (ensure you have Font Awesome linked in header.php for these to work) */
+    /* Alternatively, use Bootstrap Icons or SVG if preferred */
+    .fa-list, .fa-users, .fa-file-alt, .fa-question-circle, .fa-broadcast-tower, .fa-pencil-ruler, .fa-archive, .fa-book-open, .fa-tags, .fa-file-signature {
+        /* Basic styling if you use Font Awesome classes directly */
+    }
 </style>
 <?php
 if (isset($conn) && $conn instanceof mysqli) {
