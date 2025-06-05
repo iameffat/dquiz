@@ -99,17 +99,24 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
 
 // Fetch all categories for display
 $categories = [];
-// বিবরণ এবং আইকন ক্লাস সরানো হয়েছে SQL থেকে
-$sql_all_categories = "SELECT c.id, c.name, COUNT(q.id) as question_count 
+// Updated SQL to count questions from both questions.category_id and question_categories junction table
+$sql_all_categories = "SELECT c.id, c.name, 
+                        (
+                            SELECT COUNT(DISTINCT q.id) 
+                            FROM questions q 
+                            LEFT JOIN question_categories qc ON q.id = qc.question_id
+                            WHERE q.category_id = c.id OR qc.category_id = c.id
+                        ) as question_count
                        FROM categories c
-                       LEFT JOIN questions q ON c.id = q.category_id
-                       GROUP BY c.id, c.name
                        ORDER BY c.name ASC";
 $result_all_categories = $conn->query($sql_all_categories);
 if ($result_all_categories) {
     while ($row = $result_all_categories->fetch_assoc()) {
         $categories[] = $row;
     }
+} else {
+    // Log error if query fails
+    error_log("Error fetching categories with updated count: " . $conn->error);
 }
 
 require_once 'includes/header.php';

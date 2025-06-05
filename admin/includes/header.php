@@ -179,6 +179,11 @@ $current_admin_base_url = isset($admin_base_url) ? $admin_base_url : '';
                 কুইজ ম্যানেজমেন্ট
             </a>
         </li>
+         <li class="nav-item">
+            <a class="nav-link <?php echo (basename($_SERVER['PHP_SELF']) == 'add_manual_question.php') ? 'active' : ''; ?>" href="<?php echo $current_admin_base_url; ?>add_manual_question.php">
+                ম্যানুয়াল প্রশ্ন যোগ
+            </a>
+        </li>
         <li class="nav-item">
     <a class="nav-link <?php echo (basename($_SERVER['PHP_SELF']) == 'manage_categories.php') ? 'active' : ''; ?>" href="<?php echo $current_admin_base_url; ?>manage_categories.php">
         ক্যাটাগরি ম্যানেজমেন্ট
