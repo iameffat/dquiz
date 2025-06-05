@@ -25,10 +25,10 @@ if ($result_cat_list) {
 
 $imported_questions = [];
 // Store posted category_ids for repopulation on error
-$posted_category_ids_for_questions = []; 
+$posted_category_ids_for_questions = [];
 
 if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['prepare_questions_from_bulk'])) {
-    // --- BULK IMPORT LOGIC (Largely Unchanged) ---
+    // --- BULK IMPORT LOGIC ---
     $bulk_text = trim($_POST['bulk_questions_text_import']);
     if (!empty($bulk_text)) {
         $lines = array_map('trim', explode("\n", $bulk_text));
@@ -97,10 +97,12 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['prepare_questions_from
             if (empty(trim($question_data['text']))) {
                 $errors[] = "প্রশ্ন #" . ($q_idx + 1) . ": প্রশ্নের লেখা খালি রাখা যাবে না।";
             }
-            if (!isset($question_data['category_ids']) || empty($question_data['category_ids'])) {
-                $errors[] = "প্রশ্ন #" . ($q_idx + 1) . ": কমপক্ষে একটি ক্যাটাগরি নির্বাচন করতে হবে।";
-            }
-            // Image validation (unchanged)
+            // Category is now optional, so no validation needed for its presence
+            // if (!isset($question_data['category_ids']) || empty($question_data['category_ids'])) {
+            // $errors[] = "প্রশ্ন #" . ($q_idx + 1) . ": কমপক্ষে একটি ক্যাটাগরি নির্বাচন করতে হবে।";
+            // }
+
+            // Image validation
             if (isset($_FILES['questions']['name'][$q_idx]['image_url']) && $_FILES['questions']['error'][$q_idx]['image_url'] == UPLOAD_ERR_OK) {
                 $file_name_check = $_FILES['questions']['name'][$q_idx]['image_url'];
                 $file_size_check = $_FILES['questions']['size'][$q_idx]['image_url'];
@@ -117,7 +119,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['prepare_questions_from
             } elseif (isset($_FILES['questions']['error'][$q_idx]['image_url']) && $_FILES['questions']['error'][$q_idx]['image_url'] != UPLOAD_ERR_NO_FILE) {
                 $errors[] = "প্রশ্ন #" . ($q_idx + 1) . ": ছবি আপলোড করতে সমস্যা হয়েছে (Error code: ".$_FILES['questions']['error'][$q_idx]['image_url'].")";
             }
-            // Options validation (unchanged)
+            // Options validation
             if (empty($question_data['options'])) {
                  $errors[] = "প্রশ্ন #" . ($q_idx + 1) . ": কমপক্ষে দুটি অপশন থাকতে হবে।";
             } else {
@@ -156,10 +158,10 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['prepare_questions_from
             foreach ($_POST['questions'] as $q_idx => $question_data) {
                 $q_text = trim($question_data['text']);
                 $q_explanation = isset($question_data['explanation']) ? trim($question_data['explanation']) : NULL;
-                $selected_category_ids_for_q = isset($question_data['category_ids']) ? $question_data['category_ids'] : []; // Array
+                $selected_category_ids_for_q = isset($question_data['category_ids']) ? $question_data['category_ids'] : []; 
                 $q_image_url = NULL; 
 
-                // Image upload (unchanged)
+                // Image upload
                 if (isset($_FILES['questions']['name'][$q_idx]['image_url']) && $_FILES['questions']['error'][$q_idx]['image_url'] == UPLOAD_ERR_OK) {
                     $file_tmp_name = $_FILES['questions']['tmp_name'][$q_idx]['image_url'];
                     $file_name = basename($_FILES['questions']['name'][$q_idx]['image_url']);
@@ -176,7 +178,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['prepare_questions_from
 
                     if (move_uploaded_file($file_tmp_name, $upload_path)) {
                         $q_image_url = 'uploads/question_images/' . $new_file_name; 
-                        // Image compression (unchanged)
+                        // Image compression
                         if (strtolower($file_type) == 'image/jpeg' || strtolower($file_type) == 'image/jpg') { if (function_exists('imagecreatefromjpeg') && function_exists('imagejpeg')) { $source_image = @imagecreatefromjpeg($upload_path); if ($source_image) { imagejpeg($source_image, $upload_path, 75); imagedestroy($source_image); }}}
                         elseif (strtolower($file_type) == 'image/png') { if (function_exists('imagecreatefrompng') && function_exists('imagepng')) { $source_image = @imagecreatefrompng($upload_path); if ($source_image) { imagealphablending($source_image, false); imagesavealpha($source_image, true); imagepng($source_image, $upload_path, 6); imagedestroy($source_image); }}}
                         elseif (strtolower($file_type) == 'image/webp') { if (function_exists('imagecreatefromwebp') && function_exists('imagewebp')) { $source_image = @imagecreatefromwebp($upload_path); if ($source_image) { imagewebp($source_image, $upload_path, 80); imagedestroy($source_image); }}}
@@ -202,7 +204,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['prepare_questions_from
                 $question_id = $stmt_question->insert_id;
                 $stmt_question->close();
 
-                // Insert options (unchanged)
+                // Insert options
                 $correct_option_form_index = intval($question_data['correct_option']);
                 $options_texts_from_form = $question_data['options'];
                 if (count(array_filter(array_map('trim', $options_texts_from_form))) < 2) {
@@ -256,8 +258,8 @@ require_once 'includes/header.php';
 <link href="https://cdn.jsdelivr.net/npm/select2-bootstrap-5-theme@1.3.0/dist/select2-bootstrap-5-theme.min.css" rel="stylesheet" />
 
 <style>
-/* Styles for suggestions and Select2 (copied from add_manual_question.php with minor adjustments for dark mode) */
-.suggestions-container { /* ... (existing styles) ... */
+/* Styles for suggestions and Select2 */
+.suggestions-container { 
     border: 1px solid var(--bs-border-color); border-top: none; max-height: 150px;
     overflow-y: auto; background-color: var(--bs-body-bg); position: absolute;
     z-index: 1050; width: 100%; box-shadow: 0 0.125rem 0.25rem rgba(0, 0, 0, 0.075);
@@ -269,13 +271,12 @@ require_once 'includes/header.php';
 .input-group .form-control-wrapper { display: flex; flex-direction: column; flex-grow: 1; }
 .input-group .form-control-wrapper .suggestions-container { width: 100%; }
 
-/* Select2 Styles */
 .select2-container--bootstrap-5 .select2-selection--multiple .select2-selection__rendered {
     white-space: normal !important;
 }
 .select2-container--bootstrap-5 .select2-selection--multiple .select2-selection__choice {
     margin-top: 0.3rem !important;
-    font-size: 0.85rem; /* Slightly smaller font for selected choices */
+    font-size: 0.85rem; 
 }
 .select2-container--bootstrap-5 .select2-dropdown {
     border-color: var(--bs-border-color);
@@ -321,6 +322,7 @@ body.dark-mode .select2-container--bootstrap-5 .select2-selection--multiple .sel
     <?php endif; ?>
     
     <?php display_flash_message(); ?>
+
 
     <form action="<?php echo htmlspecialchars($_SERVER["PHP_SELF"]); ?>" method="post" id="addQuizForm" enctype="multipart/form-data">
         <div class="card mb-4">
@@ -369,7 +371,6 @@ body.dark-mode .select2-container--bootstrap-5 .select2-selection--multiple .sel
             for ($q_form_idx = 0; $q_form_idx < $question_count_for_form; $q_form_idx++): 
                 $current_import_data = $imported_questions[$q_form_idx] ?? null;
                 $post_data_q = $_POST['questions'][$q_form_idx] ?? null;
-                // Get selected category IDs for this question for repopulation
                 $current_question_cat_ids = $posted_category_ids_for_questions[$q_form_idx] ?? ($current_import_data['category_ids'] ?? []);
             ?>
             <div class="card question-block mb-3" data-question-index="<?php echo $q_form_idx; ?>">
@@ -390,8 +391,8 @@ body.dark-mode .select2-container--bootstrap-5 .select2-selection--multiple .sel
                     </div>
                     
                     <div class="mb-3">
-                        <label for="question_categories_<?php echo $q_form_idx; ?>" class="form-label">ক্যাটাগরি(সমূহ) <span class="text-danger">*</span></label>
-                        <select class="form-select question-categories-select" id="question_categories_<?php echo $q_form_idx; ?>" name="questions[<?php echo $q_form_idx; ?>][category_ids][]" multiple="multiple" required>
+                        <label for="question_categories_<?php echo $q_form_idx; ?>" class="form-label">ক্যাটাগরি(সমূহ)</label>
+                        <select class="form-select question-categories-select" id="question_categories_<?php echo $q_form_idx; ?>" name="questions[<?php echo $q_form_idx; ?>][category_ids][]" multiple="multiple">
                             <?php if (!empty($categories_list)): ?>
                                 <?php foreach ($categories_list as $category_item): 
                                     $selected_cat = in_array($category_item['id'], $current_question_cat_ids) ? 'selected' : '';
@@ -402,7 +403,7 @@ body.dark-mode .select2-container--bootstrap-5 .select2-selection--multiple .sel
                                 <option value="" disabled>কোনো ক্যাটাগরি পাওয়া যায়নি।</option>
                             <?php endif; ?>
                         </select>
-                        <small class="form-text text-muted">প্রশ্নটি এক বা একাধিক ক্যাটাগরির সাথে যুক্ত করতে পারেন।</small>
+                        <small class="form-text text-muted">প্রশ্নটি এক বা একাধিক ক্যাটাগরির সাথে যুক্ত করতে পারেন। (ঐচ্ছিক)</small>
                     </div>
 
                     <div class="options-container mb-3">
@@ -452,26 +453,22 @@ document.addEventListener('DOMContentLoaded', function () {
     const addQuestionBtn = document.getElementById('add_question_btn');
     let questionIndex = <?php echo $question_count_for_form; ?>; 
 
-    // Function to initialize Select2 on a given select element
     function initializeSelect2(element) {
         $(element).select2({
             theme: "bootstrap-5",
-            placeholder: "ক্যাটাগরি(সমূহ) নির্বাচন করুন",
+            placeholder: "ক্যাটাগরি(সমূহ) নির্বাচন করুন (ঐচ্ছিক)", // Placeholder updated
             allowClear: true,
             width: '100%'
         });
     }
     
-    // Initialize Select2 for existing category dropdowns on page load
     document.querySelectorAll('.question-categories-select').forEach(selectElement => {
         initializeSelect2(selectElement);
     });
 
-
     let suggestionDebounceTimeout;
-    // fetchSuggestions and displaySuggestions (copied from add_manual_question.php)
-    function fetchSuggestions(inputValue, inputType, suggestionsContainerEl, inputFieldEl) {
-        if (inputValue.length < 2) {
+    function fetchSuggestions(inputValue, inputType, suggestionsContainerEl, inputFieldEl) { 
+         if (inputValue.length < 2) {
             suggestionsContainerEl.innerHTML = ''; suggestionsContainerEl.style.display = 'none'; return;
         }
         clearTimeout(suggestionDebounceTimeout);
@@ -497,8 +494,7 @@ document.addEventListener('DOMContentLoaded', function () {
             xhr.send();
         }, 350);
     }
-
-    function displaySuggestions(suggestions, containerEl, inputFieldEl) {
+    function displaySuggestions(suggestions, containerEl, inputFieldEl) { 
         containerEl.innerHTML = '';
         if (suggestions && suggestions.length > 0) {
             suggestions.forEach(suggestionText => {
@@ -506,7 +502,7 @@ document.addEventListener('DOMContentLoaded', function () {
                 item.classList.add('suggestion-item');
                 item.textContent = suggestionText;
                 item.addEventListener('mousedown', function (e) {
-                    e.preventDefault();
+                    e.preventDefault(); 
                     inputFieldEl.value = suggestionText;
                     containerEl.innerHTML = ''; containerEl.style.display = 'none';
                     inputFieldEl.focus();
@@ -554,13 +550,13 @@ document.addEventListener('DOMContentLoaded', function () {
                 let newName = oldName.replace(/questions\[\d+\]/, `questions[${index}]`);
                 input.setAttribute('name', newName);
 
-                if (input.id && input.id.match(/_\d+/)) { // Check if ID has an index
+                if (input.id && input.id.match(/_\d+/)) {
                     let oldId = input.id;
-                    let newId = oldId.replace(/_\d+/, `_${index}`); // Basic replacement
+                    let newId = oldId.replace(/_\d+/, `_${index}`); 
                     
                     if (oldId.match(/^question_text_/) || oldId.match(/^question_image_/) || oldId.match(/^question_explanation_/) || oldId.match(/^suggestions_q_/) && !oldId.includes('_opt_')) {
                         newId = oldId.replace(/_\d+$/, `_${index}`);
-                    } else if (oldId.match(/^question_categories_/)) { // For Select2
+                    } else if (oldId.match(/^question_categories_/)) {
                         newId = `question_categories_${index}`;
                     } else if (oldId.match(/^option_text_\d+_\d+$/)) {
                         newId = oldId.replace(/_\d+_/, `_${index}_`);
@@ -571,26 +567,20 @@ document.addEventListener('DOMContentLoaded', function () {
 
                     const label = document.querySelector(`label[for="${oldId}"]`);
                     if(label) label.setAttribute('for', newId);
-
-                    const suggestionsContainer = document.getElementById(`suggestions_q_${index}`) || 
-                                                 document.getElementById(`suggestions_q_${index}_opt_${input.id.split('_').pop()}`);
-                    if(suggestionsContainer && suggestionsContainer.id !== newId.replace("text_", "suggestions_") && suggestionsContainer.id !== newId.replace("option_text_","suggestions_q_")) {
-                         // If suggestion container ID also needs update based on input ID.
-                         // This logic depends on how suggestion container IDs are structured.
-                         // Example: if suggestion container ID for question_text_0 is suggestions_q_0
-                         if(oldId.startsWith('question_text_')) {
-                            const oldSuggestionsId = `suggestions_q_${oldId.split('_').pop()}`;
-                            const newSuggestionsId = `suggestions_q_${index}`;
-                            const sgContainer = document.getElementById(oldSuggestionsId);
-                            if(sgContainer) sgContainer.id = newSuggestionsId;
-                         } else if (oldId.startsWith('option_text_')) {
-                            const parts = oldId.split('_'); // option_text_OLDQIDX_OPTIDX
-                            const oldQSuggestionsId = `suggestions_q_${parts[2]}_opt_${parts[3]}`;
-                            const newQSuggestionsId = `suggestions_q_${index}_opt_${parts[3]}`;
-                             const sgContainer = document.getElementById(oldQSuggestionsId);
-                            if(sgContainer) sgContainer.id = newQSuggestionsId;
-                         }
-                    }
+                    
+                    // Update suggestion container IDs
+                     if(oldId.startsWith('question_text_')) {
+                        const oldSuggestionsId = `suggestions_q_${oldId.split('_').pop()}`;
+                        const newSuggestionsId = `suggestions_q_${index}`;
+                        const sgContainer = document.getElementById(oldSuggestionsId);
+                        if(sgContainer) sgContainer.id = newSuggestionsId;
+                     } else if (oldId.startsWith('option_text_')) {
+                        const parts = oldId.split('_');
+                        const oldQSuggestionsId = `suggestions_q_${parts[2]}_opt_${parts[3]}`;
+                        const newQSuggestionsId = `suggestions_q_${index}_opt_${parts[3]}`;
+                         const sgContainer = document.getElementById(oldQSuggestionsId);
+                        if(sgContainer) sgContainer.id = newQSuggestionsId;
+                     }
                 }
             });
             block.querySelectorAll('input[type="radio"][name^="questions["]').forEach(radio => {
@@ -614,17 +604,16 @@ document.addEventListener('DOMContentLoaded', function () {
             return;
         }
         const newQuestionBlock = firstQuestionBlock.cloneNode(true);
-        const newQuestionIndex = questionsContainer.querySelectorAll('.question-block').length; // Index for the new block
+        const newQuestionIndex = questionsContainer.querySelectorAll('.question-block').length;
         newQuestionBlock.dataset.questionIndex = newQuestionIndex;
         
         newQuestionBlock.querySelectorAll('textarea, input[type="text"], input[type="file"]').forEach(input => input.value = '');
         
-        // Select2 specific cleanup and re-initialization
         const selectElement = newQuestionBlock.querySelector('.question-categories-select');
         if (selectElement) {
-            $(selectElement).val(null).trigger('change'); // Clear selected options
-            $(selectElement).select2('destroy'); // Destroy previous instance if any (important for cloned elements)
-             selectElement.id = `question_categories_${newQuestionIndex}`; // Update ID before re-initializing
+            $(selectElement).val(null).trigger('change'); 
+            $(selectElement).select2('destroy'); 
+            selectElement.id = `question_categories_${newQuestionIndex}`;
         }
         
         const radios = newQuestionBlock.querySelectorAll('input[type="radio"]');
@@ -637,12 +626,10 @@ document.addEventListener('DOMContentLoaded', function () {
         });
         
         questionsContainer.appendChild(newQuestionBlock);
-        updateQuestionNumbersAndNames(); // This will also handle name/id updates for the new block
+        updateQuestionNumbersAndNames(); 
 
-        // Re-initialize Select2 for the new block's category select
-        const newSelectElement = newQuestionBlock.querySelector('.question-categories-select');
-        if (newSelectElement) {
-             initializeSelect2(newSelectElement);
+        if (selectElement) {
+             initializeSelect2(selectElement);
         }
     });
 
@@ -650,7 +637,6 @@ document.addEventListener('DOMContentLoaded', function () {
         if (event.target.classList.contains('remove-question')) {
             if (questionsContainer.querySelectorAll('.question-block').length > 1) {
                 const blockToRemove = event.target.closest('.question-block');
-                // Destroy Select2 instance before removing the block to prevent memory leaks
                 const selectElement = blockToRemove.querySelector('.question-categories-select');
                 if (selectElement && $(selectElement).data('select2')) {
                     $(selectElement).select2('destroy');
@@ -664,8 +650,7 @@ document.addEventListener('DOMContentLoaded', function () {
     });
 
     if (document.getElementById('quiz_description_editor')) {
-        // Quill setup (unchanged)
-        const quillDescription = new Quill('#quiz_description_editor', { /* ... quill options ... */ 
+        const quillDescription = new Quill('#quiz_description_editor', { 
              theme: 'snow',
             modules: {
                 toolbar: [
@@ -698,7 +683,7 @@ document.addEventListener('DOMContentLoaded', function () {
     document.querySelectorAll('.question-block').forEach(block => {
         setupSuggestionListenersForBlock(block);
     });
-    updateQuestionNumbersAndNames();
+    updateQuestionNumbersAndNames(); 
 });
 </script>
 
