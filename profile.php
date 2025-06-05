@@ -169,7 +169,7 @@ require_once 'includes/header.php';
 
 <div class="container mt-5 mb-5">
     <div class="row">
-        <div class="col-md-4"> {/* প্রোফাইল তথ্য এবং নতুন কুইজ তালিকার জন্য কলাম (আগে ডানদিকে ছিল, এখন বামে) */}
+        <div class="col-md-4">
             <div class="card shadow-sm mb-4">
                 <div class="card-header bg-primary text-white">
                     <h4 class="mb-0">প্রোফাইল তথ্য</h4>
@@ -247,7 +247,7 @@ require_once 'includes/header.php';
             </div>
             </div>
 
-        <div class="col-md-8"> {/* কুইজের ইতিহাসের জন্য কলাম (আগে বামে ছিল, এখন ডানে) */}
+        <div class="col-md-8">
             <div class="card shadow-sm mb-4"> 
                 <div class="card-header bg-success text-white">
                     <h4 class="mb-0">আমার কুইজের ইতিহাস</h4>
