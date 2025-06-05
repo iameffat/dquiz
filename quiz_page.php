@@ -7,6 +7,11 @@ require_once 'includes/functions.php';
 
 $quiz_id = isset($_GET['id']) ? intval($_GET['id']) : 0;
 $quiz_info_for_display = null;
+$questions = [];
+$total_questions = 0;
+$quiz_duration_seconds = 0;
+$attempt_id = null;
+
 
 if ($quiz_id <= 0) {
     $_SESSION['flash_message'] = "অবৈধ কুইজ ID।";
@@ -15,7 +20,7 @@ if ($quiz_id <= 0) {
     exit;
 }
 
-// Fetch basic quiz details for display, regardless of login status
+// Fetch basic quiz details for display, regardless of login status (needed early)
 $sql_quiz_details_basic = "SELECT q.id, q.title, q.description, q.duration_minutes, q.status, q.live_start_datetime, q.live_end_datetime,
                           (SELECT COUNT(qs.id) FROM questions qs WHERE qs.quiz_id = q.id) as question_count
                           FROM quizzes q WHERE q.id = ?";
@@ -27,7 +32,7 @@ if ($stmt_quiz_details_basic) {
     $result_quiz_details_basic = $stmt_quiz_details_basic->get_result();
     if ($result_quiz_details_basic->num_rows === 1) {
         $quiz_info_for_display = $result_quiz_details_basic->fetch_assoc();
-        $page_title = escape_html($quiz_info_for_display['title']) . " - কুইজ"; // এখানে $page_title সেট করা হচ্ছে
+        $page_title = escape_html($quiz_info_for_display['title']) . " - কুইজ";
     } else {
         $_SESSION['flash_message'] = "কুইজ (ID: {$quiz_id}) খুঁজে পাওয়া যায়নি।";
         $_SESSION['flash_message_type'] = "danger";
@@ -37,48 +42,285 @@ if ($stmt_quiz_details_basic) {
     $stmt_quiz_details_basic->close();
 } else {
     error_log("Prepare failed for basic quiz details: (" . $conn->errno . ") " . $conn->error);
+    // এই পর্যায়ে header.php কল করা হয়নি, তাই flash message সেট করে রিডাইরেক্ট করা নিরাপদ
     $_SESSION['flash_message'] = "কুইজের তথ্য আনতে ডেটাবেস সমস্যা হয়েছে।";
     $_SESSION['flash_message_type'] = "danger";
     header("Location: quizzes.php");
     exit;
 }
 
-$page_specific_styles = "
-    .blur-background {
-        filter: blur(5px);
-        transition: filter 0.3s ease-in-out;
-    }
-    #quizContainer.blur-background, .timer-progress-bar.blur-background {
-        /* Specificity to ensure blur applies */
-    }
-    .disable-text-selection {
-        -webkit-user-select: none; /* Safari */
-        -moz-user-select: none; /* Firefox */
-        -ms-user-select: none; /* Internet Explorer/Edge */
-        user-select: none; /* Standard syntax */
-    }
-    .question-image { max-width: 100%; height: auto; max-height: 350px; margin-bottom: 15px; border-radius: 5px; box-shadow: 0 2px 5px rgba(0,0,0,0.1); display: block; margin-left: auto; margin-right: auto;}
-    body.dark-mode .question-image { box-shadow: 0 2px 5px rgba(255,255,255,0.05); border-color: var(--border-color); background-color: var(--body-bg); }
+// --- Logic before any HTML output (including header.php) ---
+$can_take_quiz = false;
+$access_message = '';
+$show_quiz_interface = false; // Flag to indicate if quiz UI should be shown
 
+if (!isset($_SESSION["loggedin"]) || $_SESSION["loggedin"] !== true) {
+    // User is NOT logged in.
+    // $access_message will be handled in the HTML part to show login prompt.
+    // $show_quiz_interface remains false.
+} else {
+    // User IS logged in.
+    $user_id = $_SESSION['user_id'];
+    $user_role = isset($_SESSION['role']) ? $_SESSION['role'] : 'user';
+    $quiz = $quiz_info_for_display; // Use $quiz for clarity within this block
+
+    // Check for existing attempt if user is not admin
+    if ($user_role !== 'admin') {
+        $sql_check_existing_attempt = "SELECT id, score, end_time FROM quiz_attempts WHERE user_id = ? AND quiz_id = ? LIMIT 1";
+        $stmt_check_existing_attempt = $conn->prepare($sql_check_existing_attempt);
+        
+        if (!$stmt_check_existing_attempt) {
+            error_log("Prepare failed for existing attempt check: (" . $conn->errno . ") " . $conn->error);
+            $_SESSION['flash_message'] = "ডেটাবেস সমস্যা। অনুগ্রহ করে আবার চেষ্টা করুন। (Error: QPEP1)";
+            $_SESSION['flash_message_type'] = "danger";
+            header("Location: quizzes.php");
+            exit;
+        }
+        $stmt_check_existing_attempt->bind_param("ii", $user_id, $quiz_id);
+        if (!$stmt_check_existing_attempt->execute()) {
+            error_log("Execute failed for existing attempt check: (" . $stmt_check_existing_attempt->errno . ") " . $stmt_check_existing_attempt->error);
+            $_SESSION['flash_message'] = "ডেটাবেস সমস্যা। অনুগ্রহ করে আবার চেষ্টা করুন। (Error: QPEE1)";
+            $_SESSION['flash_message_type'] = "danger";
+            header("Location: quizzes.php");
+            exit;
+        }
+        $result_existing_attempt = $stmt_check_existing_attempt->get_result();
+        $existing_attempt_data = $result_existing_attempt->fetch_assoc();
+        $stmt_check_existing_attempt->close();
+
+        if ($existing_attempt_data) {
+            // User has already attempted this quiz. Redirect to results page.
+            $_SESSION['flash_message'] = ($existing_attempt_data['score'] === null && $existing_attempt_data['end_time'] === null) ?
+                                        "আপনি ইতিমধ্যে এই কুইজে একবার প্রবেশ করেছিলেন কিন্তু সম্পন্ন করেননি। আপনার অসমাপ্ত চেষ্টার ফলাফল দেখানো হচ্ছে অথবা কুইজটি নতুন করে শুরু হতে পারে।" :
+                                        "আপনি ইতিমধ্যে এই কুইজটি সম্পন্ন করেছেন। নিচে আপনার আগের ফলাফল দেখানো হলো।";
+            $_SESSION['flash_message_type'] = ($existing_attempt_data['score'] === null && $existing_attempt_data['end_time'] === null) ? "warning" : "info";
+            header("Location: results.php?attempt_id=" . $existing_attempt_data['id'] . "&quiz_id=" . $quiz_id);
+            exit; // CRITICAL: Exit immediately after redirection
+        }
+    }
+
+    // If not redirected, determine if quiz can be taken by this logged-in user
+    $current_datetime = new DateTime();
+    if ($user_role === 'admin') {
+        $can_take_quiz = true; 
+        $access_message = "আপনি অ্যাডমিন হিসেবে এই কুইজটি দেখছেন/টেস্ট করছেন।";
+    } else { // Regular user
+        if ($quiz['status'] == 'draft') {
+            $access_message = "এই কুইজটি এখন অংশগ্রহণের জন্য উপলব্ধ নয় কারণ এটি এখনও ড্রাফট পর্যায়ে রয়েছে।";
+        } elseif ($quiz['status'] == 'upcoming') {
+            $access_message = "এই কুইজটি এখনও শুরু হয়নি (আপকামিং)।";
+            if ($quiz['live_start_datetime']) {
+                try {
+                    $live_start_dt_check = new DateTime($quiz['live_start_datetime']);
+                    if ($current_datetime < $live_start_dt_check) {
+                         $access_message .= " সম্ভাব্য শুরু: " . format_datetime($quiz['live_start_datetime']);
+                    } else { // Should be live if start time passed, but status is still upcoming (edge case)
+                        $can_take_quiz = true; // Allow if start time passed but somehow status wasn't updated
+                    }
+                } catch (Exception $e) { /* Invalid date format, treat as upcoming */ }
+            }
+        } elseif ($quiz['status'] == 'live') {
+            $can_take_quiz_live_check = true;
+            if ($quiz['live_start_datetime'] !== null) {
+                try {
+                    $live_start_dt = new DateTime($quiz['live_start_datetime']);
+                    if ($current_datetime < $live_start_dt) {
+                        $can_take_quiz_live_check = false;
+                        $access_message = "এই কুইজটি এখনও শুরু হয়নি। শুরু হওয়ার সময়: " . format_datetime($quiz['live_start_datetime']);
+                    }
+                } catch (Exception $e) { $can_take_quiz_live_check = false; $access_message = "কুইজের শুরুর সময় নির্ধারণে ত্রুটি।"; }
+            }
+            if ($can_take_quiz_live_check && $quiz['live_end_datetime'] !== null) {
+                try {
+                    $live_end_dt = new DateTime($quiz['live_end_datetime']);
+                    if ($current_datetime > $live_end_dt) {
+                        $can_take_quiz_live_check = false;
+                        $access_message = "দুঃখিত, এই কুইজে অংশগ্রহণের সময়সীমা শেষ হয়ে গিয়েছে।";
+                    }
+                } catch (Exception $e) { $can_take_quiz_live_check = false; $access_message = "কুইজের শেষের সময় নির্ধারণে ত্রুটি।"; }
+            }
+            if ($can_take_quiz_live_check) {
+                $can_take_quiz = true;
+            }
+        } elseif ($quiz['status'] == 'archived') {
+            $can_take_quiz = true; // Archived quizzes can be taken for practice by logged-in users
+            $access_message = "এটি একটি আর্কাইভ কুইজ। আপনি অনুশীলনের জন্য অংশগ্রহণ করতে পারেন।";
+        }
+    }
+
+    // If user can take the quiz, fetch questions and create attempt record
+    if ($can_take_quiz) {
+        $sql_questions = "SELECT id, question_text, image_url FROM questions WHERE quiz_id = ? ORDER BY order_number ASC, id ASC";
+        $stmt_questions = $conn->prepare($sql_questions);
+        if (!$stmt_questions) {
+             error_log("Prepare failed for questions fetch: (" . $conn->errno . ") " . $conn->error);
+             $_SESSION['flash_message'] = "প্রশ্ন আনতে ডেটাবেস সমস্যা। (Error: QPEP2)"; $_SESSION['flash_message_type'] = "danger";
+             header("Location: quizzes.php"); exit;
+        }
+        $stmt_questions->bind_param("i", $quiz_id);
+        if (!$stmt_questions->execute()) {
+            error_log("Execute failed for questions fetch: (" . $stmt_questions->errno . ") " . $stmt_questions->error);
+             $_SESSION['flash_message'] = "প্রশ্ন আনতে ডেটাবেস সমস্যা। (Error: QPEE2)"; $_SESSION['flash_message_type'] = "danger";
+             header("Location: quizzes.php"); exit;
+        }
+        $result_questions = $stmt_questions->get_result();
+        while ($q_row = $result_questions->fetch_assoc()) {
+            $options_for_q = [];
+            $sql_options = "SELECT id, option_text FROM options WHERE question_id = ?";
+            $stmt_options = $conn->prepare($sql_options);
+             if (!$stmt_options) { error_log("Prepare failed for options fetch: (" . $conn->errno . ") " . $conn->error); continue; }
+            $stmt_options->bind_param("i", $q_row['id']);
+            if (!$stmt_options->execute()) { error_log("Execute failed for options fetch: (" . $stmt_options->errno . ") " . $stmt_options->error); $stmt_options->close(); continue;}
+            $result_options_data = $stmt_options->get_result();
+            while ($opt_row = $result_options_data->fetch_assoc()) {
+                $options_for_q[] = $opt_row;
+            }
+            $stmt_options->close();
+            shuffle($options_for_q);
+            $q_row['options'] = $options_for_q;
+            $questions[] = $q_row;
+        }
+        $stmt_questions->close();
+        
+        $total_questions = count($questions);
+        $quiz_duration_seconds = $quiz['duration_minutes'] * 60;
+
+        if ($total_questions === 0) {
+            // If, after all checks, a "takable" quiz has no questions.
+            // Admins might see this during setup. For users, it's an issue.
+            if ($user_role !== 'admin' && $quiz['status'] !== 'archived') {
+                $can_take_quiz = false; // Override: cannot take a live/upcoming quiz with no questions
+                $access_message = "দুঃখিত, এই কুইজে এখনো কোনো প্রশ্ন যোগ করা হয়নি।";
+            } elseif ($user_role === 'admin' || $quiz['status'] === 'archived') {
+                $access_message = ($user_role === 'admin') ? "অ্যাডমিন ভিউ: এই কুইজে কোনো প্রশ্ন যোগ করা হয়নি।" : "এই কুইজে অনুশীলনের জন্য কোনো প্রশ্ন পাওয়া যায়নি।";
+                $can_take_quiz = false; // Cannot take if no questions, even for practice/admin
+            }
+        }
+
+        if ($can_take_quiz) { // Re-check $can_take_quiz after question count check
+            $start_time = date('Y-m-d H:i:s');
+            $user_ip_address = $_SERVER['REMOTE_ADDR'] ?? 'UNKNOWN';
+            $user_agent_string = isset($_SERVER['HTTP_USER_AGENT']) ? $_SERVER['HTTP_USER_AGENT'] : 'N/A';
+            $parsed_ua = parse_user_agent_simple($user_agent_string);
+            $browser_name = $parsed_ua['browser'];
+            $os_platform = $parsed_ua['os'];
+
+            $sql_start_attempt = "INSERT INTO quiz_attempts (user_id, quiz_id, start_time, ip_address, user_agent, browser_name, os_platform) VALUES (?, ?, ?, ?, ?, ?, ?)";
+            $stmt_start_attempt = $conn->prepare($sql_start_attempt);
+            if (!$stmt_start_attempt) {
+                 error_log("Prepare failed for start attempt: (" . $conn->errno . ") " . $conn->error);
+                 $_SESSION['flash_message'] = "কুইজ শুরু করতে ডেটাবেস সমস্যা। (Error: QPSA1)"; $_SESSION['flash_message_type'] = "danger";
+                 header("Location: quizzes.php"); exit;
+            }
+            $stmt_start_attempt->bind_param("iisssss", $user_id, $quiz_id, $start_time, $user_ip_address, $user_agent_string, $browser_name, $os_platform);
+            if ($stmt_start_attempt->execute()) {
+                $attempt_id = $stmt_start_attempt->insert_id;
+                $show_quiz_interface = true; // Quiz can be shown
+            } else {
+                error_log("Execute failed for start attempt: (" . $stmt_start_attempt->errno . ") " . $stmt_start_attempt->error);
+                $_SESSION['flash_message'] = "কুইজ শুরু করতে সমস্যা হয়েছে। অনুগ্রহ করে আবার চেষ্টা করুন। (Error: QPSE1)";
+                $_SESSION['flash_message_type'] = "danger";
+                header("Location: quizzes.php");
+                exit;
+            }
+            $stmt_start_attempt->close();
+        }
+    }
+}
+// --- End of logic before HTML output ---
+
+$page_specific_styles = "
+    .blur-background { filter: blur(5px); transition: filter 0.3s ease-in-out; }
+    #quizContainer.blur-background, .timer-progress-bar.blur-background { /* Specificity to ensure blur applies */ }
+    .disable-text-selection { -webkit-user-select: none; -moz-user-select: none; -ms-user-select: none; user-select: none; }
+    .question-image { max-width: 100%; height: auto; max-height: 350px; margin-bottom: 15px; border-radius: 5px; box-shadow: 0 2px 5px rgba(0,0,0,0.1); display: block; margin-left: auto; margin-right: auto; border: 1px solid var(--border-color); padding: 3px; background-color: var(--body-bg); }
+    body.dark-mode .question-image { box-shadow: 0 2px 5px rgba(255,255,255,0.05); border-color: var(--border-color); background-color: var(--body-bg); }
     .timer-progress-bar { position: sticky; top: 0; z-index: 1030; background-color: var(--timer-progress-bar-bg); padding: 10px 0; box-shadow: 0 2px 4px rgba(0,0,0,0.1); border-bottom: 1px solid var(--border-color); }
     body.dark-mode .timer-progress-bar { box-shadow: 0 2px 4px rgba(255,255,255,0.1); }
     .timer.critical { color: var(--danger-color) !important; font-weight: bold; }
+    .question-option-wrapper .form-check-label { cursor: pointer; transition: background-color 0.2s ease-in-out, border-color 0.2s ease-in-out; }
+    .question-option-wrapper .form-check-label:hover { background-color: var(--question-option-hover-bg); }
+    .question-option-wrapper label.selected-option-display { background-color: var(--primary-color) !important; border-color: var(--primary-color) !important; color: #fff !important; font-weight: bold; }
 ";
 
-require_once 'includes/header.php'; // header.php এখানে include করা হচ্ছে
+require_once 'includes/header.php'; // HTML <head> and navbar are outputted here
+?>
 
-$can_take_quiz = false; // Flag to determine if the quiz interface should be shown
-$access_message = '';   // Message if quiz cannot be taken
+<?php if ($show_quiz_interface && $attempt_id && $total_questions > 0): ?>
+    <div class="modal fade" id="quizWarningModal" tabindex="-1" aria-labelledby="quizWarningModalLabel" aria-hidden="true" data-bs-backdrop="static" data-bs-keyboard="false">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="quizWarningModalLabel">গুরুত্বপূর্ণ নির্দেশাবলী</h5>
+                </div>
+                <div class="modal-body">
+                    <p>অনুগ্রহ করে কুইজ শুরু করার আগে নিচের নিয়মাবলী ভালোভাবে পড়ে নিন:</p>
+                    <ul>
+                        <li>এই কুইজের জন্য আপনার হাতে মোট <strong><?php echo $quiz_info_for_display['duration_minutes']; ?> মিনিট</strong> সময় থাকবে।</li>
+                        <li>প্রতিটি প্রশ্নের জন্য চারটি অপশন থাকবে, যার মধ্যে একটি সঠিক উত্তর।</li>
+                        <li>একবার উত্তর নির্বাচন করার পর তা পরিবর্তন করা যাবে না।</li>
+                        <li>কোনো প্রকার অসাধু উপায় (যেমন: অন্যের সাহায্য নেওয়া, ইন্টারনেট সার্চ করা, কপি-পেস্ট করা) অবলম্বন করলে সাক্ষী হিসেবে আল্লাহ তায়ালাই যথেষ্ট।</li>
+                        <li>সময় শেষ হওয়ার সাথে সাথে আপনার পরীক্ষা স্বয়ংক্রিয়ভাবে সাবমিট হয়ে যাবে।</li>
+                         <li>প্রতি ভুল উত্তরের জন্য ০.২০ নম্বর কাটা যাবে।</li>
+                    </ul>
+                    <p class="text-danger fw-bold">আপনি কি উপরের সকল নিয়মের সাথে একমত এবং কুইজ শুরু করতে প্রস্তুত?</p>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" onclick="window.location.href='quizzes.php';">সম্মত নই (ফিরে যান)</button>
+                    <button type="button" class="btn btn-primary" id="agreeAndStartQuiz" data-bs-dismiss="modal">সম্মত ও শুরু করুন</button>
+                </div>
+            </div>
+        </div>
+    </div>
 
-// Check if user is logged in
-if (!isset($_SESSION["loggedin"]) || $_SESSION["loggedin"] !== true) {
-    // User is NOT logged in. Display quiz info and login prompt.
-    // This part remains unchanged from your original logic.
-    ?>
+    <div class="timer-progress-bar py-2 px-3 mb-4">
+        <div class="container d-flex justify-content-between align-items-center">
+            <div id="timer" class="fs-5 fw-bold">সময়: --:--</div>
+            <div id="progress_indicator" class="fs-5">উত্তর: 0/<?php echo $total_questions; ?></div>
+        </div>
+    </div>
+
+    <div class="container" id="quizContainer">
+        <h2 class="mb-4 text-center"><?php echo escape_html($quiz_info_for_display['title']); ?></h2>
+        <form id="quizForm" action="results.php" method="post">
+            <input type="hidden" name="quiz_id" value="<?php echo $quiz_id; ?>">
+            <input type="hidden" name="attempt_id" value="<?php echo $attempt_id; ?>">
+            <?php foreach ($questions as $index => $question): ?>
+            <div class="card question-card mb-4 shadow-sm" id="question_<?php echo $question['id']; ?>" data-question-id="<?php echo $question['id']; ?>">
+                <div class="card-header">
+                    <h5 class="card-title mb-0">প্রশ্ন <?php echo $index + 1; ?>: <?php echo nl2br(escape_html($question['question_text'])); ?></h5>
+                </div>
+                <div class="card-body">
+                    <?php if (!empty($question['image_url'])): ?>
+                        <div class="mb-3 text-center">
+                            <img src="<?php echo $base_url . escape_html($question['image_url']); ?>" alt="প্রশ্ন সম্পর্কিত ছবি" class="img-fluid question-image">
+                        </div>
+                    <?php endif; ?>
+                    <?php foreach ($question['options'] as $opt_index => $option): ?>
+                    <div class="form-check question-option-wrapper mb-2">
+                        <input class="form-check-input question-option-radio" type="radio"
+                               name="answers[<?php echo $question['id']; ?>]"
+                               id="option_<?php echo $option['id']; ?>"
+                               value="<?php echo $option['id']; ?>"
+                               data-question-id="<?php echo $question['id']; ?>">
+                        <label class="form-check-label w-100 p-2 rounded border" for="option_<?php echo $option['id']; ?>">
+                            <?php echo escape_html($option['option_text']); ?>
+                        </label>
+                    </div>
+                    <?php endforeach; ?>
+                </div>
+            </div>
+            <?php endforeach; ?>
+            <div class="text-center mt-4">
+                <button type="submit" name="submit_quiz" class="btn btn-primary btn-lg">সাবমিট করুন</button>
+            </div><br>
+        </form>
+    </div>
+<?php else: // Quiz cannot be taken or is not available (for logged-in or non-logged-in users) ?>
     <div class="container mt-5">
         <div class="card shadow-sm">
             <div class="card-header bg-primary text-white">
-                <center><h2 class="mb-0"><?php echo escape_html($quiz_info_for_display['title']); ?></h2> </center>
+                <center><h2 class="mb-0"><?php echo escape_html($quiz_info_for_display['title']); ?></h2></center>
             </div>
             <div class="card-body">
                 <h5 class="card-subtitle mb-2 text-muted">কুইজের বিবরণ</h5>
@@ -89,32 +331,35 @@ if (!isset($_SESSION["loggedin"]) || $_SESSION["loggedin"] !== true) {
                     <li class="list-group-item"><strong>কুইজের সময়:</strong> <?php echo $quiz_info_for_display['duration_minutes']; ?> মিনিট</li>
                     <li class="list-group-item"><strong>মোট প্রশ্ন:</strong> <?php echo $quiz_info_for_display['question_count']; ?> টি</li>
                     <?php
-                    // Logic to display quiz status for non-logged-in users (copied from your original code)
                     $status_display_text = ''; $status_text_class = 'text-muted'; $current_datetime_for_status_check = new DateTime();
                     if ($quiz_info_for_display['status'] == 'live') {
                         $is_truly_live_for_display = true;
                         if ($quiz_info_for_display['live_start_datetime'] !== null) {
-                            $live_start_dt_check = new DateTime($quiz_info_for_display['live_start_datetime']);
-                            if ($current_datetime_for_status_check < $live_start_dt_check) {
-                                $is_truly_live_for_display = false;
-                                $status_display_text = 'আপকামিং (শুরু হবে: ' . format_datetime($quiz_info_for_display['live_start_datetime']) . ')';
-                                $status_text_class = 'text-info';
-                            }
+                            try {
+                                $live_start_dt_check = new DateTime($quiz_info_for_display['live_start_datetime']);
+                                if ($current_datetime_for_status_check < $live_start_dt_check) {
+                                    $is_truly_live_for_display = false;
+                                    $status_display_text = 'আপকামিং (শুরু হবে: ' . format_datetime($quiz_info_for_display['live_start_datetime']) . ')';
+                                    $status_text_class = 'text-info';
+                                }
+                            } catch (Exception $e) { $is_truly_live_for_display = false; $status_display_text = 'ত্রুটিপূর্ণ শুরুর তারিখ'; $status_text_class = 'text-danger';}
                         }
                         if ($is_truly_live_for_display && $quiz_info_for_display['live_end_datetime'] !== null) {
-                            $live_end_dt_check = new DateTime($quiz_info_for_display['live_end_datetime']);
-                            if ($current_datetime_for_status_check > $live_end_dt_check) {
-                                $is_truly_live_for_display = false;
-                                $status_display_text = 'শেষ হয়েছে';
-                                $status_text_class = 'text-secondary';
-                            }
+                           try {
+                                $live_end_dt_check = new DateTime($quiz_info_for_display['live_end_datetime']);
+                                if ($current_datetime_for_status_check > $live_end_dt_check) {
+                                    $is_truly_live_for_display = false;
+                                    $status_display_text = 'শেষ হয়েছে';
+                                    $status_text_class = 'text-secondary';
+                                }
+                            } catch (Exception $e) { $is_truly_live_for_display = false; $status_display_text = 'ত্রুটিপূর্ণ শেষের তারিখ'; $status_text_class = 'text-danger';}
                         }
                         if ($is_truly_live_for_display) { $status_display_text = 'লাইভ'; $status_text_class = 'text-success fw-bold'; }
                     } elseif ($quiz_info_for_display['status'] == 'upcoming') {
                         $status_display_text = 'আপকামিং'; $status_text_class = 'text-info';
                         if ($quiz_info_for_display['live_start_datetime']) { $status_display_text .= ' (শুরু: ' . format_datetime($quiz_info_for_display['live_start_datetime']) . ')';}
                     } elseif ($quiz_info_for_display['status'] == 'archived') {
-                        $status_display_text = 'আর্কাইভড (অনুশীলনের জন্য উপলব্ধ)'; $status_text_class = 'text-secondary';
+                        $status_display_text = 'আর্কাইভড' . (($user_id && $user_role !== 'admin') ? ' (অনুশীলনের জন্য উপলব্ধ)' : ''); $status_text_class = 'text-secondary';
                     } elseif ($quiz_info_for_display['status'] == 'draft') {
                         $status_display_text = 'ড্রাফট (শীঘ্রই আসছে)'; $status_text_class = 'text-warning';
                     } else { $status_display_text = ucfirst($quiz_info_for_display['status']); }
@@ -122,422 +367,186 @@ if (!isset($_SESSION["loggedin"]) || $_SESSION["loggedin"] !== true) {
                     <li class="list-group-item"><strong>স্ট্যাটাস:</strong> <span class="<?php echo $status_text_class; ?>"><?php echo $status_display_text; ?></span></li>
                 </ul>
                 <hr>
-                <p class="lead text-center">এই কুইজে অংশগ্রহণ করতে অনুগ্রহ করে লগইন করুন।</p>
-                <div class="d-grid gap-2 d-md-flex justify-content-md-center">
-                    <a href="login.php?redirect=<?php echo urlencode('quiz_page.php?id=' . $quiz_id); ?>" class="btn btn-primary btn-lg px-4">লগইন করুন</a>
-                </div><br>
-                <p class="lead text-center">রেজিস্টার করা না থাকলে, উপরের <b>লগইন বাটনে</b> ক্লিক করে রেজিস্টেশন করুন!</p>
+                <?php if (!isset($_SESSION["loggedin"]) || $_SESSION["loggedin"] !== true): ?>
+                    <p class="lead text-center">এই কুইজে অংশগ্রহণ করতে অনুগ্রহ করে লগইন করুন।</p>
+                    <div class="d-grid gap-2 d-md-flex justify-content-md-center">
+                        <a href="login.php?redirect=<?php echo urlencode('quiz_page.php?id=' . $quiz_id); ?>" class="btn btn-primary btn-lg px-4">লগইন করুন</a>
+                    </div><br>
+                     <p class="lead text-center">রেজিস্টার করা না থাকলে, উপরের <b>লগইন বাটনে</b> ক্লিক করে রেজিস্টেশন করুন!</p>
+                <?php elseif (!empty($access_message)): ?>
+                     <div class="alert alert-warning text-center"><?php echo $access_message; ?></div>
+                <?php endif; ?>
                  <p class="text-center mt-3"><a href="<?php echo $base_url; ?>quizzes.php" class="btn btn-outline-secondary btn-sm">সকল কুইজ দেখুন</a></p>
             </div>
         </div>
     </div>
-    <?php
-} else {
-    // User IS logged in.
-    $user_id = $_SESSION['user_id'];
-    $user_role = isset($_SESSION['role']) ? $_SESSION['role'] : 'user';
-    $quiz = $quiz_info_for_display; // Use $quiz for clarity
+<?php endif; ?>
 
-    // Check for existing attempt if user is not admin
-    if ($user_role !== 'admin') {
-        $sql_check_existing_attempt = "SELECT id, score, end_time FROM quiz_attempts WHERE user_id = ? AND quiz_id = ? LIMIT 1";
-        $stmt_check_existing_attempt = $conn->prepare($sql_check_existing_attempt);
-        // Error handling for prepare and execute (as in your original code)
-        if (!$stmt_check_existing_attempt) { /* ... error handling ... */ header("Location: quizzes.php"); exit; }
-        $stmt_check_existing_attempt->bind_param("ii", $user_id, $quiz_id);
-        if (!$stmt_check_existing_attempt->execute()) { /* ... error handling ... */ header("Location: quizzes.php"); exit; }
-        $result_existing_attempt = $stmt_check_existing_attempt->get_result();
-        $existing_attempt_data = $result_existing_attempt->fetch_assoc();
-        $stmt_check_existing_attempt->close();
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const quizForm = document.getElementById('quizForm'); // This will be null if quiz interface is not shown
+    const warningModalElement = document.getElementById('quizWarningModal');
+    const agreeAndStartButton = document.getElementById('agreeAndStartQuiz');
+    const mainQuizContainer = document.getElementById('quizContainer');
+    const timerProgressBar = document.querySelector('.timer-progress-bar');
+    const totalQuestionsJS = <?php echo $total_questions; ?>; // Will be 0 if quiz interface is not shown
 
-        if ($existing_attempt_data) {
-            // Redirect to results page if already attempted (as per your original logic)
-            $_SESSION['flash_message'] = ($existing_attempt_data['score'] === null && $existing_attempt_data['end_time'] === null) ?
-                                        "আপনি ইতিমধ্যে এই কুইজে একবার প্রবেশ করেছিলেন কিন্তু সম্পন্ন করেননি। আপনার অসমাপ্ত চেষ্টার ফলাফল দেখানো হচ্ছে অথবা কুইজটি নতুন করে শুরু হতে পারে।" :
-                                        "আপনি ইতিমধ্যে এই কুইজটি সম্পন্ন করেছেন। নিচে আপনার আগের ফলাফল দেখানো হলো।";
-            $_SESSION['flash_message_type'] = ($existing_attempt_data['score'] === null && $existing_attempt_data['end_time'] === null) ? "warning" : "info";
-            header("Location: results.php?attempt_id=" . $existing_attempt_data['id'] . "&quiz_id=" . $quiz_id);
-            exit;
-        }
+    let quizLogicInitialized = false;
+
+    function applyBlurToBackground(shouldBlur) {
+        if (mainQuizContainer) mainQuizContainer.classList.toggle('blur-background', shouldBlur);
+        if (timerProgressBar) timerProgressBar.classList.toggle('blur-background', shouldBlur);
     }
 
-    // Determine if the quiz can be taken
-    if ($user_role === 'admin') {
-        $can_take_quiz = true; // Admins can view/take any quiz for testing/preview
-        $access_message = "আপনি অ্যাডমিন হিসেবে এই কুইজটি দেখছেন।";
-    } else {
-        $current_datetime = new DateTime();
-        if ($quiz['status'] == 'draft') {
-            $access_message = "এই কুইজটি এখন অংশগ্রহণের জন্য উপলব্ধ নয় কারণ এটি এখনও ড্রাফট পর্যায়ে রয়েছে।";
-        } elseif ($quiz['status'] == 'upcoming') {
-            $access_message = "এই কুইজটি এখনও শুরু হয়নি (আপকামিং)।";
-            if ($quiz['live_start_datetime']) {
-                $access_message .= " সম্ভাব্য শুরু: " . format_datetime($quiz['live_start_datetime']);
-            }
-        } elseif ($quiz['status'] == 'live') {
-            $can_take_quiz_live = true;
-            if ($quiz['live_start_datetime'] !== null) {
-                $live_start_dt = new DateTime($quiz['live_start_datetime']);
-                if ($current_datetime < $live_start_dt) {
-                    $can_take_quiz_live = false;
-                    $access_message = "এই কুইজটি এখনও শুরু হয়নি। শুরু হওয়ার সময়: " . format_datetime($quiz['live_start_datetime']);
+    function initializeQuizFunctionalities() {
+        if (quizLogicInitialized || !quizForm) return; // Ensure quizForm exists
+        quizLogicInitialized = true;
+        applyBlurToBackground(false);
+
+        const bodyElement = document.body;
+        bodyElement.classList.add('disable-text-selection');
+        // Disable copy, paste, cut and context menu
+        bodyElement.addEventListener('copy', function(e) { e.preventDefault(); });
+        bodyElement.addEventListener('paste', function(e) { e.preventDefault(); });
+        bodyElement.addEventListener('cut', function(e) { e.preventDefault(); });
+        bodyElement.addEventListener('contextmenu', function(e) { e.preventDefault(); });
+
+        const timerDisplay = document.getElementById('timer');
+        const progressIndicator = document.getElementById('progress_indicator');
+        const answeredQuestionLocks = new Set();
+        let timeLeft = <?php echo $quiz_duration_seconds; ?>;
+        var timerInterval;
+
+        function updateTimerDisplay() {
+            if (!timerDisplay) return;
+            const minutes = Math.floor(timeLeft / 60);
+            const seconds = timeLeft % 60;
+            timerDisplay.textContent = `সময়: ${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
+            if (timeLeft <= 60 && timeLeft > 0) { timerDisplay.classList.add('critical'); }
+            else if (timeLeft <= 0) {
+                timerDisplay.classList.remove('critical');
+                timerDisplay.textContent = "সময় শেষ!";
+                if (quizForm && !quizForm.dataset.submitted) { // Check if already submitted by other means
+                    quizForm.dataset.submitted = 'true'; // Mark as submitted
+                    quizForm.submit();
                 }
+                if(timerInterval) clearInterval(timerInterval);
             }
-            if ($can_take_quiz_live && $quiz['live_end_datetime'] !== null) {
-                $live_end_dt = new DateTime($quiz['live_end_datetime']);
-                if ($current_datetime > $live_end_dt) {
-                    $can_take_quiz_live = false;
-                    $access_message = "দুঃখিত, এই কুইজে অংশগ্রহণের সময়সীমা শেষ হয়ে গিয়েছে।";
-                }
-            }
-            if ($can_take_quiz_live) {
-                $can_take_quiz = true;
-            }
-        } elseif ($quiz['status'] == 'archived') {
-            $can_take_quiz = true; // Archived quizzes can be taken for practice
-            // $access_message = "এটি একটি আর্কাইভ কুইজ। আপনি অনুশীলনের জন্য অংশগ্রহণ করতে পারেন।"; // Optional
+             if (timeLeft > 0) timeLeft--; else timeLeft = 0; // Ensure timeLeft doesn't go negative
         }
-    }
-
-    $questions = [];
-    $total_questions = 0;
-    $quiz_duration_seconds = 0;
-    $attempt_id = null;
-
-    if ($can_take_quiz) {
-        // Fetch questions
-        $sql_questions = "SELECT id, question_text, image_url FROM questions WHERE quiz_id = ? ORDER BY order_number ASC, id ASC";
-        $stmt_questions = $conn->prepare($sql_questions);
-        $stmt_questions->bind_param("i", $quiz_id);
-        $stmt_questions->execute();
-        $result_questions = $stmt_questions->get_result();
-        while ($q_row = $result_questions->fetch_assoc()) {
-            $options = [];
-            $sql_options = "SELECT id, option_text FROM options WHERE question_id = ?";
-            $stmt_options = $conn->prepare($sql_options);
-            $stmt_options->bind_param("i", $q_row['id']);
-            $stmt_options->execute();
-            $result_options_data = $stmt_options->get_result();
-            while ($opt_row = $result_options_data->fetch_assoc()) {
-                $options[] = $opt_row;
-            }
-            $stmt_options->close();
-            shuffle($options);
-            $q_row['options'] = $options;
-            $questions[] = $q_row;
+        
+        // Start timer only if there are questions and a time limit
+        if (totalQuestionsJS > 0 && timeLeft > 0) {
+            updateTimerDisplay(); // Initial display
+            timerInterval = setInterval(updateTimerDisplay, 1000);
+        } else if (totalQuestionsJS > 0 && timeLeft <= 0) { // No time limit (timeLeft was initialized to 0 or less if duration_minutes was 0)
+             if(timerDisplay) timerDisplay.textContent = "সময়: সীমাহীন";
+             if(progressIndicator) progressIndicator.textContent = `উত্তর: 0/${totalQuestionsJS}`;
         }
-        $stmt_questions->close();
-        $total_questions = count($questions);
-        $quiz_duration_seconds = $quiz['duration_minutes'] * 60;
-
-        if ($total_questions === 0 && $user_role !== 'admin' && $quiz['status'] !== 'archived') {
-            $can_take_quiz = false; // Override if no questions for a live quiz
-            $access_message = "দুঃখিত, এই কুইজে এখনো কোনো প্রশ্ন যোগ করা হয়নি।";
-        } elseif ($total_questions === 0 && ($user_role === 'admin' || $quiz['status'] === 'archived') ){
-            $access_message = ($user_role === 'admin') ? "অ্যাডমিন ভিউ: এই কুইজে কোনো প্রশ্ন যোগ করা হয়নি।" : "এই আর্কাইভ কুইজে অনুশীলনের জন্য কোনো প্রশ্ন পাওয়া যায়নি।";
-             $can_take_quiz = false; // Still can't take if no questions
+        else { // No questions
+            if(timerDisplay) timerDisplay.textContent = "কোনো প্রশ্ন নেই";
+            if(progressIndicator) progressIndicator.textContent = "উত্তর: 0/0";
+            const submitButton = quizForm ? quizForm.querySelector('button[type="submit"]') : null;
+            if(submitButton) { submitButton.disabled = true; submitButton.style.display = 'none'; }
         }
 
-        if ($can_take_quiz) { // Only create attempt if quiz is truly takable (has questions, etc.)
-            $start_time = date('Y-m-d H:i:s');
-            $user_ip_address = $_SERVER['REMOTE_ADDR'];
-            $user_agent_string = isset($_SERVER['HTTP_USER_AGENT']) ? $_SERVER['HTTP_USER_AGENT'] : 'N/A';
-            $parsed_ua = parse_user_agent_simple($user_agent_string);
-            $browser_name = $parsed_ua['browser'];
-            $os_platform = $parsed_ua['os'];
 
-            $sql_start_attempt = "INSERT INTO quiz_attempts (user_id, quiz_id, start_time, ip_address, user_agent, browser_name, os_platform) VALUES (?, ?, ?, ?, ?, ?, ?)";
-            $stmt_start_attempt = $conn->prepare($sql_start_attempt);
-            // Error handling for prepare
-            if (!$stmt_start_attempt) { /* ... error handling ... */ header("Location: quizzes.php"); exit; }
-            $stmt_start_attempt->bind_param("iisssss", $user_id, $quiz_id, $start_time, $user_ip_address, $user_agent_string, $browser_name, $os_platform);
-            if ($stmt_start_attempt->execute()) {
-                $attempt_id = $stmt_start_attempt->insert_id;
-            } else {
-                // Error handling for execute
-                $stmt_start_attempt->close();
-                $_SESSION['flash_message'] = "কুইজ শুরু করতে সমস্যা হয়েছে। অনুগ্রহ করে আবার চেষ্টা করুন। (ত্রুটি কোড: DB_START_FAIL)";
-                $_SESSION['flash_message_type'] = "danger";
-                header("Location: quizzes.php");
-                exit;
-            }
-            $stmt_start_attempt->close();
-        }
-    }
+        const questionCards = document.querySelectorAll('.question-card');
+        questionCards.forEach(questionCard => {
+            const questionId = questionCard.dataset.questionId;
+            const radiosInThisGroup = questionCard.querySelectorAll(`.question-option-radio`);
 
+            radiosInThisGroup.forEach(radio => {
+                radio.addEventListener('change', function() {
+                    if (this.checked && !answeredQuestionLocks.has(questionId)) {
+                        // Remove 'selected' class from all labels in this question
+                        const allLabelsInQuestion = questionCard.querySelectorAll('.question-option-wrapper label');
+                        allLabelsInQuestion.forEach(lbl => {
+                            lbl.classList.remove('selected-option-display', 'border-primary', 'border-2');
+                            lbl.style.opacity = '1'; // Reset opacity if needed
+                        });
 
-    if ($can_take_quiz && $attempt_id) { // Check attempt_id as well
-    ?>
-        <div class="modal fade" id="quizWarningModal" tabindex="-1" aria-labelledby="quizWarningModalLabel" aria-hidden="true" data-bs-backdrop="static" data-bs-keyboard="false">
-            <div class="modal-dialog modal-dialog-centered">
-                <div class="modal-content">
-                    <div class="modal-header">
-                        <h5 class="modal-title" id="quizWarningModalLabel">গুরুত্বপূর্ণ নির্দেশাবলী</h5>
-                    </div>
-                    <div class="modal-body">
-                        <p>অনুগ্রহ করে কুইজ শুরু করার আগে নিচের নিয়মাবলী ভালোভাবে পড়ে নিন:</p>
-                        <ul>
-                            <li>এই কুইজের জন্য আপনার হাতে মোট <strong><?php echo $quiz['duration_minutes']; ?> মিনিট</strong> সময় থাকবে।</li>
-                            <li>প্রতিটি প্রশ্নের জন্য চারটি অপশন থাকবে, যার মধ্যে একটি সঠিক উত্তর।</li>
-                            <li>একবার উত্তর নির্বাচন করার পর তা পরিবর্তন করা যাবে না।</li>
-                            <li>কোনো প্রকার অসাধু উপায় (যেমন: অন্যের সাহায্য নেওয়া, ইন্টারনেট সার্চ করা, কপি-পেস্ট করা) অবলম্বন করলে সাক্ষী হিসেবে আল্লাহ তায়ালাই যথেষ্ট।</li>
-                            <li>সময় শেষ হওয়ার সাথে সাথে আপনার পরীক্ষা স্বয়ংক্রিয়ভাবে সাবমিট হয়ে যাবে।</li>
-                            <li>প্রতি ভুল উত্তরের জন্য ০.২০ নম্বর কাটা যাবে।</li>
-                        </ul>
-                        <p class="text-danger fw-bold">আপনি কি উপরের সকল নিয়মের সাথে একমত এবং কুইজ শুরু করতে প্রস্তুত?</p>
-                    </div>
-                    <div class="modal-footer">
-                        <button type="button" class="btn btn-secondary" onclick="window.location.href='quizzes.php';">সম্মত নই (ফিরে যান)</button>
-                        <button type="button" class="btn btn-primary" id="agreeAndStartQuiz" data-bs-dismiss="modal">সম্মত ও শুরু করুন</button>
-                    </div>
-                </div>
-            </div>
-        </div>
-
-        <div class="timer-progress-bar py-2 px-3 mb-4">
-            <div class="container d-flex justify-content-between align-items-center">
-                <div id="timer" class="fs-5 fw-bold">সময়: --:--</div>
-                <div id="progress_indicator" class="fs-5">উত্তর: 0/<?php echo $total_questions; ?></div>
-            </div>
-        </div>
-
-        <div class="container" id="quizContainer">
-            <h2 class="mb-4 text-center"><?php echo escape_html($quiz['title']); ?></h2>
-            <form id="quizForm" action="results.php" method="post">
-                <input type="hidden" name="quiz_id" value="<?php echo $quiz_id; ?>">
-                <input type="hidden" name="attempt_id" value="<?php echo $attempt_id; ?>">
-                <?php foreach ($questions as $index => $question): ?>
-                <div class="card question-card mb-4 shadow-sm" id="question_<?php echo $question['id']; ?>" data-question-id="<?php echo $question['id']; ?>">
-                    <div class="card-header">
-                        <h5 class="card-title mb-0">প্রশ্ন <?php echo $index + 1; ?>: <?php echo nl2br(escape_html($question['question_text'])); ?></h5>
-                    </div>
-                    <div class="card-body">
-                        <?php if (!empty($question['image_url'])): ?>
-                            <div class="mb-3 text-center">
-                                <img src="<?php echo $base_url . escape_html($question['image_url']); ?>" alt="প্রশ্ন সম্পর্কিত ছবি" class="img-fluid question-image">
-                            </div>
-                        <?php endif; ?>
-                        <?php foreach ($question['options'] as $opt_index => $option): ?>
-                        <div class="form-check question-option-wrapper mb-2">
-                            <input class="form-check-input question-option-radio" type="radio"
-                                   name="answers[<?php echo $question['id']; ?>]"
-                                   id="option_<?php echo $option['id']; ?>"
-                                   value="<?php echo $option['id']; ?>"
-                                   data-question-id="<?php echo $question['id']; ?>">
-                            <label class="form-check-label w-100 p-2 rounded border" for="option_<?php echo $option['id']; ?>">
-                                <?php echo escape_html($option['option_text']); ?>
-                            </label>
-                        </div>
-                        <?php endforeach; ?>
-                    </div>
-                </div>
-                <?php endforeach; ?>
-                <div class="text-center mt-4">
-                    <button type="submit" name="submit_quiz" class="btn btn-primary btn-lg">সাবমিট করুন</button>
-                </div><br>
-            </form>
-        </div>
-        <script>
-        // Script part from original code, with totalQuestionsJS updated
-        document.addEventListener('DOMContentLoaded', function() {
-            const quizForm = document.getElementById('quizForm');
-            const warningModalElement = document.getElementById('quizWarningModal');
-            const agreeAndStartButton = document.getElementById('agreeAndStartQuiz');
-            const mainQuizContainer = document.getElementById('quizContainer');
-            const timerProgressBar = document.querySelector('.timer-progress-bar');
-            const totalQuestionsJS = <?php echo $total_questions; ?>; // Correctly use $total_questions
-
-            let quizLogicInitialized = false;
-
-            function applyBlurToBackground(shouldBlur) {
-                if (mainQuizContainer) mainQuizContainer.classList.toggle('blur-background', shouldBlur);
-                if (timerProgressBar) timerProgressBar.classList.toggle('blur-background', shouldBlur);
-            }
-
-            function initializeQuizFunctionalities() {
-                if (quizLogicInitialized || !quizForm) return;
-                quizLogicInitialized = true;
-                applyBlurToBackground(false);
-
-                const bodyElement = document.body;
-                bodyElement.classList.add('disable-text-selection');
-                bodyElement.addEventListener('copy', function(e) { e.preventDefault(); });
-                bodyElement.addEventListener('paste', function(e) { e.preventDefault(); });
-                bodyElement.addEventListener('cut', function(e) { e.preventDefault(); });
-                bodyElement.addEventListener('contextmenu', function(e) { e.preventDefault(); });
-
-                const timerDisplay = document.getElementById('timer');
-                const progressIndicator = document.getElementById('progress_indicator');
-                const answeredQuestionLocks = new Set();
-                let timeLeft = <?php echo $quiz_duration_seconds; ?>;
-                var timerInterval;
-
-                function updateTimerDisplay() {
-                    if (!timerDisplay) return;
-                    const minutes = Math.floor(timeLeft / 60);
-                    const seconds = timeLeft % 60;
-                    timerDisplay.textContent = `সময়: ${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
-                    if (timeLeft <= 60 && timeLeft > 0) { timerDisplay.classList.add('critical'); }
-                    else if (timeLeft <= 0) {
-                        timerDisplay.classList.remove('critical');
-                        timerDisplay.textContent = "সময় শেষ!";
-                        if (quizForm && !quizForm.dataset.submitted) {
-                            quizForm.dataset.submitted = 'true';
-                            quizForm.submit();
+                        // Add 'selected' class to the currently selected label
+                        const parentWrapper = this.closest('.question-option-wrapper');
+                        if (parentWrapper) {
+                            const labelForRadio = parentWrapper.querySelector('label');
+                            if (labelForRadio) {
+                                labelForRadio.classList.add('selected-option-display', 'border-primary', 'border-2');
+                                labelForRadio.style.opacity = '1'; // Make sure selected is fully opaque
+                            }
                         }
-                        if(timerInterval) clearInterval(timerInterval);
-                    }
-                    if (timeLeft > 0) timeLeft--; else timeLeft = 0;
-                }
+                        
+                        answeredQuestionLocks.add(questionId);
+                        if(progressIndicator) progressIndicator.textContent = `উত্তর: ${answeredQuestionLocks.size}/${totalQuestionsJS}`;
 
-                if (totalQuestionsJS > 0 && timeLeft > 0) { // Ensure timer only runs if there's time
-                    updateTimerDisplay();
-                    timerInterval = setInterval(updateTimerDisplay, 1000);
-                } else if (totalQuestionsJS > 0 && timeLeft <= 0) { // No time limit
-                     if(timerDisplay) timerDisplay.textContent = "সময়: সীমাহীন";
-                     if(progressIndicator) progressIndicator.textContent = `উত্তর: 0/${totalQuestionsJS}`;
-                }
-                else { // No questions
-                    if(timerDisplay) timerDisplay.textContent = "কোনো প্রশ্ন নেই";
-                    if(progressIndicator) progressIndicator.textContent = "উত্তর: 0/0";
-                    const submitButton = quizForm ? quizForm.querySelector('button[type="submit"]') : null;
-                    if(submitButton) { submitButton.disabled = true; submitButton.style.display = 'none'; }
-                }
-
-                const questionCards = document.querySelectorAll('.question-card');
-                questionCards.forEach(questionCard => {
-                    const questionId = questionCard.dataset.questionId;
-                    const radiosInThisGroup = questionCard.querySelectorAll(`.question-option-radio`);
-                    radiosInThisGroup.forEach(radio => {
-                        radio.addEventListener('change', function() {
-                            if (this.checked && !answeredQuestionLocks.has(questionId)) {
-                                const allLabelsInQuestion = questionCard.querySelectorAll('.question-option-wrapper label');
-                                allLabelsInQuestion.forEach(lbl => {
-                                    lbl.classList.remove('selected-option-display', 'border-primary', 'border-2');
-                                    lbl.style.opacity = '1';
-                                });
-                                radiosInThisGroup.forEach(r => {
-                                    const parentWrapper = r.closest('.question-option-wrapper');
-                                    if (parentWrapper) {
-                                        const labelForRadio = parentWrapper.querySelector('label');
-                                        if (labelForRadio) {
-                                            if (r.checked) {
-                                                labelForRadio.classList.add('selected-option-display', 'border-primary', 'border-2');
-                                                labelForRadio.style.opacity = '1';
-                                            } else {
-                                                labelForRadio.style.opacity = '0.6';
-                                            }
-                                        }
-                                    }
-                                });
-                                answeredQuestionLocks.add(questionId);
-                                if(progressIndicator) progressIndicator.textContent = `উত্তর: ${answeredQuestionLocks.size}/${totalQuestionsJS}`;
-                                radiosInThisGroup.forEach(otherRadioInGroup => {
-                                    const otherLabel = otherRadioInGroup.closest('.question-option-wrapper').querySelector('label');
-                                    if (otherRadioInGroup !== this) {
-                                        otherRadioInGroup.disabled = true;
-                                        if(otherLabel) otherLabel.style.cursor = 'default';
-                                    } else {
-                                        if(otherLabel) otherLabel.style.cursor = 'default';
-                                    }
-                                });
+                        // Disable other options and dim them
+                        radiosInThisGroup.forEach(otherRadioInGroup => {
+                            const otherLabel = otherRadioInGroup.closest('.question-option-wrapper').querySelector('label');
+                            if (otherRadioInGroup !== this) {
+                                otherRadioInGroup.disabled = true;
+                                if(otherLabel) {
+                                    otherLabel.style.opacity = '0.6';
+                                    otherLabel.style.cursor = 'default';
+                                }
+                            } else { // For the selected one
+                                 if(otherLabel) otherLabel.style.cursor = 'default';
                             }
                         });
-                    });
-                });
-                if (window.history.replaceState) { window.history.replaceState(null, null, window.location.href); }
-            }
-
-            // Modal logic
-            if (warningModalElement && agreeAndStartButton && totalQuestionsJS > 0) {
-                const warningModal = new bootstrap.Modal(warningModalElement);
-                warningModal.show();
-                applyBlurToBackground(true);
-                agreeAndStartButton.addEventListener('click', function() { initializeQuizFunctionalities(); });
-                warningModalElement.addEventListener('hidden.bs.modal', function () {
-                    applyBlurToBackground(false);
-                    if (!quizLogicInitialized && document.body.contains(warningModalElement)) {
-                        window.location.href = 'quizzes.php'; // Redirect if modal closed without agreeing
                     }
                 });
-            } else if (totalQuestionsJS > 0) { // If no modal (e.g. admin), start directly
-                initializeQuizFunctionalities();
-            } else { // No questions, handle gracefully
-                 applyBlurToBackground(false);
-                 const bodyElement = document.body;
-                 bodyElement.classList.add('disable-text-selection');
-                 bodyElement.addEventListener('contextmenu', function(e) { e.preventDefault(); });
-                 if (document.getElementById('timer')) document.getElementById('timer').textContent = "কোনো প্রশ্ন নেই";
-                 if (document.getElementById('progress_indicator')) document.getElementById('progress_indicator').textContent = "উত্তর: 0/0";
-                 const submitButton = quizForm ? quizForm.querySelector('button[type="submit"]') : null;
-                 if(submitButton) submitButton.style.display = 'none';
+            });
+        });
+        if (window.history.replaceState) { window.history.replaceState(null, null, window.location.href); }
+    }
+
+    // Modal logic
+    if (warningModalElement && agreeAndStartButton && totalQuestionsJS > 0 && <?php echo json_encode($show_quiz_interface); ?>) {
+        const warningModal = new bootstrap.Modal(warningModalElement);
+        warningModal.show();
+        applyBlurToBackground(true); // Blur background when modal is shown
+
+        agreeAndStartButton.addEventListener('click', function() {
+            // Modal is dismissed by data-bs-dismiss, then 'hidden.bs.modal' fires
+            // Functionalities will be initialized in the 'hidden.bs.modal' event listener
+        });
+
+        warningModalElement.addEventListener('hidden.bs.modal', function () {
+             applyBlurToBackground(false); // Remove blur when modal is hidden
+            if (!quizLogicInitialized && document.body.contains(warningModalElement)) {
+                // If user closed modal without clicking "Agree", redirect or handle as "not agreed"
+                // Check if agreeAndStartButton was the one causing dismiss, if not, then user cancelled
+                // This is tricky, a simpler way is to check if quizLogicInitialized after modal hide
+                if (!quizLogicInitialized) { // If agree was not clicked
+                    window.location.href = 'quizzes.php'; 
+                }
             }
         });
-        </script>
-    <?php
-    } else { // Quiz is not takable for the logged-in user, or no questions
-    ?>
-        <div class="container mt-5">
-            <div class="card shadow-sm">
-                <div class="card-header bg-primary text-white">
-                    <center><h2 class="mb-0"><?php echo escape_html($quiz_info_for_display['title']); ?></h2></center>
-                </div>
-                <div class="card-body">
-                    <h5 class="card-subtitle mb-2 text-muted">কুইজের বিবরণ</h5>
-                    <div class="quiz-description-display mb-3">
-                        <?php echo $quiz_info_for_display['description'] ? $quiz_info_for_display['description'] : '<p>এই কুইজের জন্য কোনো বিস্তারিত বিবরণ দেওয়া হয়নি।</p>'; ?>
-                    </div>
-                    <ul class="list-group list-group-flush mb-3">
-                        <li class="list-group-item"><strong>কুইজের সময়:</strong> <?php echo $quiz_info_for_display['duration_minutes']; ?> মিনিট</li>
-                        <li class="list-group-item"><strong>মোট প্রশ্ন:</strong> <?php echo $quiz_info_for_display['question_count']; ?> টি</li>
-                        <?php
-                        // Status display for this info box (copied and adapted)
-                        $status_display_text_info = ''; $status_text_class_info = 'text-muted';
-                        $current_datetime_info = new DateTime();
-                        if ($quiz_info_for_display['status'] == 'live') {
-                            $is_truly_live_info = true;
-                            if ($quiz_info_for_display['live_start_datetime'] !== null) {
-                                $live_start_dt_info = new DateTime($quiz_info_for_display['live_start_datetime']);
-                                if ($current_datetime_info < $live_start_dt_info) {
-                                    $is_truly_live_info = false;
-                                    $status_display_text_info = 'আপকামিং (শুরু হবে: ' . format_datetime($quiz_info_for_display['live_start_datetime']) . ')';
-                                    $status_text_class_info = 'text-info';
-                                }
-                            }
-                            if ($is_truly_live_info && $quiz_info_for_display['live_end_datetime'] !== null) {
-                                $live_end_dt_info = new DateTime($quiz_info_for_display['live_end_datetime']);
-                                if ($current_datetime_info > $live_end_dt_info) {
-                                    $is_truly_live_info = false;
-                                    $status_display_text_info = 'শেষ হয়েছে';
-                                    $status_text_class_info = 'text-secondary';
-                                }
-                            }
-                            if ($is_truly_live_info) { $status_display_text_info = 'লাইভ'; $status_text_class_info = 'text-success fw-bold'; }
-                        } elseif ($quiz_info_for_display['status'] == 'upcoming') {
-                            $status_display_text_info = 'আপকামিং'; $status_text_class_info = 'text-info';
-                            if ($quiz_info_for_display['live_start_datetime']) { $status_display_text_info .= ' (শুরু: ' . format_datetime($quiz_info_for_display['live_start_datetime']) . ')';}
-                        } elseif ($quiz_info_for_display['status'] == 'archived') {
-                            $status_display_text_info = 'আর্কাইভড'; $status_text_class_info = 'text-secondary';
-                        } elseif ($quiz_info_for_display['status'] == 'draft') {
-                            $status_display_text_info = 'ড্রাফট'; $status_text_class_info = 'text-warning';
-                        } else { $status_display_text_info = ucfirst($quiz_info_for_display['status']); }
-                        ?>
-                        <li class="list-group-item"><strong>স্ট্যাটাস:</strong> <span class="<?php echo $status_text_class_info; ?>"><?php echo $status_display_text_info; ?></span></li>
-                    </ul>
-                    <hr>
-                    <div class="alert alert-warning text-center">
-                        <?php echo !empty($access_message) ? $access_message : "এই কুইজটি বর্তমানে অংশগ্রহণের জন্য উপলব্ধ নয়।"; ?>
-                    </div>
-                    <div class="text-center mt-3">
-                        <a href="<?php echo $base_url; ?>quizzes.php" class="btn btn-secondary">অন্যান্য কুইজ দেখুন</a>
-                    </div>
-                </div>
-            </div>
-        </div>
-    <?php
-    }
-} // End of logged-in user block
+         agreeAndStartButton.addEventListener('click', function() {
+            initializeQuizFunctionalities();
+        });
 
+    } else if (totalQuestionsJS > 0 && <?php echo json_encode($show_quiz_interface); ?>) { // If no modal needed (e.g. admin or direct start)
+        initializeQuizFunctionalities();
+    } else if (<?php echo json_encode($show_quiz_interface); ?>) { // Quiz interface should be shown, but no questions
+         applyBlurToBackground(false); // No blur needed if no quiz interface
+         const bodyElement = document.body;
+         bodyElement.classList.add('disable-text-selection');
+         bodyElement.addEventListener('contextmenu', function(e) { e.preventDefault(); });
+
+         if (document.getElementById('timer')) document.getElementById('timer').textContent = "কোনো প্রশ্ন নেই";
+         if (document.getElementById('progress_indicator')) document.getElementById('progress_indicator').textContent = "উত্তর: 0/0";
+         const submitButton = quizForm ? quizForm.querySelector('button[type="submit"]') : null;
+         if(submitButton) {
+             submitButton.disabled = true;
+             submitButton.textContent = "কোনো প্রশ্ন নেই"; // Change button text or hide
+             // submitButton.style.display = 'none';
+         }
+    }
+});
+</script>
+
+<?php
+// Close connection and include footer
 if ($conn) {
     $conn->close();
 }
