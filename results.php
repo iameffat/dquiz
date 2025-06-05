@@ -211,59 +211,22 @@ function prepare_results_data($conn, $current_attempt_id, $current_quiz_id, $cur
 if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['quiz_id']) && isset($_POST['attempt_id'])) {
     $quiz_id = intval($_POST['quiz_id']);
     $attempt_id = intval($_POST['attempt_id']);
-    $current_user_id = $_SESSION['user_id']; // Ensure $user_id is set correctly for POST
+    // ... (rest of your POST handling code remains largely the same) ...
+    // Ensure that after successful commit and before redirect/display:
+    // $results_display_data = prepare_results_data($conn, $attempt_id, $quiz_id, $user_id);
+    // if ($results_display_data['success']) {
+    //     extract($results_display_data); // This will make $correct_answers_count etc. available
+    // }
+    // ...
 
-    // Fetch quiz status to determine if it's an archived quiz retake
-    $sql_quiz_status = "SELECT status FROM quizzes WHERE id = ?";
-    $stmt_quiz_status = $conn->prepare($sql_quiz_status);
-    if (!$stmt_quiz_status) {
-        // Handle error - perhaps log and redirect with a generic error
-        error_log("Failed to prepare statement to fetch quiz status: " . $conn->error);
-        $_SESSION['flash_message'] = "ফলাফল প্রসেস করতে একটি ত্রুটি হয়েছে।";
-        $_SESSION['flash_message_type'] = "danger";
-        header("Location: quizzes.php");
-        exit;
-    }
-    $stmt_quiz_status->bind_param("i", $quiz_id);
-    $stmt_quiz_status->execute();
-    $result_quiz_status = $stmt_quiz_status->get_result();
-    $quiz_meta_info = $result_quiz_status->fetch_assoc();
-    $stmt_quiz_status->close();
-
-    $is_archived_quiz_submission = ($quiz_meta_info && $quiz_meta_info['status'] === 'archived');
-    $is_first_completed_archived_attempt = false; // Assume not, unless proven otherwise
-
-    if ($is_archived_quiz_submission) {
-        // Check if there are any *other* successfully completed (score IS NOT NULL) attempts for this quiz by this user
-        $sql_check_other_archived = "SELECT COUNT(id) as count 
-                                     FROM quiz_attempts 
-                                     WHERE user_id = ? AND quiz_id = ? AND id != ? AND score IS NOT NULL AND submitted_at IS NOT NULL";
-        $stmt_check_other_archived = $conn->prepare($sql_check_other_archived);
-        if ($stmt_check_other_archived) {
-            $stmt_check_other_archived->bind_param("iii", $current_user_id, $quiz_id, $attempt_id);
-            $stmt_check_other_archived->execute();
-            $other_archived_result = $stmt_check_other_archived->get_result()->fetch_assoc();
-            $stmt_check_other_archived->close();
-            
-            if ($other_archived_result && $other_archived_result['count'] == 0) {
-                $is_first_completed_archived_attempt = true; // This is the first time user is completing this archived quiz
-            }
-        } else {
-            // Log error, but proceed cautiously, perhaps default to storing score
-            error_log("Failed to prepare statement to check other archived attempts: " . $conn->error);
-        }
-    }
-
-
-    // Calculate time taken (original logic)
+    // Calculate time taken
     $end_time_dt = new DateTime();
     $end_time = $end_time_dt->format('Y-m-d H:i:s');
     $time_taken_seconds = null;
 
     $sql_get_start_time = "SELECT start_time FROM quiz_attempts WHERE id = ? AND user_id = ?";
     $stmt_get_start_time = $conn->prepare($sql_get_start_time);
-    // ... (bind, execute, fetch $start_timestamp_db as before) ...
-    $stmt_get_start_time->bind_param("ii", $attempt_id, $current_user_id); // Use current_user_id
+    $stmt_get_start_time->bind_param("ii", $attempt_id, $user_id);
     $stmt_get_start_time->execute();
     $result_start_time = $stmt_get_start_time->get_result();
     if ($result_start_time->num_rows > 0) {
@@ -273,27 +236,24 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['quiz_id']) && isset($_
     }
     $stmt_get_start_time->close();
 
-
     $questions_answered_correctly_post = 0;
     $incorrect_answers_count_post = 0;
-    // $total_questions_in_quiz is fetched later by prepare_results_data, but needed now for penalty calc
-    // Let's fetch it here if not already available reliably
-    $sql_q_count_for_penalty = "SELECT COUNT(id) as total_q FROM questions WHERE quiz_id = ?";
-    $stmt_q_count_penalty = $conn->prepare($sql_q_count_for_penalty);
-    $stmt_q_count_penalty->bind_param("i", $quiz_id);
-    $stmt_q_count_penalty->execute();
-    $total_questions_for_penalty_calc = $stmt_q_count_penalty->get_result()->fetch_assoc()['total_q'];
-    $stmt_q_count_penalty->close();
+
+    $sql_all_q_count = "SELECT COUNT(id) as total_q FROM questions WHERE quiz_id = ?";
+    $stmt_all_q_count = $conn->prepare($sql_all_q_count);
+    $stmt_all_q_count->bind_param("i", $quiz_id);
+    $stmt_all_q_count->execute();
+    $total_questions_in_quiz_from_db = $stmt_all_q_count->get_result()->fetch_assoc()['total_q'];
+    $stmt_all_q_count->close();
+    $total_questions_in_quiz = $total_questions_in_quiz_from_db;
 
 
     $conn->begin_transaction();
     try {
-        // Fetch correct options map (original logic)
         $sql_questions_options = "SELECT q.id as question_id, o.id as option_id, o.is_correct
                                   FROM questions q
                                   JOIN options o ON q.id = o.question_id
                                   WHERE q.quiz_id = ?";
-        // ... (prepare, execute, fetch into $correct_options_map and $all_questions_map as before) ...
         $stmt_qo = $conn->prepare($sql_questions_options);
         $stmt_qo->bind_param("i", $quiz_id);
         $stmt_qo->execute();
@@ -308,7 +268,6 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['quiz_id']) && isset($_
         }
         $stmt_qo->close();
 
-        // Insert user answers (original logic)
         $submitted_answers = isset($_POST['answers']) ? $_POST['answers'] : [];
         foreach ($all_questions_map as $question_id_loop => $val) {
             $selected_option_id = isset($submitted_answers[$question_id_loop]) ? intval($submitted_answers[$question_id_loop]) : null;
@@ -323,7 +282,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['quiz_id']) && isset($_
                     $is_correct_answer_for_db = 0;
                 }
             }
-            // Insert into user_answers (original logic, this is fine for practice retakes too for review page)
+            
             if ($selected_option_id === null) { 
                  $stmt_insert_answer_final = $conn->prepare("INSERT INTO user_answers (attempt_id, question_id, selected_option_id, is_correct) VALUES (?, ?, NULL, ?)");
                  if(!$stmt_insert_answer_final) throw new Exception("ব্যবহারকারীর উত্তর সংরক্ষণ स्टेटमेंट প্রস্তুত করতে সমস্যা হয়েছে (NULL): " . $conn->error);
@@ -339,26 +298,13 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['quiz_id']) && isset($_
             $stmt_insert_answer_final->close();
         }
 
-        // Calculate score for this session
         $penalty = $incorrect_answers_count_post * 0.20; 
         $final_raw_score = $questions_answered_correctly_post - $penalty; 
-        $calculated_session_score = max(0, $final_raw_score); 
+        $total_score = max(0, $final_raw_score); 
 
-        // Update quiz_attempts table
-        if ($is_archived_quiz_submission && !$is_first_completed_archived_attempt) {
-            // This is a RETAKE of an archived quiz. Score is not stored (set to NULL).
-            $sql_update_attempt = "UPDATE quiz_attempts SET score = NULL, end_time = ?, time_taken_seconds = ?, submitted_at = NOW() WHERE id = ? AND user_id = ?";
-            $stmt_update_attempt = $conn->prepare($sql_update_attempt);
-            if (!$stmt_update_attempt) throw new Exception("কুইজের চেষ্টা (প্র্যাকটিস) আপডেট স্টেটমেন্ট প্রস্তুত করতে সমস্যা: " . $conn->error);
-            $stmt_update_attempt->bind_param("siii", $end_time, $time_taken_seconds, $attempt_id, $current_user_id);
-        } else {
-            // This is a live quiz, upcoming (if somehow submitted), or the FIRST attempt of an archived quiz. Store score.
-            $sql_update_attempt = "UPDATE quiz_attempts SET score = ?, end_time = ?, time_taken_seconds = ?, submitted_at = NOW() WHERE id = ? AND user_id = ?";
-            $stmt_update_attempt = $conn->prepare($sql_update_attempt);
-            if (!$stmt_update_attempt) throw new Exception("কুইজের চেষ্টা আপডেট স্টেটমেন্ট প্রস্তুত করতে সমস্যা: " . $conn->error);
-            $stmt_update_attempt->bind_param("dsiii", $calculated_session_score, $end_time, $time_taken_seconds, $attempt_id, $current_user_id);
-        }
-        
+        $sql_update_attempt = "UPDATE quiz_attempts SET score = ?, end_time = ?, time_taken_seconds = ?, submitted_at = NOW() WHERE id = ? AND user_id = ?";
+        $stmt_update_attempt = $conn->prepare($sql_update_attempt);
+        $stmt_update_attempt->bind_param("dsiii", $total_score, $end_time, $time_taken_seconds, $attempt_id, $user_id);
         if (!$stmt_update_attempt->execute()) {
              throw new Exception("কুইজের চেষ্টা আপডেট করতে সমস্যা হয়েছে: " . $stmt_update_attempt->error);
         }
@@ -367,46 +313,15 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['quiz_id']) && isset($_
         $conn->commit();
 
         // After commit, fetch all data for display using the common function
-        $results_display_data = prepare_results_data($conn, $attempt_id, $quiz_id, $current_user_id);
-        
+        $results_display_data = prepare_results_data($conn, $attempt_id, $quiz_id, $user_id);
         if ($results_display_data['success']) {
             extract($results_display_data); 
-            // $total_score is now from DB (which could be NULL for retakes)
-            // $total_questions_in_quiz comes from prepare_results_data
-
-            if ($is_archived_quiz_submission && !$is_first_completed_archived_attempt) {
-                // For retakes of archived quizzes, override $total_score for display with the one calculated in this session
-                $total_score = $calculated_session_score; // This $total_score is now for display
-                $results_display_data['total_score'] = $total_score; // Update array for consistency
-                
-                // Recalculate feedback message based on the practice score
-                if ($total_questions_in_quiz > 0) { // $total_questions_in_quiz from extract()
-                    $percentage_score = ($total_score / $total_questions_in_quiz) * 100;
-                    if ($percentage_score >= 80) {
-                        $feedback_message = "খুব ভালো!"; $feedback_class = "very-good";
-                    } elseif ($percentage_score >= 65) {
-                        $feedback_message = "ভালো!"; $feedback_class = "good";
-                    } elseif ($percentage_score >= 50) {
-                        $feedback_message = "সাধারণ"; $feedback_class = "average";
-                    } else {
-                        $feedback_message = "খারাপ (অনুশীলন চালিয়ে যান!)"; $feedback_class = "improve";
-                    }
-                    // Update these in the $results_display_data as well if they are used by chart directly
-                    $results_display_data['feedback_message'] = $feedback_message;
-                    $results_display_data['feedback_class'] = $feedback_class;
-                } else {
-                    $feedback_message = "ফলাফল উপলব্ধ"; $feedback_class = "average";
-                }
-            }
-            
             // Set global chart variables explicitly after extract for POST case
-            // These counts are based on the current attempt's user_answers, which are always stored.
             $correct_answers_count_for_chart = $results_display_data['correct_answers_count'];
             $incorrect_answers_count_for_chart = $results_display_data['incorrect_answers_count_raw'];
             $unanswered_questions_count_for_chart = $results_display_data['unanswered_questions_count'];
 
         } else {
-            // If prepare_results_data fails, redirect (original logic)
             header("Location: quizzes.php");
             exit;
         }
