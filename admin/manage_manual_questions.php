@@ -125,8 +125,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['prepare_manual_questio
                         $cat_id = intval($cat_id_val);
                         $stmt_q_cat->bind_param("ii", $question_id, $cat_id);
                         if (!$stmt_q_cat->execute()) {
-                            // Handle potential duplicate entry error gracefully if a question is linked to same category twice (shouldn't happen with UI)
-                            if ($conn->errno != 1062) { // 1062 is duplicate entry
+                            if ($conn->errno != 1062) { 
                                 throw new Exception("প্রশ্ন-ক্যাটাগরি লিংক সংরক্ষণ করতে সমস্যা (ক্যাটাগরি ID: {$cat_id}): " . $stmt_q_cat->error);
                             }
                         }
@@ -278,7 +277,10 @@ if ($result_manual_questions) {
 <div class="container-fluid">
     <div class="d-flex justify-content-between align-items-center mt-4 mb-3">
         <h1><?php echo $page_title; ?></h1>
-        <a href="add_manual_question.php" class="btn btn-primary">নতুন একক ম্যানুয়াল প্রশ্ন যোগ করুন</a>
+        <div>
+            <a href="add_manual_question.php" class="btn btn-primary">নতুন একক ম্যানুয়াল প্রশ্ন যোগ করুন</a>
+            <button type="button" class="btn btn-info" id="toggleBulkImportFormBtn">বাল্ক ইম্পোর্ট ফর্ম দেখান/লুকান</button>
+        </div>
     </div>
 
     <?php display_flash_message(); ?>
@@ -290,7 +292,7 @@ if ($result_manual_questions) {
     </div>
     <?php endif; ?>
 
-    <div class="card mb-4">
+    <div id="bulkImportManualFormContainer" class="card mb-4" style="display: none;">
         <div class="card-header">বাল্ক ম্যানুয়াল প্রশ্ন ইম্পোর্ট করুন</div>
         <div class="card-body">
             <p>প্রশ্ন এবং অপশনগুলো নিচের ফর্ম্যাটে লিখুন। প্রতিটি প্রশ্ন এবং অপশন নতুন লাইনে লিখুন। যেমন:</p>
@@ -408,6 +410,25 @@ document.addEventListener('DOMContentLoaded', function () {
         allowClear: true,
         width: '100%'
     });
+
+    const toggleBulkImportFormBtn = document.getElementById('toggleBulkImportFormBtn');
+    const bulkImportFormContainer = document.getElementById('bulkImportManualFormContainer');
+
+    if (toggleBulkImportFormBtn && bulkImportFormContainer) {
+        toggleBulkImportFormBtn.addEventListener('click', function() {
+            if (bulkImportFormContainer.style.display === 'none') {
+                bulkImportFormContainer.style.display = 'block';
+                this.textContent = 'বাল্ক ইম্পোর্ট ফর্ম লুকান';
+                this.classList.remove('btn-info');
+                this.classList.add('btn-warning');
+            } else {
+                bulkImportFormContainer.style.display = 'none';
+                this.textContent = 'বাল্ক ইম্পোর্ট ফর্ম দেখান';
+                this.classList.remove('btn-warning');
+                this.classList.add('btn-info');
+            }
+        });
+    }
 });
 </script>
 
