@@ -42,6 +42,7 @@ if ($stmt_quiz_details_basic) {
     $stmt_quiz_details_basic->close();
 } else {
     error_log("Prepare failed for basic quiz details: (" . $conn->errno . ") " . $conn->error);
+    // এই পর্যায়ে header.php কল করা হয়নি, তাই flash message সেট করে রিডাইরেক্ট করা নিরাপদ
     $_SESSION['flash_message'] = "কুইজের তথ্য আনতে ডেটাবেস সমস্যা হয়েছে।";
     $_SESSION['flash_message_type'] = "danger";
     header("Location: quizzes.php");
@@ -138,6 +139,7 @@ if (!isset($_SESSION["loggedin"]) || $_SESSION["loggedin"] !== true) {
             }
         } elseif ($quiz['status'] == 'archived') {
             $can_take_quiz = true; 
+            // $access_message = "এটি একটি আর্কাইভ কুইজ। আপনি অনুশীলনের জন্য অংশগ্রহণ করতে পারেন।"; // Optional
         }
     }
 
@@ -221,7 +223,7 @@ if (!isset($_SESSION["loggedin"]) || $_SESSION["loggedin"] !== true) {
 
 $page_specific_styles = "
     .blur-background { filter: blur(5px); transition: filter 0.3s ease-in-out; }
-    #quizContainer.blur-background, .timer-progress-bar.blur-background { /* Specificity to ensure blur applies */ }
+    #quizContainer.blur-background, .timer-progress-bar.blur-background { /* Specificity */ }
     .disable-text-selection { -webkit-user-select: none; -moz-user-select: none; -ms-user-select: none; user-select: none; }
     .question-image { max-width: 100%; height: auto; max-height: 350px; margin-bottom: 15px; border-radius: 5px; box-shadow: 0 2px 5px rgba(0,0,0,0.1); display: block; margin-left: auto; margin-right: auto; border: 1px solid var(--border-color); padding: 3px; background-color: var(--body-bg); }
     body.dark-mode .question-image { box-shadow: 0 2px 5px rgba(255,255,255,0.05); border-color: var(--border-color); background-color: var(--body-bg); }
@@ -236,34 +238,36 @@ $page_specific_styles = "
     .real-radio-btn { /* Hide the actual radio button */
         opacity: 0;
         position: absolute;
-        left: 0; /* Position it behind the custom one or off-screen */
-        width: 1.5em; /* Ensure it's clickable over the custom one */
-        height: 1.5em;
-        z-index: 2; /* Above custom-radio-look but below label text if needed */
+        left: 0; 
+        width: 1.8em; /* Increased to cover custom-radio-look fully */
+        height: 1.8em;
+        margin: 0; /* Reset margin */
+        z-index: 2; 
         cursor: pointer;
     }
     .custom-radio-label {
         display: flex; 
         align-items: center;
         cursor: pointer;
-        padding-left: 0 !important; 
+        padding-left: 0px !important; /* Adjusted padding for custom look */
     }
     .custom-radio-look {
         display: inline-flex; 
         align-items: center;
         justify-content: center;
-        width: 1.5em;  
-        height: 1.5em; 
-        border: 2px solid var(--bs-border-color); 
+        width: 1.5em;  /* Size of the circle */
+        height: 1.5em; /* Size of the circle */
+        border: 2px solid var(--border-color); 
         border-radius: 50%;
         margin-right: 0.75em; 
         transition: border-color 0.15s ease-in-out, background-color 0.15s ease-in-out;
-        font-size: 0.9em; 
+        font-size: 0.9em; /* Font size for ক, খ, etc. */
         font-weight: bold;
         color: var(--body-color); 
-        line-height: 1; 
+        line-height: 1; /* Ensures character is centered */
         position: relative;
         z-index: 1;
+        background-color: var(--bs-body-bg); /* Ensure it has a background */
     }
     .custom-radio-look::before {
         content: attr(data-char);
@@ -273,42 +277,45 @@ $page_specific_styles = "
         border-color: var(--primary-color); 
         color: #fff; 
     }
-    .real-radio-btn:focus + .custom-radio-label .custom-radio-look {
+    .real-radio-btn:focus + .custom-radio-label .custom-radio-look { /* Focus style for accessibility */
          box-shadow: 0 0 0 0.25rem rgba(var(--primary-rgb), .25);
     }
+    /* Styling for when a radio is selected and others are disabled */
     .form-check-input.real-radio-btn:disabled + .custom-radio-label {
-        opacity: 0.6;
+        opacity: 0.6; /* Dim the entire label (custom look + text) */
         cursor: default;
     }
-     .form-check-input.real-radio-btn:disabled + .custom-radio-label .custom-radio-look {
-        background-color: var(--bs-secondary-bg);
+    .form-check-input.real-radio-btn:disabled + .custom-radio-label .custom-radio-look {
+        background-color: var(--bs-secondary-bg); /* Different background for disabled custom look */
         border-color: var(--bs-border-color);
         color: var(--bs-secondary-color);
     }
+    /* Ensure the selected and locked option is not dimmed and looks checked */
     .form-check-input.real-radio-btn:checked:disabled + .custom-radio-label {
-         opacity: 1; /* Selected but disabled should still look selected */
+         opacity: 1; 
     }
-     .form-check-input.real-radio-btn:checked:disabled + .custom-radio-label .custom-radio-look {
-        background-color: var(--primary-color); /* Keep checked style even if disabled */
+    .form-check-input.real-radio-btn:checked:disabled + .custom-radio-label .custom-radio-look {
+        background-color: var(--primary-color); /* Keep checked style */
         border-color: var(--primary-color);
         color: #fff;
-        opacity: 0.7; /* Slightly dim the checked+disabled state */
+        opacity: 0.7; /* Optional: slightly dim the checked circle itself if locked */
     }
-
     .option-text {
-        flex-grow: 1;
-        z-index: 1; /* Ensure text is clickable */
+        flex-grow: 1; /* Allow text to take remaining space */
+        z-index: 1; /* Make sure text is clickable if label for overlaps */
     }
+    /* Dark mode adjustments */
     body.dark-mode .custom-radio-look {
         border-color: var(--border-color);
         color: var(--body-color);
+        background-color: var(--bs-body-bg);
     }
     body.dark-mode .real-radio-btn:checked + .custom-radio-label .custom-radio-look {
         background-color: var(--primary-color);
         border-color: var(--primary-color);
         color: #fff;
     }
-    body.dark-mode .form-check-input.real-radio-btn:disabled + .custom-radio-label .custom-radio-look {
+     body.dark-mode .form-check-input.real-radio-btn:disabled + .custom-radio-label .custom-radio-look {
         background-color: var(--bs-tertiary-bg);
         border-color: var(--bs-border-color);
         color: var(--bs-text-muted-color);
@@ -444,7 +451,7 @@ require_once 'includes/header.php';
                         if ($quiz_info_for_display['live_start_datetime']) { $status_display_text .= ' (শুরু: ' . format_datetime($quiz_info_for_display['live_start_datetime']) . ')';}
                     } elseif ($quiz_info_for_display['status'] == 'archived') {
                         $status_display_text = 'আর্কাইভড';
-                         if (isset($_SESSION["loggedin"]) && $_SESSION["loggedin"] === true && (!isset($user_role) || $user_role !== 'admin')) {
+                         if (isset($_SESSION["loggedin"]) && $_SESSION["loggedin"] === true && (!isset($user_role) || $user_role !== 'admin')) { // Check if $user_role is set
                              $status_display_text .= ' (অনুশীলনের জন্য উপলব্ধ)';
                          }
                         $status_text_class = 'text-secondary';
@@ -540,17 +547,14 @@ document.addEventListener('DOMContentLoaded', function() {
         const questionCards = document.querySelectorAll('.question-card');
         questionCards.forEach(questionCard => {
             const questionId = questionCard.dataset.questionId;
-            const radiosInThisGroup = questionCard.querySelectorAll(`.real-radio-btn`); // Target real radio
+            const radiosInThisGroup = questionCard.querySelectorAll(`.real-radio-btn`); 
 
             radiosInThisGroup.forEach(radio => {
                 radio.addEventListener('change', function() {
                     if (this.checked && !answeredQuestionLocks.has(questionId)) {
-                        // The CSS :checked selector will handle the visual change of the custom radio.
-                        // The JS part for .selected-option-display on the main label (for border) can remain.
                         const allMainLabelsInQuestion = questionCard.querySelectorAll('.custom-radio-label');
                         allMainLabelsInQuestion.forEach(lbl => {
                             lbl.classList.remove('selected-option-display', 'border-primary', 'border-2');
-                            // Opacity will be handled by :disabled CSS selector now
                         });
 
                         const parentWrapper = this.closest('.custom-radio-option');
@@ -568,7 +572,6 @@ document.addEventListener('DOMContentLoaded', function() {
                             if (otherRadioInGroup !== this) {
                                 otherRadioInGroup.disabled = true;
                             }
-                            // The cursor and opacity are handled by CSS based on :disabled
                         });
                     }
                 });
