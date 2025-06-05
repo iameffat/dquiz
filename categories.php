@@ -7,10 +7,15 @@ require_once 'includes/functions.php';
 
 $categories = [];
 // SQL কুয়েরি আপডেট করা হয়েছে: description এবং icon_class বাদ দেওয়া হয়েছে
-$sql = "SELECT c.id, c.name, COUNT(q.id) as question_count 
+// এবং প্রশ্ন গণনার জন্য question_categories জাংশন টেবিলও অন্তর্ভুক্ত করা হয়েছে
+$sql = "SELECT c.id, c.name, 
+               (SELECT COUNT(DISTINCT q.id) 
+                FROM questions q 
+                LEFT JOIN question_categories qc ON q.id = qc.question_id
+                WHERE q.category_id = c.id OR qc.category_id = c.id
+               ) as question_count
         FROM categories c
-        LEFT JOIN questions q ON c.id = q.category_id
-        GROUP BY c.id, c.name  -- description এবং icon_class গ্রুপ বাই থেকে সরানো হয়েছে
+        GROUP BY c.id, c.name  -- Group by c.id and c.name is still needed
         HAVING question_count > 0 
         ORDER BY c.name ASC";
 
