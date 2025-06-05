@@ -224,16 +224,16 @@ if ($stmt_quizzes) {
                             <td><?php echo $quiz['live_end_datetime'] ? format_datetime($quiz['live_end_datetime'], "d M Y, h:i A") : 'N/A'; ?></td>
                             <td><?php echo format_datetime($quiz['created_at'], "d M Y"); ?></td>
                             <td>
-                                <div class="btn-group" role="group" aria-label="Quiz Actions">
-                                    <a href="edit_quiz.php?id=<?php echo $quiz['id']; ?>" class="btn btn-sm btn-info" title="এডিট করুন">এডিট</a>
-                                    <a href="duplicate_quiz.php?quiz_id_to_duplicate=<?php echo $quiz['id']; ?>" class="btn btn-sm btn-warning" onclick="return confirm('আপনি কি নিশ্চিতভাবে এই কুইজটি ডুপ্লিকেট করতে চান?');" title="ডুপ্লিকেট করুন">ডুপ্লিকেট</a>
-                                    <a href="manage_quizzes.php?action=delete&quiz_id=<?php echo $quiz['id']; ?>&status_filter=<?php echo urlencode($filter_status); ?>" class="btn btn-sm btn-danger" onclick="return confirm('আপনি কি নিশ্চিতভাবে এই কুইজটি এবং এর সাথে সম্পর্কিত সকল প্রশ্ন, অপশন ও উত্তর ডিলিট করতে চান?');" title="ডিলিট করুন">ডিলিট</a>
-                                    <a href="view_quiz_attempts.php?quiz_id=<?php echo $quiz['id']; ?>" class="btn btn-sm btn-success" title="ফলাফল ও অংশগ্রহণকারী দেখুন">ফলাফল</a>
-                                    <a href="../quiz_page.php?id=<?php echo $quiz['id']; ?>" target="_blank" class="btn btn-sm btn-outline-secondary" title="কুইজটি দেখুন">দেখুন</a>
-                                    <?php
-                                        $quiz_public_link = rtrim((isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] === 'on' ? "https" : "http") . "://" . $_SERVER['HTTP_HOST'] . dirname(dirname($_SERVER['PHP_SELF'])), '/') . '/quiz_page.php?id=' . $quiz['id'];
-                                    ?>
-                                    <button class="btn btn-sm btn-outline-primary copy-quiz-link-btn" data-link="<?php echo htmlspecialchars($quiz_public_link); ?>" title="কুইজের লিংক কপি করুন">লিংক</button>
+                               <div class="btn-group" role="group" aria-label="Quiz Actions">
+    <a href="edit_quiz.php?id=<?php echo $quiz['id']; ?>" class="btn btn-sm btn-info me-1" title="এডিট করুন">এডিট</a>
+    <a href="duplicate_quiz.php?quiz_id_to_duplicate=<?php echo $quiz['id']; ?>" class="btn btn-sm btn-warning me-1" onclick="return confirm('আপনি কি নিশ্চিতভাবে এই কুইজটি ডুপ্লিকেট করতে চান?');" title="ডুপ্লিকেট করুন">ডুপ্লিকেট</a>
+    <a href="manage_quizzes.php?action=delete&quiz_id=<?php echo $quiz['id']; ?>&status_filter=<?php echo urlencode($filter_status); ?>" class="btn btn-sm btn-danger me-1" onclick="return confirm('আপনি কি নিশ্চিতভাবে এই কুইজটি এবং এর সাথে সম্পর্কিত সকল প্রশ্ন, অপশন ও উত্তর ডিলিট করতে চান?');" title="ডিলিট করুন">ডিলিট</a>
+    <a href="view_quiz_attempts.php?quiz_id=<?php echo $quiz['id']; ?>" class="btn btn-sm btn-success me-1" title="ফলাফল ও অংশগ্রহণকারী দেখুন">ফলাফল</a>
+    <a href="../quiz_page.php?id=<?php echo $quiz['id']; ?>" target="_blank" class="btn btn-sm btn-outline-secondary me-1" title="কুইজটি দেখুন">দেখুন</a>
+    <?php
+        $quiz_public_link = rtrim((isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] === 'on' ? "https" : "http") . "://" . $_SERVER['HTTP_HOST'] . dirname(dirname($_SERVER['PHP_SELF'])), '/') . '/quiz_page.php?id=' . $quiz['id'];
+    ?>
+    <button class="btn btn-sm btn-outline-primary copy-quiz-link-btn" data-link="<?php echo htmlspecialchars($quiz_public_link); ?>" title="কুইজের লিংক কপি করুন">লিংক</button> </div>
                                 </div>
                             </td>
                         </tr>
