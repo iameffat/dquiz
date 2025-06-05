@@ -6,7 +6,7 @@ require_once 'includes/auth_check.php';
 require_once '../includes/functions.php';
 
 $quiz_id = isset($_GET['quiz_id']) ? intval($_GET['quiz_id']) : 0;
-$admin_base_url = ''; // যেহেতু এই ফাইলটি admin ফোল্ডারের রুটে আছে
+$admin_base_url = '';
 
 if ($quiz_id <= 0) {
     $_SESSION['flash_message'] = "অবৈধ কুইজ ID.";
@@ -40,7 +40,7 @@ if ($result_quiz_info->num_rows === 1) {
 }
 $stmt_quiz_info->close();
 
-// Handle Cancel/Reinstate/Delete Attempt Action
+// Handle Cancel/Reinstate/Delete Attempt Action (এই অংশ অপরিবর্তিত থাকবে)
 if (isset($_GET['action']) && isset($_GET['attempt_id'])) {
     $action = $_GET['action'];
     $attempt_id_to_manage = intval($_GET['attempt_id']);
@@ -122,7 +122,7 @@ $sql_attempts = "
         qa.id as attempt_id,
         qa.user_id,
         u.name as user_name,
-        u.email as user_email, -- ইমেইল যুক্ত করা হলো
+        u.mobile_number as user_mobile, -- মোবাইল নম্বর যুক্ত করা হলো
         qa.score,
         qa.time_taken_seconds,
         qa.submitted_at,
@@ -167,23 +167,22 @@ if (!empty($attempts_data)) {
     }
 }
 
-// Function to mask email for privacy print
-function mask_email_for_print($email) {
-    if (empty($email) || strpos($email, '@') === false) {
+// Function to mask phone number for privacy print
+function mask_phone_for_print($phone) {
+    if (empty($phone)) {
         return 'N/A';
     }
-    list($user, $domain) = explode('@', $email);
-    $user_len = strlen($user);
-    $masked_user = '';
-
-    if ($user_len <= 1) { // যদি ইউজারনেম ১ অক্ষরের হয়
-        $masked_user = '*';
-    } elseif ($user_len <= 5) { // যদি ইউজারনেম ২ থেকে ৫ অক্ষরের হয়
-        $masked_user = substr($user, 0, 1) . str_repeat('*', $user_len - 1);
-    } else { // যদি ইউজারনেম ৫ অক্ষরের বেশি হয়
-        $masked_user = substr($user, 0, 3) . str_repeat('*', $user_len - 4) . substr($user, -1);
+    $phone_len = strlen($phone);
+    // সাধারণত বাংলাদেশী নম্বর ১১ সংখ্যার হয় (01xxxxxxxxx)
+    if ($phone_len == 11) {
+        return substr($phone, 0, 3) . '****' . substr($phone, -4);
+    } elseif ($phone_len > 7) { // অন্যান্য দেশের নম্বরের জন্য সাধারণ মাস্কিং
+        return substr($phone, 0, 3) . str_repeat('*', $phone_len - 6) . substr($phone, -3);
+    } elseif ($phone_len > 3) {
+        return substr($phone, 0, 1) . str_repeat('*', $phone_len - 2) . substr($phone, -1);
+    } else {
+        return str_repeat('*', $phone_len); // খুব ছোট হলে সম্পূর্ণ মাস্ক
     }
-    return $masked_user . '@' . $domain;
 }
 
 
@@ -244,13 +243,13 @@ require_once 'includes/header.php';
         a[href]:after {
             content: none !important;
         }
-        .print-only-email, .print-only-name { display: none; } 
+        .print-only-phone, .print-only-name { display: none; } 
 
-        body.print-privacy .print-only-email { display: table-cell !important; } 
+        body.print-privacy .print-only-phone { display: table-cell !important; } 
         body:not(.print-privacy) .print-only-name { display: table-cell !important; } 
 
         body.print-privacy .participant-col-print-name { display: none !important; }
-        body:not(.print-privacy) .participant-col-print-email { display: none !important; }
+        body:not(.print-privacy) .participant-col-print-phone { display: none !important; }
 
         .table tbody tr {
             page-break-inside: avoid; 
@@ -281,13 +280,13 @@ require_once 'includes/header.php';
                 </svg>
                 ফলাফল প্রিন্ট করুন (নাম সহ)
             </button>
-            <button onclick="prepareAndPrint('email');" class="btn btn-outline-info ms-2">
+            <button onclick="prepareAndPrint('phone');" class="btn btn-outline-info ms-2">
                  <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-printer" viewBox="0 0 16 16">
                     <path d="M2.5 8a.5.5 0 1 0 0-1 .5.5 0 0 0 0 1"/>
                     <path d="M5 1a2 2 0 0 0-2 2v2H2a2 2 0 0 0-2 2v3a2 2 0 0 0 2 2h1v1a2 2 0 0 0 2 2h6a2 2 0 0 0 2-2v-1h1a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2h-1V3a2 2 0 0 0-2-2zM4 3a1 1 0 0 1 1-1h6a1 1 0 0 1 1 1v2H4zm1 5a2 2 0 0 0-2 2v1H2.5a.5.5 0 0 1-.5-.5V7.5a.5.5 0 0 1 .5-.5H3v-1zM11 4H5v1h6zM2.5 7a.5.5 0 0 1 .5.5v1a.5.5 0 0 1-.5.5H2v-1.5a.5.5 0 0 1 .5-.5zm1.498 7.157a.5.5 0 0 1-.707 0l-1.002-1.001a.5.5 0 1 1 .707-.708l1.001 1.001a.5.5 0 0 1 0 .707M11.5 14a.5.5 0 0 1-.5.5h-3a.5.5 0 0 1 0-1h3a.5.5 0 0 1 .5.5"/>
                     <path d="M13.5 9a.5.5 0 0 1 .5.5v4a.5.5 0 0 1-.5.5h-1v-1.335a3.5 3.5 0 0 0-3.5-3.5H5.335v-1H13.5z"/>
                  </svg>
-                প্রাইভেসি প্রিন্ট (ইমেইল সহ)
+                প্রাইভেসি প্রিন্ট (ফোন নম্বর সহ)
             </button>
             <a href="manage_quizzes.php" class="btn btn-outline-secondary ms-2">সকল কুইজে ফিরে যান</a>
         </div>
@@ -332,7 +331,7 @@ require_once 'includes/header.php';
                             <tr>
                                 <th># র‍্যাংক</th>
                                 <th class="participant-col-print-name">অংশগ্রহণকারীর নাম (ID)</th>
-                                <th class="participant-col-print-email" style="display:none;">অংশগ্রহণকারী (ইমেইল)</th>
+                                <th class="participant-col-print-phone" style="display:none;">অংশগ্রহণকারী (ফোন)</th>
                                 <th>স্কোর</th>
                                 <th>সময় লেগেছে</th>
                                 <th>সাবমিটের সময়</th>
@@ -399,8 +398,8 @@ require_once 'includes/header.php';
                                 <td class="participant-col-print-name print-only-name">
                                     <?php echo htmlspecialchars($attempt['user_name']); ?> (ID: <?php echo $attempt['user_id']; ?>)
                                 </td>
-                                <td class="participant-col-print-email print-only-email" style="display:none;">
-                                    <?php echo htmlspecialchars(mask_email_for_print($attempt['user_email'])); ?> (ID: <?php echo $attempt['user_id']; ?>)
+                                <td class="participant-col-print-phone print-only-phone" style="display:none;">
+                                    <?php echo htmlspecialchars(mask_phone_for_print($attempt['user_mobile'])); ?> (ID: <?php echo $attempt['user_id']; ?>)
                                 </td>
                                 <td><?php echo $attempt['score'] !== null ? number_format($attempt['score'], 2) : 'N/A'; ?></td>
                                 <td><?php echo $attempt['time_taken_seconds'] ? format_seconds_to_hms($attempt['time_taken_seconds']) : 'N/A'; ?></td>
@@ -432,13 +431,13 @@ require_once 'includes/header.php';
             printTitleElement.style.display = 'block';
         }
 
-        if (printMode === 'email') {
+        if (printMode === 'phone') { // 'email' পরিবর্তন করে 'phone' করা হলো
             bodyElement.classList.add('print-privacy');
             document.querySelectorAll('.participant-col-print-name').forEach(el => el.style.display = 'none');
-            document.querySelectorAll('.participant-col-print-email').forEach(el => el.style.display = 'table-cell');
+            document.querySelectorAll('.participant-col-print-phone').forEach(el => el.style.display = 'table-cell'); // .participant-col-print-email পরিবর্তন করে .participant-col-print-phone করা হলো
         } else { 
             bodyElement.classList.remove('print-privacy');
-            document.querySelectorAll('.participant-col-print-email').forEach(el => el.style.display = 'none');
+            document.querySelectorAll('.participant-col-print-phone').forEach(el => el.style.display = 'none'); // .participant-col-print-email পরিবর্তন করে .participant-col-print-phone করা হলো
             document.querySelectorAll('.participant-col-print-name').forEach(el => el.style.display = 'table-cell');
         }
         
