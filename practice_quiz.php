@@ -154,6 +154,15 @@ $page_specific_styles = "
     .timer-display { font-size: 1.2rem; font-weight: bold; }
     .timer-display.critical { color: var(--bs-danger); }
     .settings-card { max-width: 600px; margin: 2rem auto; }
+
+    /* Styles for time's up modal */
+    .blur-background {
+        filter: blur(5px);
+        transition: filter 0.3s ease-in-out;
+    }
+    #quizInterfaceContainer.blur-background { /* Specificity */
+        /* No additional styles needed here if .blur-background is applied directly */
+    }
 ";
 require_once 'includes/header.php'; //
 ?>
@@ -280,12 +289,36 @@ require_once 'includes/header.php'; //
     <?php endif; ?>
 </div>
 
+<div class="modal fade" id="timesUpModal" tabindex="-1" aria-labelledby="timesUpModalLabel" aria-hidden="true" data-bs-backdrop="static" data-bs-keyboard="false">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="timesUpModalLabel">সময় শেষ!</h5>
+            </div>
+            <div class="modal-body">
+                <p>অনুশীলন কুইজের জন্য আপনার নির্ধারিত সময় শেষ হয়ে গেছে।</p>
+                <p>আপনার উত্তর সাবমিট করতে নিচের বাটনে ক্লিক করুন।</p>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-primary" id="submitFromModalBtn">ফলাফল দেখুন</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+
 <script>
 document.addEventListener('DOMContentLoaded', function() {
     const quizForm = document.getElementById('practiceQuizForm');
     const timerDisplay = document.getElementById('timerDisplayPractice');
+    const quizInterfaceContainer = document.getElementById('quizInterfaceContainer'); // Main quiz container
     let timeLeft = <?php echo $quiz_duration_seconds > 0 ? $quiz_duration_seconds : -1; ?>;
     let timerInterval;
+    let timesUpModalInstance = null; // Modal instance
+
+    if (document.getElementById('timesUpModal')) {
+        timesUpModalInstance = new bootstrap.Modal(document.getElementById('timesUpModal'));
+    }
 
     function formatTime(seconds) {
         const h = Math.floor(seconds / 3600);
@@ -297,14 +330,29 @@ document.addEventListener('DOMContentLoaded', function() {
         return timeString;
     }
 
+    function showTimesUpModal() {
+        if (timesUpModalInstance && quizInterfaceContainer) {
+            quizInterfaceContainer.classList.add('blur-background'); // Blur background
+            timesUpModalInstance.show();
+            // Disable further interactions with the quiz form if needed
+            const quizElements = quizForm.elements;
+            for (let i = 0; i < quizElements.length; i++) {
+                quizElements[i].disabled = true;
+            }
+            // Also disable the main submit button
+            const mainSubmitBtn = document.getElementById('submitPracticeQuizBtn');
+            if(mainSubmitBtn) mainSubmitBtn.disabled = true;
+        }
+    }
+
     function updateTimerDisplay() {
-        if (!timerDisplay || timeLeft < 0) return; // টাইমার ডিসপ্লে না থাকলে বা সময় শেষ হয়ে গেলে আর কাজ করবে না
+        if (!timerDisplay || timeLeft < 0) return;
 
         timerDisplay.textContent = "সময় বাকি: " + formatTime(timeLeft);
 
-        if (timeLeft <= 60 && timeLeft > 0) { // যখন ৬০ সেকেন্ড বা তার কম সময় বাকি থাকবে
-            timerDisplay.classList.add('critical'); // Critical ক্লাস যোগ করবে (যেমন লাল রঙ)
-            timerDisplay.classList.remove('text-success'); // যদি অন্য কোনো ক্লাস থাকে, তা সরিয়ে দেবে
+        if (timeLeft <= 60 && timeLeft > 0) {
+            timerDisplay.classList.add('critical');
+            timerDisplay.classList.remove('text-success');
         } else if (timeLeft > 60) {
             timerDisplay.classList.remove('critical');
         }
@@ -312,20 +360,31 @@ document.addEventListener('DOMContentLoaded', function() {
         if (timeLeft <= 0) { // যখন সময় একদম শেষ
             timerDisplay.textContent = "সময় শেষ!";
             timerDisplay.classList.remove('critical');
-            timerDisplay.classList.add('text-danger'); // সময় শেষ হলে লাল রঙ দেখাবে
+            timerDisplay.classList.add('text-danger');
 
-            if (quizForm && !quizForm.dataset.submitted) { // যদি ফর্ম থাকে এবং ইতিমধ্যে সাবমিট না হয়ে থাকে
-                quizForm.dataset.submitted = 'true'; // একাধিকবার সাবমিট হওয়া থেকে বিরত রাখার জন্য
-                quizForm.submit(); // ফর্ম স্বয়ংক্রিয়ভাবে সাবমিট করবে
+            if (quizForm && !quizForm.dataset.submitted) {
+                // quizForm.dataset.submitted = 'true'; // Mark as submitted conceptually
+                // quizForm.submit(); // আগের মতো অটো সাবমিট না করে পপআপ দেখাবে
+                showTimesUpModal(); // Show the modal instead of auto-submitting
             }
-            if(timerInterval) clearInterval(timerInterval); // টাইমার বন্ধ করে দেবে
+            if(timerInterval) clearInterval(timerInterval);
         }
-        if (timeLeft > 0) timeLeft--; // প্রতি সেকেন্ডে সময় কমাবে
+        if (timeLeft > 0) timeLeft--;
     }
 
-    if (timeLeft >= 0 && document.getElementById('practiceQuizForm')) { // ফর্ম এবং সময়সীমা সেট করা থাকলেই টাইমার শুরু হবে
-        updateTimerDisplay(); // প্রথমবার সময় দেখানোর জন্য
-        timerInterval = setInterval(updateTimerDisplay, 1000); // প্রতি সেকেন্ডে সময় আপডেট করার জন্য
+    if (timeLeft >= 0 && quizForm) {
+        updateTimerDisplay();
+        timerInterval = setInterval(updateTimerDisplay, 1000);
+    }
+
+    const submitFromModalBtn = document.getElementById('submitFromModalBtn');
+    if (submitFromModalBtn && quizForm) {
+        submitFromModalBtn.addEventListener('click', function() {
+            if (!quizForm.dataset.submitted) {
+                quizForm.dataset.submitted = 'true'; // Prevent multiple submissions
+                quizForm.submit();
+            }
+        });
     }
 
 
@@ -351,7 +410,6 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     });
 
-    // Form validation for number of questions
     const practiceSettingsForm = document.getElementById('practiceSettingsForm');
     if (practiceSettingsForm) {
         const numQuestionsInput = document.getElementById('num_questions');
