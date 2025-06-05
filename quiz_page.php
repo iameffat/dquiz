@@ -280,6 +280,9 @@ $page_specific_styles = "
         width: 0;
         height: 0;
     }
+    .form-check {
+    padding-left: 0!important;
+}
     /* ==== End of Styles for Circular Option Prefix ==== */
 ";
 
