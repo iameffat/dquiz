@@ -45,3 +45,15 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     }
 });
+
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('/service-worker.js') // নিশ্চিত করুন পাথটি সঠিক
+      .then(registration => {
+        console.log('ServiceWorker registration successful with scope: ', registration.scope);
+      })
+      .catch(err => {
+        console.log('ServiceWorker registration failed: ', err);
+      });
+  });
+}
