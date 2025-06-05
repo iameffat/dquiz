@@ -2,8 +2,9 @@
 // practice_quiz.php
 $page_title = "অনুশীলন কুইজ";
 $base_url = '';
-require_once '../includes/db_connect.php';
-require_once '../includes/functions.php';
+// Corrected include paths
+require_once 'includes/db_connect.php';
+require_once 'includes/functions.php';
 
 $category_id = isset($_REQUEST['category_id']) ? intval($_REQUEST['category_id']) : 0;
 $category_name = "";
@@ -51,7 +52,7 @@ if ($stmt_cat) {
     $stmt_cat->bind_param("i", $category_id);
     $stmt_cat->execute();
     $result_cat = $stmt_cat->get_result();
-    if ($cat_data = $result_cat->fetch_assoc()) {
+    if ($result_cat && $cat_data = $result_cat->fetch_assoc()) {
         $category_name = $cat_data['name'];
         $page_title = "অনুশীলন: " . htmlspecialchars($category_name);
     } else {
@@ -62,7 +63,7 @@ if ($stmt_cat) {
     }
     $stmt_cat->close();
 } else {
-    error_log("Failed to prepare category fetch statement: " . $conn->error);
+    error_log("Practice Quiz: Failed to prepare category fetch statement: " . $conn->error);
     $_SESSION['flash_message'] = "ডাটাবেস সমস্যা: ক্যাটাগরির তথ্য আনতে সমস্যা হয়েছে।";
     $_SESSION['flash_message_type'] = "danger";
     header("Location: categories.php");
@@ -79,13 +80,23 @@ $sql_q_count = "
 $stmt_q_count = $conn->prepare($sql_q_count);
 if($stmt_q_count){
     $stmt_q_count->bind_param("ii", $category_id, $category_id);
-    $stmt_q_count->execute();
-    $total_questions_in_category_result = $stmt_q_count->get_result()->fetch_assoc();
-    $total_questions_in_category = $total_questions_in_category_result ? $total_questions_in_category_result['total_q'] : 0;
+    if ($stmt_q_count->execute()) {
+        $result_q_count_obj = $stmt_q_count->get_result();
+        if ($result_q_count_obj) {
+            $total_questions_in_category_result = $result_q_count_obj->fetch_assoc();
+            $total_questions_in_category = $total_questions_in_category_result ? (int)$total_questions_in_category_result['total_q'] : 0;
+        } else {
+            error_log("Practice Quiz: Failed to get result for question count: " . $stmt_q_count->error);
+            $total_questions_in_category = 0;
+        }
+    } else {
+        error_log("Practice Quiz: Failed to execute question count statement: " . $stmt_q_count->error);
+        $total_questions_in_category = 0;
+    }
     $stmt_q_count->close();
 } else {
-    error_log("Failed to prepare question count statement: " . $conn->error);
-     $total_questions_in_category = 0; // Default to 0 if query fails
+    error_log("Practice Quiz: Failed to prepare question count statement: " . $conn->error);
+    $total_questions_in_category = 0;
 }
 
 
@@ -102,12 +113,11 @@ if ($start_quiz) {
         $num_questions_to_show = $default_num_questions; 
     }
     if ($num_questions_to_show > $total_questions_in_category && $total_questions_in_category > 0) {
-        $num_questions_to_show = $total_questions_in_category; // যদি ইউজার বেশি প্রশ্ন চায় কিন্তু ক্যাটাগরিতে কম থাকে
+        $num_questions_to_show = $total_questions_in_category;
     }
     
     $num_questions_to_load = $num_questions_to_show;
 
-    // Updated SQL to fetch questions from both quiz-specific and manual (category-specific) sources
     $sql_questions = "
         (SELECT q.id, q.question_text, q.image_url, q.explanation
          FROM questions q
@@ -124,35 +134,52 @@ if ($start_quiz) {
 
     if ($stmt_questions) {
         $stmt_questions->bind_param("iii", $category_id, $category_id, $num_questions_to_load);
-        $stmt_questions->execute();
-        $result_questions = $stmt_questions->get_result();
-
-        while ($q_row = $result_questions->fetch_assoc()) {
-            $options = [];
-            $sql_options = "SELECT id, option_text, is_correct FROM options WHERE question_id = ?";
-            $stmt_options_inner = $conn->prepare($sql_options);
-            if ($stmt_options_inner) {
-                $stmt_options_inner->bind_param("i", $q_row['id']);
-                $stmt_options_inner->execute();
-                $result_options_data = $stmt_options_inner->get_result();
-                while ($opt_row = $result_options_data->fetch_assoc()) {
-                    $options[] = $opt_row;
+        if ($stmt_questions->execute()) {
+            $result_questions_obj = $stmt_questions->get_result();
+            if ($result_questions_obj) {
+                while ($q_row = $result_questions_obj->fetch_assoc()) {
+                    $options = []; // Reset options for each question
+                    $sql_options_q = "SELECT id, option_text, is_correct FROM options WHERE question_id = ?";
+                    $stmt_options_inner = $conn->prepare($sql_options_q);
+                    if ($stmt_options_inner) {
+                        $stmt_options_inner->bind_param("i", $q_row['id']);
+                        if ($stmt_options_inner->execute()) {
+                            $result_options_data = $stmt_options_inner->get_result();
+                            if ($result_options_data) {
+                                while ($opt_row = $result_options_data->fetch_assoc()) {
+                                    $options[] = $opt_row;
+                                }
+                            } else {
+                                error_log("Practice Quiz: Failed to get result for options for q_id " . $q_row['id'] . ": " . $stmt_options_inner->error);
+                            }
+                        } else {
+                             error_log("Practice Quiz: Failed to execute options fetch for q_id " . $q_row['id'] . ": " . $stmt_options_inner->error);
+                        }
+                        $stmt_options_inner->close();
+                    } else {
+                         error_log("Practice Quiz: Failed to prepare options fetch statement for q_id " . $q_row['id'] . ": " . $conn->error);
+                    }
+                    shuffle($options);
+                    $q_row['options'] = $options;
+                    $questions[] = $q_row;
                 }
-                $stmt_options_inner->close();
             } else {
-                error_log("Failed to prepare options fetch statement for question ID " . $q_row['id'] . ": " . $conn->error);
+                error_log("Practice Quiz: Failed to get result for questions fetch: " . $stmt_questions->error);
             }
-            shuffle($options);
-            $q_row['options'] = $options;
-            $questions[] = $q_row;
+        } else {
+            error_log("Practice Quiz: Failed to execute questions fetch statement: " . $stmt_questions->error);
         }
         $stmt_questions->close();
     } else {
-        error_log("Failed to prepare questions fetch statement: " . $conn->error);
+        error_log("Practice Quiz: Failed to prepare questions fetch statement: " . $conn->error);
         $_SESSION['flash_message'] = "প্রশ্ন আনতে ডাটাবেস সমস্যা হয়েছে।";
         $_SESSION['flash_message_type'] = "danger";
-        header("Location: practice_quiz.php?category_id=" . $category_id);
-        exit;
+        // Redirect or display error, but avoid header if HTML already started
+        // For simplicity, if header.php isn't called yet, this is okay:
+        if (!headers_sent()) {
+            header("Location: practice_quiz.php?category_id=" . $category_id);
+            exit;
+        }
     }
 }
 
@@ -175,13 +202,14 @@ $page_specific_styles = "
     .timer-display.critical { color: var(--bs-danger); }
     .settings-card { max-width: 600px; margin: 2rem auto; }
 ";
-require_once '../includes/header.php';
+// Corrected include path for header
+require_once 'includes/header.php';
 ?>
 
 <div class="container" id="quizInterfaceContainer">
     <h2 class="mb-3 mt-4 text-center">অনুশীলন কুইজ: <?php echo htmlspecialchars($category_name); ?></h2>
 
-    <?php if (!$start_quiz): // যদি কুইজ শুরু না হয়ে থাকে, সেটিংস ফর্ম দেখান ?>
+    <?php if (!$start_quiz): ?>
         <div class="card shadow-sm settings-card">
             <div class="card-header">
                 <h5 class="mb-0">অনুশীলন সেটিংস</h5>
@@ -229,7 +257,7 @@ require_once '../includes/header.php';
                 </div>
             </div>
         </div>
-    <?php else: // কুইজ শুরু হয়েছে, প্রশ্ন দেখান ?>
+    <?php else: ?>
         
         <?php if ($quiz_duration_seconds > 0): ?>
         <div class="text-center my-3 timer-display-container">
@@ -338,18 +366,18 @@ document.addEventListener('DOMContentLoaded', function() {
         if (timeLeft <= 0) {
             timerDisplay.textContent = "সময় শেষ!";
             timerDisplay.classList.remove('critical');
-            timerDisplay.classList.add('text-danger'); // Bootstrap class for red color
+            timerDisplay.classList.add('text-danger');
             if (quizForm && !quizForm.dataset.submitted) {
                 quizForm.dataset.submitted = 'true';
-                quizForm.submit(); // Submit the form when time is up
+                quizForm.submit();
             }
             if(timerInterval) clearInterval(timerInterval);
         }
         if (timeLeft > 0) timeLeft--;
     }
 
-    if (timeLeft >= 0 && document.getElementById('practiceQuizForm')) { // Start timer only if form exists and time is set
-        updateTimerDisplay(); // Initial display
+    if (timeLeft >= 0 && document.getElementById('practiceQuizForm')) {
+        updateTimerDisplay(); 
         timerInterval = setInterval(updateTimerDisplay, 1000);
     }
 
@@ -376,7 +404,6 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     });
 
-    // Form validation for number of questions
     const practiceSettingsForm = document.getElementById('practiceSettingsForm');
     if (practiceSettingsForm) {
         const numQuestionsInput = document.getElementById('num_questions');
@@ -395,5 +422,6 @@ document.addEventListener('DOMContentLoaded', function() {
 
 <?php
 if ($conn) { $conn->close(); }
-require_once '../includes/footer.php';
+// Corrected include path for footer
+require_once 'includes/footer.php';
 ?>
