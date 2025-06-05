@@ -42,7 +42,6 @@ if ($stmt_quiz_details_basic) {
     $stmt_quiz_details_basic->close();
 } else {
     error_log("Prepare failed for basic quiz details: (" . $conn->errno . ") " . $conn->error);
-    // এই পর্যায়ে header.php কল করা হয়নি, তাই flash message সেট করে রিডাইরেক্ট করা নিরাপদ
     $_SESSION['flash_message'] = "কুইজের তথ্য আনতে ডেটাবেস সমস্যা হয়েছে।";
     $_SESSION['flash_message_type'] = "danger";
     header("Location: quizzes.php");
@@ -56,15 +55,12 @@ $show_quiz_interface = false; // Flag to indicate if quiz UI should be shown
 
 if (!isset($_SESSION["loggedin"]) || $_SESSION["loggedin"] !== true) {
     // User is NOT logged in.
-    // $access_message will be handled in the HTML part to show login prompt.
-    // $show_quiz_interface remains false.
 } else {
     // User IS logged in.
     $user_id = $_SESSION['user_id'];
     $user_role = isset($_SESSION['role']) ? $_SESSION['role'] : 'user';
-    $quiz = $quiz_info_for_display; // Use $quiz for clarity within this block
+    $quiz = $quiz_info_for_display; 
 
-    // Check for existing attempt if user is not admin
     if ($user_role !== 'admin') {
         $sql_check_existing_attempt = "SELECT id, score, end_time FROM quiz_attempts WHERE user_id = ? AND quiz_id = ? LIMIT 1";
         $stmt_check_existing_attempt = $conn->prepare($sql_check_existing_attempt);
@@ -89,22 +85,20 @@ if (!isset($_SESSION["loggedin"]) || $_SESSION["loggedin"] !== true) {
         $stmt_check_existing_attempt->close();
 
         if ($existing_attempt_data) {
-            // User has already attempted this quiz. Redirect to results page.
             $_SESSION['flash_message'] = ($existing_attempt_data['score'] === null && $existing_attempt_data['end_time'] === null) ?
                                         "আপনি ইতিমধ্যে এই কুইজে একবার প্রবেশ করেছিলেন কিন্তু সম্পন্ন করেননি। আপনার অসমাপ্ত চেষ্টার ফলাফল দেখানো হচ্ছে অথবা কুইজটি নতুন করে শুরু হতে পারে।" :
                                         "আপনি ইতিমধ্যে এই কুইজটি সম্পন্ন করেছেন। নিচে আপনার আগের ফলাফল দেখানো হলো।";
             $_SESSION['flash_message_type'] = ($existing_attempt_data['score'] === null && $existing_attempt_data['end_time'] === null) ? "warning" : "info";
             header("Location: results.php?attempt_id=" . $existing_attempt_data['id'] . "&quiz_id=" . $quiz_id);
-            exit; // CRITICAL: Exit immediately after redirection
+            exit; 
         }
     }
 
-    // If not redirected, determine if quiz can be taken by this logged-in user
     $current_datetime = new DateTime();
     if ($user_role === 'admin') {
         $can_take_quiz = true; 
         $access_message = "আপনি অ্যাডমিন হিসেবে এই কুইজটি দেখছেন/টেস্ট করছেন।";
-    } else { // Regular user
+    } else { 
         if ($quiz['status'] == 'draft') {
             $access_message = "এই কুইজটি এখন অংশগ্রহণের জন্য উপলব্ধ নয় কারণ এটি এখনও ড্রাফট পর্যায়ে রয়েছে।";
         } elseif ($quiz['status'] == 'upcoming') {
@@ -114,10 +108,10 @@ if (!isset($_SESSION["loggedin"]) || $_SESSION["loggedin"] !== true) {
                     $live_start_dt_check = new DateTime($quiz['live_start_datetime']);
                     if ($current_datetime < $live_start_dt_check) {
                          $access_message .= " সম্ভাব্য শুরু: " . format_datetime($quiz['live_start_datetime']);
-                    } else { // Should be live if start time passed, but status is still upcoming (edge case)
-                        $can_take_quiz = true; // Allow if start time passed but somehow status wasn't updated
+                    } else { 
+                        $can_take_quiz = true; 
                     }
-                } catch (Exception $e) { /* Invalid date format, treat as upcoming */ }
+                } catch (Exception $e) { /* Invalid date format */ }
             }
         } elseif ($quiz['status'] == 'live') {
             $can_take_quiz_live_check = true;
@@ -143,12 +137,10 @@ if (!isset($_SESSION["loggedin"]) || $_SESSION["loggedin"] !== true) {
                 $can_take_quiz = true;
             }
         } elseif ($quiz['status'] == 'archived') {
-            $can_take_quiz = true; // Archived quizzes can be taken for practice by logged-in users
-            // $access_message = "এটি একটি আর্কাইভ কুইজ। আপনি অনুশীলনের জন্য অংশগ্রহণ করতে পারেন।"; // Optional: Set if you want specific msg for archived
+            $can_take_quiz = true; 
         }
     }
 
-    // If user can take the quiz, fetch questions and create attempt record
     if ($can_take_quiz) {
         $sql_questions = "SELECT id, question_text, image_url FROM questions WHERE quiz_id = ? ORDER BY order_number ASC, id ASC";
         $stmt_questions = $conn->prepare($sql_questions);
@@ -236,12 +228,100 @@ $page_specific_styles = "
     .timer-progress-bar { position: sticky; top: 0; z-index: 1030; background-color: var(--timer-progress-bar-bg); padding: 10px 0; box-shadow: 0 2px 4px rgba(0,0,0,0.1); border-bottom: 1px solid var(--border-color); }
     body.dark-mode .timer-progress-bar { box-shadow: 0 2px 4px rgba(255,255,255,0.1); }
     .timer.critical { color: var(--danger-color) !important; font-weight: bold; }
-    .question-option-wrapper .form-check-label { cursor: pointer; transition: background-color 0.2s ease-in-out, border-color 0.2s ease-in-out; }
-    .question-option-wrapper .form-check-label:hover { background-color: var(--question-option-hover-bg); }
-    .question-option-wrapper label.selected-option-display { background-color: var(--primary-color) !important; border-color: var(--primary-color) !important; color: #fff !important; font-weight: bold; }
+    
+    /* Custom Radio Button Styles */
+    .custom-radio-option {
+        position: relative; 
+    }
+    .real-radio-btn { /* Hide the actual radio button */
+        opacity: 0;
+        position: absolute;
+        left: 0; /* Position it behind the custom one or off-screen */
+        width: 1.5em; /* Ensure it's clickable over the custom one */
+        height: 1.5em;
+        z-index: 2; /* Above custom-radio-look but below label text if needed */
+        cursor: pointer;
+    }
+    .custom-radio-label {
+        display: flex; 
+        align-items: center;
+        cursor: pointer;
+        padding-left: 0 !important; 
+    }
+    .custom-radio-look {
+        display: inline-flex; 
+        align-items: center;
+        justify-content: center;
+        width: 1.5em;  
+        height: 1.5em; 
+        border: 2px solid var(--bs-border-color); 
+        border-radius: 50%;
+        margin-right: 0.75em; 
+        transition: border-color 0.15s ease-in-out, background-color 0.15s ease-in-out;
+        font-size: 0.9em; 
+        font-weight: bold;
+        color: var(--body-color); 
+        line-height: 1; 
+        position: relative;
+        z-index: 1;
+    }
+    .custom-radio-look::before {
+        content: attr(data-char);
+    }
+    .real-radio-btn:checked + .custom-radio-label .custom-radio-look {
+        background-color: var(--primary-color); 
+        border-color: var(--primary-color); 
+        color: #fff; 
+    }
+    .real-radio-btn:focus + .custom-radio-label .custom-radio-look {
+         box-shadow: 0 0 0 0.25rem rgba(var(--primary-rgb), .25);
+    }
+    .form-check-input.real-radio-btn:disabled + .custom-radio-label {
+        opacity: 0.6;
+        cursor: default;
+    }
+     .form-check-input.real-radio-btn:disabled + .custom-radio-label .custom-radio-look {
+        background-color: var(--bs-secondary-bg);
+        border-color: var(--bs-border-color);
+        color: var(--bs-secondary-color);
+    }
+    .form-check-input.real-radio-btn:checked:disabled + .custom-radio-label {
+         opacity: 1; /* Selected but disabled should still look selected */
+    }
+     .form-check-input.real-radio-btn:checked:disabled + .custom-radio-label .custom-radio-look {
+        background-color: var(--primary-color); /* Keep checked style even if disabled */
+        border-color: var(--primary-color);
+        color: #fff;
+        opacity: 0.7; /* Slightly dim the checked+disabled state */
+    }
+
+    .option-text {
+        flex-grow: 1;
+        z-index: 1; /* Ensure text is clickable */
+    }
+    body.dark-mode .custom-radio-look {
+        border-color: var(--border-color);
+        color: var(--body-color);
+    }
+    body.dark-mode .real-radio-btn:checked + .custom-radio-label .custom-radio-look {
+        background-color: var(--primary-color);
+        border-color: var(--primary-color);
+        color: #fff;
+    }
+    body.dark-mode .form-check-input.real-radio-btn:disabled + .custom-radio-label .custom-radio-look {
+        background-color: var(--bs-tertiary-bg);
+        border-color: var(--bs-border-color);
+        color: var(--bs-text-muted-color);
+    }
+    body.dark-mode .form-check-input.real-radio-btn:checked:disabled + .custom-radio-label .custom-radio-look {
+        background-color: var(--primary-color);
+        border-color: var(--primary-color);
+        color: #fff;
+        opacity:0.7;
+    }
 ";
 
-require_once 'includes/header.php'; // HTML <head> and navbar are outputted here
+require_once 'includes/header.php'; 
 ?>
 
 <?php if ($show_quiz_interface && $attempt_id && $total_questions > 0): ?>
@@ -264,6 +344,7 @@ require_once 'includes/header.php'; // HTML <head> and navbar are outputted here
                     <p class="text-danger fw-bold">আপনি কি উপরের সকল নিয়মের সাথে একমত এবং কুইজ শুরু করতে প্রস্তুত?</p>
                 </div>
                 <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" onclick="window.location.href='quizzes.php';">সম্মত নই (ফিরে যান)</button>
                     <button type="button" class="btn btn-primary" id="agreeAndStartQuiz" data-bs-dismiss="modal">সম্মত ও শুরু করুন</button>
                 </div>
             </div>
@@ -283,7 +364,7 @@ require_once 'includes/header.php'; // HTML <head> and navbar are outputted here
             <input type="hidden" name="quiz_id" value="<?php echo $quiz_id; ?>">
             <input type="hidden" name="attempt_id" value="<?php echo $attempt_id; ?>">
             <?php 
-            $bengali_options_map = ['ক', 'খ', 'গ', 'ঘ', 'ঙ', 'চ']; // যদি ৪টির বেশি অপশন থাকে তার জন্য অতিরিক্ত অক্ষর
+            $bengali_options_map = ['ক', 'খ', 'গ', 'ঘ', 'ঙ', 'চ']; 
             foreach ($questions as $index => $question): 
             ?>
             <div class="card question-card mb-4 shadow-sm" id="question_<?php echo $question['id']; ?>" data-question-id="<?php echo $question['id']; ?>">
@@ -297,16 +378,17 @@ require_once 'includes/header.php'; // HTML <head> and navbar are outputted here
                         </div>
                     <?php endif; ?>
                     <?php foreach ($question['options'] as $opt_index => $option): 
-                        $option_prefix = isset($bengali_options_map[$opt_index]) ? $bengali_options_map[$opt_index] . '. ' : '';
+                        $option_char = isset($bengali_options_map[$opt_index]) ? $bengali_options_map[$opt_index] : '';
                     ?>
-                    <div class="form-check question-option-wrapper mb-2">
-                        <input class="form-check-input question-option-radio" type="radio"
+                    <div class="form-check question-option-wrapper custom-radio-option mb-2">
+                        <input class="form-check-input real-radio-btn" type="radio"
                                name="answers[<?php echo $question['id']; ?>]"
                                id="option_<?php echo $option['id']; ?>"
                                value="<?php echo $option['id']; ?>"
                                data-question-id="<?php echo $question['id']; ?>">
-                        <label class="form-check-label w-100 p-2 rounded border" for="option_<?php echo $option['id']; ?>">
-                            <?php echo $option_prefix . escape_html($option['option_text']); ?>
+                        <label class="form-check-label custom-radio-label w-100 p-2 rounded border" for="option_<?php echo $option['id']; ?>">
+                            <span class="custom-radio-look" data-char="<?php echo $option_char; ?>"></span>
+                            <span class="option-text"><?php echo escape_html($option['text']); ?></span>
                         </label>
                     </div>
                     <?php endforeach; ?>
@@ -318,7 +400,7 @@ require_once 'includes/header.php'; // HTML <head> and navbar are outputted here
             </div><br>
         </form>
     </div>
-<?php else: // Quiz cannot be taken or is not available (for logged-in or non-logged-in users) ?>
+<?php else: ?>
     <div class="container mt-5">
         <div class="card shadow-sm">
             <div class="card-header bg-primary text-white">
@@ -458,23 +540,24 @@ document.addEventListener('DOMContentLoaded', function() {
         const questionCards = document.querySelectorAll('.question-card');
         questionCards.forEach(questionCard => {
             const questionId = questionCard.dataset.questionId;
-            const radiosInThisGroup = questionCard.querySelectorAll(`.question-option-radio`);
+            const radiosInThisGroup = questionCard.querySelectorAll(`.real-radio-btn`); // Target real radio
 
             radiosInThisGroup.forEach(radio => {
                 radio.addEventListener('change', function() {
                     if (this.checked && !answeredQuestionLocks.has(questionId)) {
-                        const allLabelsInQuestion = questionCard.querySelectorAll('.question-option-wrapper label');
-                        allLabelsInQuestion.forEach(lbl => {
+                        // The CSS :checked selector will handle the visual change of the custom radio.
+                        // The JS part for .selected-option-display on the main label (for border) can remain.
+                        const allMainLabelsInQuestion = questionCard.querySelectorAll('.custom-radio-label');
+                        allMainLabelsInQuestion.forEach(lbl => {
                             lbl.classList.remove('selected-option-display', 'border-primary', 'border-2');
-                            lbl.style.opacity = '1'; 
+                            // Opacity will be handled by :disabled CSS selector now
                         });
 
-                        const parentWrapper = this.closest('.question-option-wrapper');
+                        const parentWrapper = this.closest('.custom-radio-option');
                         if (parentWrapper) {
-                            const labelForRadio = parentWrapper.querySelector('label');
-                            if (labelForRadio) {
-                                labelForRadio.classList.add('selected-option-display', 'border-primary', 'border-2');
-                                labelForRadio.style.opacity = '1'; 
+                            const mainLabelForRadio = parentWrapper.querySelector('.custom-radio-label');
+                            if (mainLabelForRadio) {
+                                mainLabelForRadio.classList.add('selected-option-display', 'border-primary', 'border-2');
                             }
                         }
                         
@@ -482,16 +565,10 @@ document.addEventListener('DOMContentLoaded', function() {
                         if(progressIndicator) progressIndicator.textContent = `উত্তর: ${answeredQuestionLocks.size}/${totalQuestionsJS}`;
 
                         radiosInThisGroup.forEach(otherRadioInGroup => {
-                            const otherLabel = otherRadioInGroup.closest('.question-option-wrapper').querySelector('label');
                             if (otherRadioInGroup !== this) {
                                 otherRadioInGroup.disabled = true;
-                                if(otherLabel) {
-                                    otherLabel.style.opacity = '0.6';
-                                    otherLabel.style.cursor = 'default';
-                                }
-                            } else { 
-                                 if(otherLabel) otherLabel.style.cursor = 'default';
                             }
+                            // The cursor and opacity are handled by CSS based on :disabled
                         });
                     }
                 });
@@ -506,14 +583,11 @@ document.addEventListener('DOMContentLoaded', function() {
         applyBlurToBackground(true); 
 
         agreeAndStartButton.addEventListener('click', function() {
-            initializeQuizFunctionalities(); // Initialize when user agrees
-            // Modal dismisses via data-bs-dismiss, then hidden.bs.modal will remove blur
+            initializeQuizFunctionalities(); 
         });
 
         warningModalElement.addEventListener('hidden.bs.modal', function (event) {
              applyBlurToBackground(false); 
-            // Check if quiz logic was initialized (meaning "Agree" was clicked)
-            // If not, and the modal was closed by other means (e.g., Escape key, backdrop click, close button)
             if (!quizLogicInitialized) {
                 window.location.href = 'quizzes.php'; 
             }
