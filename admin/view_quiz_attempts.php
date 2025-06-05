@@ -6,7 +6,7 @@ require_once 'includes/auth_check.php';
 require_once '../includes/functions.php';
 
 $quiz_id = isset($_GET['quiz_id']) ? intval($_GET['quiz_id']) : 0;
-$admin_base_url = '';
+$admin_base_url = ''; // যেহেতু এই ফাইলটি admin ফোল্ডারের রুটে আছে
 
 if ($quiz_id <= 0) {
     $_SESSION['flash_message'] = "অবৈধ কুইজ ID.";
@@ -15,36 +15,32 @@ if ($quiz_id <= 0) {
     exit;
 }
 
-// Fetch quiz details (অপরিবর্তিত)
+// Fetch quiz details
 $quiz_info = null;
 $sql_quiz_info = "SELECT id, title FROM quizzes WHERE id = ?";
 $stmt_quiz_info = $conn->prepare($sql_quiz_info);
-// ... (বাকি কোড অপরিবর্তিত) ...
-if ($stmt_quiz_info) {
-    $stmt_quiz_info->bind_param("i", $quiz_id);
-    $stmt_quiz_info->execute();
-    $result_quiz_info = $stmt_quiz_info->get_result();
-    if ($result_quiz_info->num_rows === 1) {
-        $quiz_info = $result_quiz_info->fetch_assoc();
-        $page_title = "ফলাফল: " . htmlspecialchars($quiz_info['title']);
-    } else {
-        $_SESSION['flash_message'] = "কুইজ (ID: {$quiz_id}) খুঁজে পাওয়া যায়নি।";
-        $_SESSION['flash_message_type'] = "danger";
-        header("Location: manage_quizzes.php");
-        exit;
-    }
-    $stmt_quiz_info->close();
-} else {
+if (!$stmt_quiz_info) {
     error_log("Quiz info prepare failed: " . $conn->error);
     $_SESSION['flash_message'] = "একটি অপ্রত্যাশিত ত্রুটি ঘটেছে।";
     $_SESSION['flash_message_type'] = "danger";
     header("Location: manage_quizzes.php");
     exit;
 }
+$stmt_quiz_info->bind_param("i", $quiz_id);
+$stmt_quiz_info->execute();
+$result_quiz_info = $stmt_quiz_info->get_result();
+if ($result_quiz_info->num_rows === 1) {
+    $quiz_info = $result_quiz_info->fetch_assoc();
+    $page_title = "ফলাফল: " . htmlspecialchars($quiz_info['title']);
+} else {
+    $_SESSION['flash_message'] = "কুইজ (ID: {$quiz_id}) খুঁজে পাওয়া যায়নি।";
+    $_SESSION['flash_message_type'] = "danger";
+    header("Location: manage_quizzes.php");
+    exit;
+}
+$stmt_quiz_info->close();
 
-
-// Handle Cancel/Reinstate/Delete Attempt Action (অপরিবর্তিত)
-// ... (সম্পূর্ণ ডিলিট/ক্যানসেল/রিইনস্টেট লজিক এখানে থাকবে) ...
+// Handle Cancel/Reinstate/Delete Attempt Action
 if (isset($_GET['action']) && isset($_GET['attempt_id'])) {
     $action = $_GET['action'];
     $attempt_id_to_manage = intval($_GET['attempt_id']);
@@ -117,16 +113,16 @@ if (isset($_GET['action']) && isset($_GET['attempt_id'])) {
 }
 
 
-// Fetch all completed attempts for this quiz (অপরিবর্তিত)
+// Fetch all completed attempts for this quiz
 $attempts_data = [];
 $ip_counts = [];
-// ... (SQL কোড অপরিবর্তিত) ...
+
 $sql_attempts = "
     SELECT
         qa.id as attempt_id,
         qa.user_id,
         u.name as user_name,
-        u.email as user_email,
+        u.email as user_email, -- ইমেইল যুক্ত করা হলো
         qa.score,
         qa.time_taken_seconds,
         qa.submitted_at,
@@ -158,9 +154,6 @@ if ($stmt_attempts) {
     error_log("Attempts fetch prepare failed: " . $conn->error);
 }
 
-
-// Find highest score (অপরিবর্তিত)
-// ... (কোড অপরিবর্তিত) ...
 $highest_score = null;
 if (!empty($attempts_data)) {
     $non_cancelled_scores = [];
@@ -174,8 +167,7 @@ if (!empty($attempts_data)) {
     }
 }
 
-// Function to mask email (অপরিবর্তিত)
-// ... (কোড অপরিবর্তিত) ...
+// Function to mask email for privacy print
 function mask_email_for_print($email) {
     if (empty($email) || strpos($email, '@') === false) {
         return 'N/A';
@@ -183,13 +175,17 @@ function mask_email_for_print($email) {
     list($user, $domain) = explode('@', $email);
     $user_len = strlen($user);
     $masked_user = '';
-    if ($user_len <= 3) {
+
+    if ($user_len <= 1) { // যদি ইউজারনেম ১ অক্ষরের হয়
+        $masked_user = '*';
+    } elseif ($user_len <= 5) { // যদি ইউজারনেম ২ থেকে ৫ অক্ষরের হয়
         $masked_user = substr($user, 0, 1) . str_repeat('*', $user_len - 1);
-    } else {
-        $masked_user = substr($user, 0, 2) . str_repeat('*', $user_len - 4) . substr($user, -2);
+    } else { // যদি ইউজারনেম ৫ অক্ষরের বেশি হয়
+        $masked_user = substr($user, 0, 3) . str_repeat('*', $user_len - 4) . substr($user, -1);
     }
     return $masked_user . '@' . $domain;
 }
+
 
 require_once 'includes/header.php';
 ?>
@@ -248,19 +244,17 @@ require_once 'includes/header.php';
         a[href]:after {
             content: none !important;
         }
-        .print-only-email, .print-only-name { display: none; }
+        .print-only-email, .print-only-name { display: none; } 
 
-        body.print-privacy .print-only-email { display: table-cell !important; }
-        body:not(.print-privacy) .print-only-name { display: table-cell !important; }
+        body.print-privacy .print-only-email { display: table-cell !important; } 
+        body:not(.print-privacy) .print-only-name { display: table-cell !important; } 
 
         body.print-privacy .participant-col-print-name { display: none !important; }
         body:not(.print-privacy) .participant-col-print-email { display: none !important; }
 
         .table tbody tr {
-            page-break-inside: avoid; /* একটি সারির মধ্যে পেজব্রেক না করার চেষ্টা করবে */
+            page-break-inside: avoid; 
         }
-        /* নিচের page-break-after ক্লাসটি আর PHP থেকে সরাসরি যুক্ত করা হবে না */
-        /* .page-break-after { page-break-after: always; } */
     }
     .ip-alert-icon {
         cursor: help;
@@ -354,10 +348,8 @@ require_once 'includes/header.php';
                             $last_score = -INF;
                             $last_time = -INF;
                             $display_rank = 0;
-                            // $row_counter = 0; // পেজব্রেকের জন্য কাউন্টার আর প্রয়োজন নেই
-
+                            
                             foreach ($attempts_data as $index => $attempt):
-                                // $row_counter++; // এই লাইনটির আর প্রয়োজন নেই
                                 if (!$attempt['is_cancelled'] && $attempt['score'] !== null) {
                                     $rank++;
                                     if ($attempt['score'] != $last_score || $attempt['time_taken_seconds'] != $last_time) {
@@ -401,11 +393,6 @@ require_once 'includes/header.php';
                                 if (!empty($attempt['browser_name'])) { $device_browser_info_screen .= htmlspecialchars($attempt['browser_name']); }
                                 if (!empty($attempt['os_platform'])) { $device_browser_info_screen .= ($device_browser_info_screen ? ' <small class="text-muted">(' . htmlspecialchars($attempt['os_platform']) . ')</small>' : htmlspecialchars($attempt['os_platform'])); }
                                 if (empty($device_browser_info_screen)) { $device_browser_info_screen = 'N/A'; }
-
-                                // পেজব্রেকের জন্য ক্লাস যুক্ত করার কোড সরানো হয়েছে
-                                // if ($row_counter % 25 == 0 && $row_counter < count($attempts_data)) {
-                                //     $row_class .= ' page-break-after';
-                                // }
                             ?>
                             <tr class="<?php echo trim($row_class); ?>">
                                 <td><?php echo (!$attempt['is_cancelled'] && $attempt['score'] !== null) ? $display_rank : 'N/A'; ?></td>
@@ -459,9 +446,6 @@ require_once 'includes/header.php';
 
         setTimeout(() => {
             if (printTitleElement) { printTitleElement.style.display = 'none'; }
-            // Reset to default view after print dialog if needed (usually CSS @media print handles this)
-            // document.querySelectorAll('.participant-col-print-name').forEach(el => el.style.display = ''); 
-            // document.querySelectorAll('.participant-col-print-email').forEach(el => el.style.display = 'none');
         }, 500); 
     }
 </script>
