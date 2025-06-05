@@ -31,19 +31,16 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['submit_practice_quiz']
         $correct_option_id_for_this_q = null;
 
         $options_for_review = [];
-        if (isset($q_info['options_data']) && is_array($q_info['options_data'])) { // Ensure options_data exists and is an array
-            foreach ($q_info['options_data'] as $opt_id_data => $opt_data) {
-                $options_for_review[] = [
-                    'id' => $opt_id_data,
-                    'text' => $opt_data['text'],
-                    'is_correct' => $opt_data['is_correct']
-                ];
-                if ($opt_data['is_correct'] == 1) {
-                    $correct_option_id_for_this_q = intval($opt_id_data);
-                }
+        foreach ($q_info['options_data'] as $opt_id_data => $opt_data) {
+            $options_for_review[] = [
+                'id' => $opt_id_data,
+                'text' => $opt_data['text'],
+                'is_correct' => $opt_data['is_correct']
+            ];
+            if ($opt_data['is_correct'] == 1) {
+                $correct_option_id_for_this_q = intval($opt_id_data);
             }
         }
-
 
         if ($user_selected_option_id !== null) {
             if ($user_selected_option_id == $correct_option_id_for_this_q) {
@@ -56,12 +53,12 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['submit_practice_quiz']
         } else {
             $unanswered_questions_chart++;
         }
-
+        
         $review_questions_practice[] = [
             'question_id' => $q_id,
-            'question_text' => $q_info['text'] ?? 'N/A', // Add null coalescing for safety
-            'image_url' => $q_info['image_url'] ?? null,
-            'explanation' => $q_info['explanation'] ?? null,
+            'question_text' => $q_info['text'],
+            'image_url' => $q_info['image_url'],
+            'explanation' => $q_info['explanation'],
             'user_selected_option_id' => $user_selected_option_id,
             'options_list' => $options_for_review,
             'was_correct_by_user' => $is_correct_answer
@@ -76,7 +73,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['submit_practice_quiz']
 }
 
 $page_title = "অনুশীলন ফলাফল: " . $category_name;
-require_once 'includes/header.php'; //
+require_once 'includes/header.php';
 ?>
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <style>
@@ -104,11 +101,6 @@ require_once 'includes/header.php'; //
         .question-image-review { max-height: 120px; margin-bottom: 5px; }
         .answer-review .card { page-break-inside: avoid; break-inside: avoid-column; width: 100%; margin-bottom: 15px !important; font-size: inherit; border: 1px solid #ddd !important; }
         .answer-review .card-header, .answer-review .card-body { padding: 0.5rem !important; font-size: inherit; border: none !important; }
-        .answer-review .list-group-item { padding: 0.3rem 0.5rem !important; font-size: 0.9em; border: 1px solid #eee !important; }
-        .answer-review .card-header strong { font-size: 1.1em; }
-        .answer-review .mt-3.p-2.bg-light.border.rounded { padding: 0.3rem !important; font-size: 0.9em; margin-top: 0.5rem !important; background-color: #f8f9fa !important; border: 1px solid #ddd !important;}
-        #printableArea > h3.mt-4.mb-3 { display: none !important;}
-        .container.mt-5 > .card.shadow-sm > .card-body.p-4 > .text-center.my-3:has(button) { display: none !important;}
     }
 </style>
 
@@ -122,7 +114,7 @@ require_once 'includes/header.php'; //
             <div class="text-center mb-4">
                 <h3>আপনি পেয়েছেন: <strong class="text-primary"><?php echo number_format($total_score_practice, 0); ?> / <?php echo $total_questions_practice; ?></strong></h3>
             </div>
-
+            
             <div id="quizResultChartContainer" class="mb-4">
                 <canvas id="quizResultChart"></canvas>
             </div>
@@ -147,43 +139,35 @@ require_once 'includes/header.php'; //
                                 <ul class="list-group list-group-flush">
                                     <?php
                                     $correct_opt_id_review = null;
-                                    if (isset($question['options_list']) && is_array($question['options_list'])) { // Check if options_list exists and is an array
-                                        foreach ($question['options_list'] as $opt) {
-                                            if ($opt['is_correct'] == 1) {
-                                                $correct_opt_id_review = $opt['id'];
-                                                break;
-                                            }
+                                    foreach ($question['options_list'] as $opt) {
+                                        if ($opt['is_correct'] == 1) {
+                                            $correct_opt_id_review = $opt['id'];
+                                            break;
                                         }
                                     }
                                     ?>
-                                    <?php
-                                    if (isset($question['options_list']) && is_array($question['options_list'])) { // Check again before iterating
-                                        foreach ($question['options_list'] as $option):
-                                            $option_class = 'list-group-item';
-                                            $option_label = '';
-                                            if ($option['id'] == $question['user_selected_option_id']) {
-                                                if ($option['is_correct'] == 1) {
-                                                    $option_class .= ' correct-user-answer';
-                                                    $option_label = ' <span class="badge bg-success-subtle text-success-emphasis rounded-pill">আপনার সঠিক উত্তর</span>';
-                                                } else {
-                                                    $option_class .= ' incorrect-user-answer';
-                                                    $option_label = ' <span class="badge bg-danger-subtle text-danger-emphasis rounded-pill">আপনার ভুল উত্তর</span>';
-                                                }
-                                            } elseif ($option['is_correct'] == 1) {
-                                                $option_class .= ' actual-correct-answer';
-                                                $option_label = ' <span class="badge bg-warning-subtle text-warning-emphasis rounded-pill">সঠিক উত্তর</span>';
+                                    <?php foreach ($question['options_list'] as $option): ?>
+                                        <?php
+                                        $option_class = 'list-group-item';
+                                        $option_label = '';
+                                        if ($option['id'] == $question['user_selected_option_id']) {
+                                            if ($option['is_correct'] == 1) {
+                                                $option_class .= ' correct-user-answer'; 
+                                                $option_label = ' <span class="badge bg-success-subtle text-success-emphasis rounded-pill">আপনার সঠিক উত্তর</span>';
+                                            } else {
+                                                $option_class .= ' incorrect-user-answer';
+                                                $option_label = ' <span class="badge bg-danger-subtle text-danger-emphasis rounded-pill">আপনার ভুল উত্তর</span>';
                                             }
-                                    ?>
+                                        } elseif ($option['is_correct'] == 1) {
+                                            $option_class .= ' actual-correct-answer';
+                                            $option_label = ' <span class="badge bg-warning-subtle text-warning-emphasis rounded-pill">সঠিক উত্তর</span>';
+                                        }
+                                        ?>
                                     <li class="<?php echo $option_class; ?>">
                                         <?php echo htmlspecialchars($option['text']); ?>
                                         <?php echo $option_label; ?>
                                     </li>
-                                    <?php
-                                        endforeach;
-                                    } else { // Handle case where options_list might be missing or not an array
-                                        echo '<li class="list-group-item text-muted">এই প্রশ্নের জন্য কোনো অপশন পাওয়া যায়নি।</li>';
-                                    }
-                                    ?>
+                                    <?php endforeach; ?>
                                 </ul>
                                 <?php if ($question['user_selected_option_id'] === null) : ?>
                                      <p class="mt-2 mb-0 text-warning print-header-message">আপনি এই প্রশ্নের উত্তর দেননি।</p>
@@ -277,5 +261,5 @@ document.addEventListener('DOMContentLoaded', function() {
 
 <?php
 if ($conn) { $conn->close(); } // Close if not already closed by includes
-require_once 'includes/footer.php'; //
+require_once 'includes/footer.php';
 ?>
