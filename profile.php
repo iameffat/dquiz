@@ -127,14 +127,8 @@ $page_specific_styles = "
         display: flex;
         justify-content: space-between;
         align-items: center;
-        padding: 0.6rem 1rem; 
-        font-size: 0.9rem; 
-        background-color: var(--bs-list-group-bg); /* Ensuring theme compatibility */
-        color: var(--bs-list-group-color);
-        border-color: var(--bs-list-group-border-color);
-    }
-    .simple-quiz-list .list-group-item:last-child {
-        border-bottom-width: var(--bs-list-group-border-width); /* Ensure last item has border if not flush */
+        padding: 0.6rem 1rem; /* Reduced padding */
+        font-size: 0.9rem; /* Slightly smaller font */
     }
     .simple-quiz-list .quiz-title {
         flex-grow: 1;
@@ -144,47 +138,30 @@ $page_specific_styles = "
         text-overflow: ellipsis;
     }
     .simple-quiz-list .btn-sm-custom {
-        font-size: 0.8rem; 
+        font-size: 0.8rem; /* Smaller button */
         padding: 0.25rem 0.6rem;
     }
     .simple-quiz-list .badge {
         font-size: 0.7rem;
         margin-left: 0.5rem;
     }
-    
-    .other-quizzes-section {
-        background-color: var(--card-bg); /* Similar to card background */
-        padding: 1.5rem;
+    .profile-sidebar-quiz-section {
+        background-color: var(--bs-tertiary-bg);
+        padding: 1rem;
         border-radius: var(--bs-border-radius);
-        border: 1px solid var(--border-color-translucent);
-        margin-top: 1.5rem; /* Space from the history card */
-        box-shadow: 0 0.125rem 0.25rem rgba(0,0,0,.075);
+        border: 1px solid var(--bs-border-color);
     }
-    body.dark-mode .other-quizzes-section {
-        background-color: var(--bs-gray-800); /* Darker background for the section */
-        border-color: var(--bs-gray-700);
-         box-shadow: 0 0.125rem 0.25rem rgba(255,255,255,.05);
+    body.dark-mode .profile-sidebar-quiz-section {
+         background-color: var(--bs-gray-800);
+         border-color: var(--bs-gray-700);
     }
-    .other-quizzes-section h4 { /* Changed from h5 for main section title */
-        margin-bottom: 1rem;
+    .profile-sidebar-quiz-section h5 {
+        margin-bottom: 0.75rem;
         font-weight: 600;
         color: var(--bs-emphasis-color);
-        padding-bottom: 0.75rem;
-        border-bottom: 2px solid var(--primary-color); /* Primary color accent */
-        text-align: center;
+        border-bottom: 1px solid var(--bs-border-color);
+        padding-bottom: 0.5rem;
     }
-     .other-quizzes-section h5.quiz-type-heading { /* For Live, Upcoming, Archived */
-        margin-top: 1rem;
-        margin-bottom: 0.5rem;
-        font-size: 1rem;
-        font-weight: 500;
-        color: var(--bs-secondary-text-emphasis);
-    }
-     .other-quizzes-section .list-group {
-        border-radius: var(--bs-border-radius-sm); /* Rounded corners for the list group */
-        overflow: hidden; /* To make border-radius work with items */
-    }
-    
 ";
 
 require_once 'includes/header.php';
@@ -192,7 +169,7 @@ require_once 'includes/header.php';
 
 <div class="container mt-5 mb-5">
     <div class="row">
-        <div class="col-md-4">
+        <div class="col-md-4"> {/* প্রোফাইল তথ্য এবং নতুন কুইজ তালিকার জন্য কলাম (আগে ডানদিকে ছিল, এখন বামে) */}
             <div class="card shadow-sm mb-4">
                 <div class="card-header bg-primary text-white">
                     <h4 class="mb-0">প্রোফাইল তথ্য</h4>
@@ -210,9 +187,67 @@ require_once 'includes/header.php';
                     <?php endif; ?>
                 </div>
             </div>
-        </div>
 
-        <div class="col-md-8">
+            <div class="profile-sidebar-quiz-section">
+                <?php if (!empty($live_quizzes_profile_simple)): ?>
+                    <h5>সরাসরি কুইজ</h5>
+                    <ul class="list-group list-group-flush simple-quiz-list mb-3">
+                        <?php foreach ($live_quizzes_profile_simple as $quiz): ?>
+                            <?php list($attempted_simple, $attempt_id_simple) = hasUserAttemptedQuiz($conn, $user_id_for_check, $quiz['id']); ?>
+                            <li class="list-group-item">
+                                <span class="quiz-title" title="<?php echo escape_html($quiz['title']); ?>"><?php echo escape_html(mb_strimwidth($quiz['title'], 0, 30, "...")); ?></span>
+                                <?php if ($attempted_simple): ?>
+                                    <a href="results.php?attempt_id=<?php echo $attempt_id_simple; ?>&quiz_id=<?php echo $quiz['id']; ?>" class="btn btn-outline-info btn-sm-custom">ফলাফল</a>
+                                <?php else: ?>
+                                    <a href="quiz_page.php?id=<?php echo $quiz['id']; ?>" class="btn btn-success btn-sm-custom">অংশগ্রহণ</a>
+                                <?php endif; ?>
+                            </li>
+                        <?php endforeach; ?>
+                    </ul>
+                <?php endif; ?>
+
+                <?php if (!empty($upcoming_quizzes_profile_simple)): ?>
+                    <h5>আসন্ন কুইজ</h5>
+                    <ul class="list-group list-group-flush simple-quiz-list mb-3">
+                        <?php foreach ($upcoming_quizzes_profile_simple as $quiz): ?>
+                            <li class="list-group-item">
+                                <span class="quiz-title" title="<?php echo escape_html($quiz['title']); ?>"><?php echo escape_html(mb_strimwidth($quiz['title'], 0, 25, "...")); ?></span>
+                                <button class="btn btn-info btn-sm-custom" disabled>শীঘ্রই আসছে</button>
+                                <?php if ($quiz['live_start_datetime']): ?>
+                                    <span class="badge bg-light text-dark ms-1" title="শুরুর তারিখ ও সময়"><small><?php echo format_datetime($quiz['live_start_datetime'], "d M, h:i A"); ?></small></span>
+                                <?php endif; ?>
+                            </li>
+                        <?php endforeach; ?>
+                    </ul>
+                <?php endif; ?>
+
+                <?php if (!empty($archived_quizzes_profile_simple)): ?>
+                    <h5>আর্কাইভ কুইজ</h5>
+                    <ul class="list-group list-group-flush simple-quiz-list mb-0">
+                        <?php foreach ($archived_quizzes_profile_simple as $quiz): ?>
+                             <?php list($attempted_simple_archived, $attempt_id_simple_archived) = hasUserAttemptedQuiz($conn, $user_id_for_check, $quiz['id']); ?>
+                            <li class="list-group-item">
+                                <span class="quiz-title" title="<?php echo escape_html($quiz['title']); ?>"><?php echo escape_html(mb_strimwidth($quiz['title'], 0, 30, "...")); ?></span>
+                                 <?php if ($attempted_simple_archived): ?>
+                                    <a href="results.php?attempt_id=<?php echo $attempt_id_simple_archived; ?>&quiz_id=<?php echo $quiz['id']; ?>" class="btn btn-outline-secondary btn-sm-custom">ফলাফল</a>
+                                <?php else: ?>
+                                <a href="quiz_page.php?id=<?php echo $quiz['id']; ?>" class="btn btn-secondary btn-sm-custom">অনুশীলন</a>
+                                 <?php endif; ?>
+                            </li>
+                        <?php endforeach; ?>
+                    </ul>
+                <?php endif; ?>
+                
+                <?php if (empty($live_quizzes_profile_simple) && empty($upcoming_quizzes_profile_simple) && empty($archived_quizzes_profile_simple)): ?>
+                     <p class="text-muted text-center small">আপাতত কোনো কুইজ নেই।</p>
+                <?php endif; ?>
+                 <div class="text-center mt-3">
+                    <a href="quizzes.php" class="btn btn-outline-primary btn-sm w-100">সকল কুইজ দেখুন</a>
+                </div>
+            </div>
+            </div>
+
+        <div class="col-md-8"> {/* কুইজের ইতিহাসের জন্য কলাম (আগে বামে ছিল, এখন ডানে) */}
             <div class="card shadow-sm mb-4"> 
                 <div class="card-header bg-success text-white">
                     <h4 class="mb-0">আমার কুইজের ইতিহাস</h4>
@@ -255,71 +290,7 @@ require_once 'includes/header.php';
             </div>
         </div>
     </div> 
-
-    <div class="row">
-        <div class="col-md-12">
-             <?php if (!empty($live_quizzes_profile_simple) || !empty($upcoming_quizzes_profile_simple) || !empty($archived_quizzes_profile_simple)): ?>
-            <div class="other-quizzes-section">
-                <h4>আপনার জন্য কুইজ</h4>
-
-                <?php if (!empty($live_quizzes_profile_simple)): ?>
-                    <h5 class="quiz-type-heading">সরাসরি কুইজ</h5>
-                    <ul class="list-group simple-quiz-list mb-3">
-                        <?php foreach ($live_quizzes_profile_simple as $quiz): ?>
-                            <?php list($attempted_simple, $attempt_id_simple) = hasUserAttemptedQuiz($conn, $user_id_for_check, $quiz['id']); ?>
-                            <li class="list-group-item">
-                                <span class="quiz-title" title="<?php echo escape_html($quiz['title']); ?>"><?php echo escape_html(mb_strimwidth($quiz['title'], 0, 45, "...")); // Increased width a bit ?></span>
-                                <?php if ($attempted_simple): ?>
-                                    <a href="results.php?attempt_id=<?php echo $attempt_id_simple; ?>&quiz_id=<?php echo $quiz['id']; ?>" class="btn btn-outline-info btn-sm-custom">ফলাফল</a>
-                                <?php else: ?>
-                                    <a href="quiz_page.php?id=<?php echo $quiz['id']; ?>" class="btn btn-success btn-sm-custom">অংশগ্রহণ</a>
-                                <?php endif; ?>
-                            </li>
-                        <?php endforeach; ?>
-                    </ul>
-                <?php endif; ?>
-
-                <?php if (!empty($upcoming_quizzes_profile_simple)): ?>
-                    <h5 class="quiz-type-heading">আসন্ন কুইজ</h5>
-                    <ul class="list-group simple-quiz-list mb-3">
-                        <?php foreach ($upcoming_quizzes_profile_simple as $quiz): ?>
-                            <li class="list-group-item">
-                                <span class="quiz-title" title="<?php echo escape_html($quiz['title']); ?>"><?php echo escape_html(mb_strimwidth($quiz['title'], 0, 35, "...")); // Adjusted width ?></span>
-                                <div>
-                                    <button class="btn btn-info btn-sm-custom" disabled>শীঘ্রই আসছে</button>
-                                    <?php if ($quiz['live_start_datetime']): ?>
-                                        <span class="badge bg-light text-dark ms-1" title="শুরুর তারিখ ও সময়"><small><?php echo format_datetime($quiz['live_start_datetime'], "d M, h:i A"); ?></small></span>
-                                    <?php endif; ?>
-                                </div>
-                            </li>
-                        <?php endforeach; ?>
-                    </ul>
-                <?php endif; ?>
-
-                <?php if (!empty($archived_quizzes_profile_simple)): ?>
-                    <h5 class="quiz-type-heading">আর্কাইভ কুইজ</h5>
-                    <ul class="list-group simple-quiz-list mb-0">
-                        <?php foreach ($archived_quizzes_profile_simple as $quiz): ?>
-                             <?php list($attempted_simple_archived, $attempt_id_simple_archived) = hasUserAttemptedQuiz($conn, $user_id_for_check, $quiz['id']); ?>
-                            <li class="list-group-item">
-                                <span class="quiz-title" title="<?php echo escape_html($quiz['title']); ?>"><?php echo escape_html(mb_strimwidth($quiz['title'], 0, 45, "...")); // Increased width a bit ?></span>
-                                 <?php if ($attempted_simple_archived): ?>
-                                    <a href="results.php?attempt_id=<?php echo $attempt_id_simple_archived; ?>&quiz_id=<?php echo $quiz['id']; ?>" class="btn btn-outline-secondary btn-sm-custom">ফলাফল</a>
-                                <?php else: ?>
-                                <a href="quiz_page.php?id=<?php echo $quiz['id']; ?>" class="btn btn-secondary btn-sm-custom">অনুশীলন</a>
-                                 <?php endif; ?>
-                            </li>
-                        <?php endforeach; ?>
-                    </ul>
-                <?php endif; ?>
-                
-                <div class="text-center mt-4">
-                    <a href="quizzes.php" class="btn btn-primary btn-sm w-100">সকল কুইজ দেখুন</a>
-                </div>
-            </div>
-            <?php endif; ?>
-        </div>
-    </div> </div>
+</div>
 
 <?php
 if ($conn) { 
