@@ -227,7 +227,7 @@ require_once 'includes/header.php';
             width: 100%;
             padding: 20px;
         }
-        .admin-sidebar, .admin-header, .admin-footer, .no-print, .page-actions-header, .alert:not(.print-this-alert) {
+        .admin-sidebar, .admin-header, .admin-footer, .no-print, .page-actions-header, .alert:not(.print-this-alert), #copyAllEmailsBtnViewAttempts {
             display: none !important;
         }
         .card {
@@ -280,6 +280,16 @@ require_once 'includes/header.php';
         .participant-details-print-hide {
             display: none !important;
         }
+        .attempt-user-email { /* Hide email column in print by default */
+             display: none !important;
+        }
+        body.print-privacy .attempt-user-email { /* Show email if privacy print with phone */
+            /* display: table-cell !important; */ /* User requested not to show email in privacy print */
+        }
+         body:not(.print-privacy) .attempt-user-email { /* Show email if name print */
+            display: table-cell !important;
+        }
+
 
         .table tbody tr {
             page-break-inside: avoid; 
@@ -337,6 +347,13 @@ require_once 'includes/header.php';
                     <path d="M13.5 9a.5.5 0 0 1 .5.5v4a.5.5 0 0 1-.5.5h-1v-1.335a3.5 3.5 0 0 0-3.5-3.5H5.335v-1H13.5z"/>
                  </svg>
                 প্রাইভেসি প্রিন্ট (ফোন নম্বর সহ)
+            </button>
+            <button id="copyAllEmailsBtnViewAttempts" class="btn btn-success ms-2 no-print">
+                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-clipboard-plus-fill me-1" viewBox="0 0 16 16">
+                  <path d="M6.5 0A1.5 1.5 0 0 0 5 1.5v1A1.5 1.5 0 0 0 6.5 4h3A1.5 1.5 0 0 0 11 2.5v-1A1.5 1.5 0 0 0 9.5 0h-3Zm3 1a.5.5 0 0 1 .5.5v1a.5.5 0 0 1-.5.5h-3a.5.5 0 0 1-.5-.5v-1a.5.5 0 0 1 .5-.5h3Z"/>
+                  <path d="M4 1.5H3a2 2 0 0 0-2 2V14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V3.5a2 2 0 0 0-2-2h-1v1A2.5 2.5 0 0 1 9.5 5h-3A2.5 2.5 0 0 1 4 2.5v-1ZM8.5 8.5a.5.5 0 0 0-1 0v1.5H6a.5.5 0 0 0 0 1h1.5V12a.5.5 0 0 0 1 0v-1.5H10a.5.5 0 0 0 0-1H8.5V8.5Z"/>
+                </svg>
+                সকল ইমেইল কপি
             </button>
             <a href="manage_quizzes.php" class="btn btn-outline-secondary ms-2">সকল কুইজে ফিরে যান</a>
         </div>
@@ -396,14 +413,14 @@ require_once 'includes/header.php';
 
                 <?php if (!empty($attempts_data)): ?>
                 <div class="table-responsive">
-                    <table class="table table-striped table-hover">
+                    <table class="table table-striped table-hover" id="quizAttemptsTable">
                         <thead>
                             <tr>
                                 <th># র‍্যাংক</th>
                                 <th class="participant-col-print-name">অংশগ্রহণকারীর নাম (ID)</th>
                                 <th class="participant-col-print-phone" style="display:none;">অংশগ্রহণকারী (ফোন)</th>
+                                <th class="participant-details-print-hide attempt-user-email">ইমেইল</th>
                                 <th class="no-print participant-details-print-hide">মোবাইল</th>
-                                <th class="no-print participant-details-print-hide">ইমেইল</th>
                                 <th class="no-print participant-details-print-hide">ঠিকানা</th>
                                 <th>স্কোর</th>
                                 <th>সময় লেগেছে</th>
@@ -498,8 +515,8 @@ require_once 'includes/header.php';
                                 <td class="participant-col-print-phone print-only-phone" style="display:none;">
                                     <?php echo htmlspecialchars(mask_phone_for_print($attempt['user_mobile'])); ?> (ID: <?php echo $attempt['user_id']; ?>)
                                 </td>
+                                <td class="participant-details-print-hide attempt-user-email"><?php echo htmlspecialchars($attempt['user_email']); ?></td>
                                 <td class="no-print participant-details-print-hide"><?php echo htmlspecialchars($attempt['user_mobile']); ?></td>
-                                <td class="no-print participant-details-print-hide"><?php echo htmlspecialchars($attempt['user_email']); ?></td>
                                 <td class="no-print participant-details-print-hide"><?php echo htmlspecialchars($attempt['user_address'] ? $attempt['user_address'] : 'N/A'); ?></td>
                                 <td><?php echo $attempt['score'] !== null ? number_format($attempt['score'], 2) : 'N/A'; ?></td>
                                 <td><?php echo $attempt['time_taken_seconds'] ? format_seconds_to_hms($attempt['time_taken_seconds']) : 'N/A'; ?></td>
@@ -547,6 +564,48 @@ require_once 'includes/header.php';
         
         window.print();
     }
+
+    document.addEventListener('DOMContentLoaded', function() {
+        const copyAllEmailsBtn = document.getElementById('copyAllEmailsBtnViewAttempts');
+        if (copyAllEmailsBtn) {
+            copyAllEmailsBtn.addEventListener('click', function() {
+                const emailCells = document.querySelectorAll('#quizAttemptsTable tbody .attempt-user-email');
+                let emails = [];
+                emailCells.forEach(cell => {
+                    // Only copy visible emails (not from cancelled attempts if they are hidden visually on screen)
+                    // and not empty
+                    const row = cell.closest('tr');
+                    if (row && getComputedStyle(row).display !== 'none' && cell.textContent.trim() !== '') {
+                        emails.push(cell.textContent.trim());
+                    }
+                });
+
+                if (emails.length > 0) {
+                    const emailString = emails.join(', ');
+                    navigator.clipboard.writeText(emailString).then(() => {
+                        const originalHTML = this.innerHTML;
+                        this.innerHTML = `
+                            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-check-circle-fill me-1" viewBox="0 0 16 16">
+                              <path d="M16 8A8 8 0 1 1 0 8a8 8 0 0 1 16 0m-3.97-3.03a.75.75 0 0 0-1.08.022L7.477 9.417 5.384 7.323a.75.75 0 0 0-1.06 1.06L6.97 11.03a.75.75 0 0 0 1.079-.02l3.992-4.99a.75.75 0 0 0-.01-1.05z"/>
+                            </svg>
+                            কপি হয়েছে!`;
+                        this.classList.remove('btn-success');
+                        this.classList.add('btn-primary');
+                        setTimeout(() => {
+                            this.innerHTML = originalHTML;
+                            this.classList.remove('btn-primary');
+                            this.classList.add('btn-success');
+                        }, 2500);
+                    }).catch(err => {
+                        console.error('ইমেইল কপি করতে সমস্যা হয়েছে: ', err);
+                        alert('ইমেইল কপি করা যায়নি। ব্রাউজার কনসোল দেখুন।');
+                    });
+                } else {
+                    alert('কপি করার জন্য কোনো ইমেইল পাওয়া যায়নি।');
+                }
+            });
+        }
+    });
 </script>
 
 <?php
