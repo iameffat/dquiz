@@ -91,12 +91,12 @@ if ($total_questions_in_category == 0 && $start_quiz) {
 
 if ($start_quiz) {
     if ($num_questions_to_show <= 0) {
-        $num_questions_to_show = $default_num_questions; 
+        $num_questions_to_show = $default_num_questions;
     }
     if ($num_questions_to_show > $total_questions_in_category && $total_questions_in_category > 0) {
         $num_questions_to_show = $total_questions_in_category; // যদি ইউজার বেশি প্রশ্ন চায় কিন্তু ক্যাটাগরিতে কম থাকে
     }
-    
+
     $num_questions_to_load = $num_questions_to_show;
 
 
@@ -141,11 +141,11 @@ $total_questions_for_display = count($questions);
 $page_specific_styles = "
     .question-image { max-width: 100%; height: auto; max-height: 350px; margin-bottom: 15px; border-radius: 5px; box-shadow: 0 2px 5px rgba(0,0,0,0.1); display: block; margin-left: auto; margin-right: auto; border: 1px solid var(--border-color); padding: 3px; background-color: var(--body-bg); }
     body.dark-mode .question-image { box-shadow: 0 2px 5px rgba(255,255,255,0.05); border-color: var(--border-color); background-color: var(--body-bg); }
-    
+
     .question-option-wrapper .form-check-label { cursor: pointer; transition: background-color 0.2s ease-in-out, border-color 0.2s ease-in-out; }
     .question-option-wrapper .form-check-label:hover { background-color: var(--question-option-hover-bg); }
     .question-option-wrapper label.selected-option-display { background-color: var(--primary-color) !important; border-color: var(--primary-color) !important; color: #fff !important; font-weight: bold; }
-    
+
     .practice-mode-notice { font-size: 0.9rem; padding: 0.75rem 1.25rem; margin-bottom: 1.5rem; border: 1px solid var(--bs-info-border-subtle); background-color: var(--bs-info-bg-subtle); color: var(--bs-info-text-emphasis); border-radius: var(--bs-border-radius); text-align: center; }
     body.dark-mode .practice-mode-notice { border-color: var(--bs-info-border-subtle); background-color: var(--bs-info-bg-subtle); color: var(--bs-info-text-emphasis); }
 
@@ -155,7 +155,7 @@ $page_specific_styles = "
     .timer-display.critical { color: var(--bs-danger); }
     .settings-card { max-width: 600px; margin: 2rem auto; }
 ";
-require_once 'includes/header.php';
+require_once 'includes/header.php'; //
 ?>
 
 <div class="container" id="quizInterfaceContainer">
@@ -171,20 +171,20 @@ require_once 'includes/header.php';
                     <input type="hidden" name="category_id" value="<?php echo $category_id; ?>">
                     <div class="mb-3">
                         <label for="num_questions" class="form-label">কতটি প্রশ্ন দিয়ে অনুশীলন করতে চান?</label>
-                        <input type="number" name="num_questions" id="num_questions" class="form-control" 
-                               value="<?php echo $default_num_questions; ?>" 
-                               min="1" 
-                               max="<?php echo $total_questions_in_category > 0 ? $total_questions_in_category : $default_num_questions; ?>" 
+                        <input type="number" name="num_questions" id="num_questions" class="form-control"
+                               value="<?php echo $default_num_questions; ?>"
+                               min="1"
+                               max="<?php echo $total_questions_in_category > 0 ? $total_questions_in_category : $default_num_questions; ?>"
                                required>
                         <small class="form-text text-muted">
-                            এই ক্যাটাগরিতে মোট <?php echo $total_questions_in_category; ?> টি প্রশ্ন রয়েছে। 
+                            এই ক্যাটাগরিতে মোট <?php echo $total_questions_in_category; ?> টি প্রশ্ন রয়েছে।
                             আপনি ১ থেকে <?php echo $total_questions_in_category > 0 ? $total_questions_in_category : $default_num_questions; ?> এর মধ্যে যেকোনো সংখ্যা দিতে পারেন।
                         </small>
                     </div>
                     <div class="mb-3">
                         <label for="quiz_duration" class="form-label">সময়সীমা (মিনিট):</label>
-                        <input type="number" name="quiz_duration" id="quiz_duration" class="form-control" 
-                               value="<?php echo $default_duration_minutes; ?>" 
+                        <input type="number" name="quiz_duration" id="quiz_duration" class="form-control"
+                               value="<?php echo $default_duration_minutes; ?>"
                                min="0">
                         <small class="form-text text-muted">০ দিলে কোনো সময়সীমা থাকবে না।</small>
                     </div>
@@ -204,7 +204,7 @@ require_once 'includes/header.php';
             </div>
         </div>
     <?php else: // কুইজ শুরু হয়েছে, প্রশ্ন দেখান ?>
-        
+
         <?php if ($quiz_duration_seconds > 0): ?>
         <div class="text-center my-3 timer-display-container">
             <span id="timerDisplayPractice" class="timer-display">সময় বাকি: --:--:--</span>
@@ -231,7 +231,7 @@ require_once 'includes/header.php';
                 <input type="hidden" name="category_id" value="<?php echo $category_id; ?>">
                 <input type="hidden" name="category_name" value="<?php echo htmlspecialchars($category_name); ?>">
                 <input type="hidden" name="num_questions_attempted" value="<?php echo $total_questions_for_display; ?>">
-                
+
                 <?php foreach ($questions as $index => $question): ?>
                     <input type="hidden" name="questions_info[<?php echo $question['id']; ?>][text]" value="<?php echo htmlspecialchars($question['question_text']); ?>">
                     <input type="hidden" name="questions_info[<?php echo $question['id']; ?>][image_url]" value="<?php echo htmlspecialchars($question['image_url'] ?? ''); ?>">
@@ -262,7 +262,7 @@ require_once 'includes/header.php';
                                     <input class="form-check-input question-option-radio" type="radio"
                                            name="answers[<?php echo $question['id']; ?>]"
                                            id="option_<?php echo $option['id']; ?>_q<?php echo $question['id']; ?>"
-                                           value="<?php echo $option['id']; ?>"> 
+                                           value="<?php echo $option['id']; ?>">
                                     <label class="form-check-label w-100 p-2 rounded border" for="option_<?php echo $option['id']; ?>_q<?php echo $question['id']; ?>">
                                         <?php echo escape_html($option['option_text']); ?>
                                     </label>
@@ -298,33 +298,34 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 
     function updateTimerDisplay() {
-        if (!timerDisplay || timeLeft < 0) return;
-        
+        if (!timerDisplay || timeLeft < 0) return; // টাইমার ডিসপ্লে না থাকলে বা সময় শেষ হয়ে গেলে আর কাজ করবে না
+
         timerDisplay.textContent = "সময় বাকি: " + formatTime(timeLeft);
 
-        if (timeLeft <= 60 && timeLeft > 0) { 
-            timerDisplay.classList.add('critical'); 
-            timerDisplay.classList.remove('text-success');
+        if (timeLeft <= 60 && timeLeft > 0) { // যখন ৬০ সেকেন্ড বা তার কম সময় বাকি থাকবে
+            timerDisplay.classList.add('critical'); // Critical ক্লাস যোগ করবে (যেমন লাল রঙ)
+            timerDisplay.classList.remove('text-success'); // যদি অন্য কোনো ক্লাস থাকে, তা সরিয়ে দেবে
         } else if (timeLeft > 60) {
             timerDisplay.classList.remove('critical');
         }
-        
-        if (timeLeft <= 0) {
+
+        if (timeLeft <= 0) { // যখন সময় একদম শেষ
             timerDisplay.textContent = "সময় শেষ!";
             timerDisplay.classList.remove('critical');
-            timerDisplay.classList.add('text-danger'); // Bootstrap class for red color
-            if (quizForm && !quizForm.dataset.submitted) {
-                quizForm.dataset.submitted = 'true';
-                quizForm.submit(); // Submit the form when time is up
+            timerDisplay.classList.add('text-danger'); // সময় শেষ হলে লাল রঙ দেখাবে
+
+            if (quizForm && !quizForm.dataset.submitted) { // যদি ফর্ম থাকে এবং ইতিমধ্যে সাবমিট না হয়ে থাকে
+                quizForm.dataset.submitted = 'true'; // একাধিকবার সাবমিট হওয়া থেকে বিরত রাখার জন্য
+                quizForm.submit(); // ফর্ম স্বয়ংক্রিয়ভাবে সাবমিট করবে
             }
-            if(timerInterval) clearInterval(timerInterval);
+            if(timerInterval) clearInterval(timerInterval); // টাইমার বন্ধ করে দেবে
         }
-        if (timeLeft > 0) timeLeft--;
+        if (timeLeft > 0) timeLeft--; // প্রতি সেকেন্ডে সময় কমাবে
     }
 
-    if (timeLeft >= 0 && document.getElementById('practiceQuizForm')) { // Start timer only if form exists and time is set
-        updateTimerDisplay(); // Initial display
-        timerInterval = setInterval(updateTimerDisplay, 1000);
+    if (timeLeft >= 0 && document.getElementById('practiceQuizForm')) { // ফর্ম এবং সময়সীমা সেট করা থাকলেই টাইমার শুরু হবে
+        updateTimerDisplay(); // প্রথমবার সময় দেখানোর জন্য
+        timerInterval = setInterval(updateTimerDisplay, 1000); // প্রতি সেকেন্ডে সময় আপডেট করার জন্য
     }
 
 
@@ -369,5 +370,5 @@ document.addEventListener('DOMContentLoaded', function() {
 
 <?php
 if ($conn) { $conn->close(); }
-require_once 'includes/footer.php';
+require_once 'includes/footer.php'; //
 ?>
