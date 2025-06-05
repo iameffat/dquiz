@@ -22,8 +22,8 @@ if ($quiz_id <= 0) {
 
 // Fetch basic quiz details for display, regardless of login status (needed early)
 $sql_quiz_details_basic = "SELECT q.id, q.title, q.description, q.duration_minutes, q.status, q.live_start_datetime, q.live_end_datetime,
-                          (SELECT COUNT(qs.id) FROM questions qs WHERE qs.quiz_id = q.id) as question_count
-                          FROM quizzes q WHERE q.id = ?";
+                                 (SELECT COUNT(qs.id) FROM questions qs WHERE qs.quiz_id = q.id) as question_count
+                                 FROM quizzes q WHERE q.id = ?";
 $stmt_quiz_details_basic = $conn->prepare($sql_quiz_details_basic);
 
 if ($stmt_quiz_details_basic) {
@@ -34,7 +34,7 @@ if ($stmt_quiz_details_basic) {
         $quiz_info_for_display = $result_quiz_details_basic->fetch_assoc();
         $page_title = escape_html($quiz_info_for_display['title']) . " - কুইজ";
     } else {
-        $_SESSION['flash_message'] = "কুইজ (ID: {$quiz_id}) খুঁজে পাওয়া যায়নি।";
+        $_SESSION['flash_message'] = "কুইজ (ID: {$quiz_id}) খুঁজে পাওয়া যায়নি।";
         $_SESSION['flash_message_type'] = "danger";
         header("Location: quizzes.php");
         exit;
@@ -43,7 +43,7 @@ if ($stmt_quiz_details_basic) {
 } else {
     error_log("Prepare failed for basic quiz details: (" . $conn->errno . ") " . $conn->error);
     // এই পর্যায়ে header.php কল করা হয়নি, তাই flash message সেট করে রিডাইরেক্ট করা নিরাপদ
-    $_SESSION['flash_message'] = "কুইজের তথ্য আনতে ডেটাবেস সমস্যা হয়েছে।";
+    $_SESSION['flash_message'] = "কুইজের তথ্য আনতে ডেটাবেস সমস্যা হয়েছে।";
     $_SESSION['flash_message_type'] = "danger";
     header("Location: quizzes.php");
     exit;
@@ -106,9 +106,9 @@ if (!isset($_SESSION["loggedin"]) || $_SESSION["loggedin"] !== true) {
         $access_message = "আপনি অ্যাডমিন হিসেবে এই কুইজটি দেখছেন/টেস্ট করছেন।";
     } else { // Regular user
         if ($quiz['status'] == 'draft') {
-            $access_message = "এই কুইজটি এখন অংশগ্রহণের জন্য উপলব্ধ নয় কারণ এটি এখনও ড্রাফট পর্যায়ে রয়েছে।";
+            $access_message = "এই কুইজটি এখন অংশগ্রহণের জন্য উপলব্ধ নয় কারণ এটি এখনও ড্রাফট পর্যায়ে রয়েছে।";
         } elseif ($quiz['status'] == 'upcoming') {
-            $access_message = "এই কুইজটি এখনও শুরু হয়নি (আপকামিং)।";
+            $access_message = "এই কুইজটি এখনও শুরু হয়নি (আপকামিং)।";
             if ($quiz['live_start_datetime']) {
                 try {
                     $live_start_dt_check = new DateTime($quiz['live_start_datetime']);
@@ -126,18 +126,18 @@ if (!isset($_SESSION["loggedin"]) || $_SESSION["loggedin"] !== true) {
                     $live_start_dt = new DateTime($quiz['live_start_datetime']);
                     if ($current_datetime < $live_start_dt) {
                         $can_take_quiz_live_check = false;
-                        $access_message = "এই কুইজটি এখনও শুরু হয়নি। শুরু হওয়ার সময়: " . format_datetime($quiz['live_start_datetime']);
+                        $access_message = "এই কুইজটি এখনও শুরু হয়নি। শুরু হওয়ার সময়: " . format_datetime($quiz['live_start_datetime']);
                     }
-                } catch (Exception $e) { $can_take_quiz_live_check = false; $access_message = "কুইজের শুরুর সময় নির্ধারণে ত্রুটি।"; }
+                } catch (Exception $e) { $can_take_quiz_live_check = false; $access_message = "কুইজের শুরুর সময় নির্ধারণে ত্রুটি।"; }
             }
             if ($can_take_quiz_live_check && $quiz['live_end_datetime'] !== null) {
                 try {
                     $live_end_dt = new DateTime($quiz['live_end_datetime']);
                     if ($current_datetime > $live_end_dt) {
                         $can_take_quiz_live_check = false;
-                        $access_message = "দুঃখিত, এই কুইজে অংশগ্রহণের সময়সীমা শেষ হয়ে গিয়েছে।";
+                        $access_message = "দুঃখিত, এই কুইজে অংশগ্রহণের সময়সীমা শেষ হয়ে গিয়েছে।";
                     }
-                } catch (Exception $e) { $can_take_quiz_live_check = false; $access_message = "কুইজের শেষের সময় নির্ধারণে ত্রুটি।"; }
+                } catch (Exception $e) { $can_take_quiz_live_check = false; $access_message = "কুইজের শেষের সময় নির্ধারণে ত্রুটি।"; }
             }
             if ($can_take_quiz_live_check) {
                 $can_take_quiz = true;
@@ -168,7 +168,7 @@ if (!isset($_SESSION["loggedin"]) || $_SESSION["loggedin"] !== true) {
             $options_for_q = [];
             $sql_options = "SELECT id, option_text FROM options WHERE question_id = ?";
             $stmt_options = $conn->prepare($sql_options);
-             if (!$stmt_options) { error_log("Prepare failed for options fetch: (" . $conn->errno . ") " . $conn->error); continue; }
+            if (!$stmt_options) { error_log("Prepare failed for options fetch: (" . $conn->errno . ") " . $conn->error); continue; }
             $stmt_options->bind_param("i", $q_row['id']);
             if (!$stmt_options->execute()) { error_log("Execute failed for options fetch: (" . $stmt_options->errno . ") " . $stmt_options->error); $stmt_options->close(); continue;}
             $result_options_data = $stmt_options->get_result();
@@ -188,9 +188,9 @@ if (!isset($_SESSION["loggedin"]) || $_SESSION["loggedin"] !== true) {
         if ($total_questions === 0) {
             if ($user_role !== 'admin' && $quiz['status'] !== 'archived') {
                 $can_take_quiz = false; 
-                $access_message = "দুঃখিত, এই কুইজে এখনো কোনো প্রশ্ন যোগ করা হয়নি।";
+                $access_message = "দুঃখিত, এই কুইজে এখনো কোনো প্রশ্ন যোগ করা হয়নি।";
             } elseif ($user_role === 'admin' || $quiz['status'] === 'archived') {
-                $access_message = ($user_role === 'admin') ? "অ্যাডমিন ভিউ: এই কুইজে কোনো প্রশ্ন যোগ করা হয়নি।" : "এই কুইজে অনুশীলনের জন্য কোনো প্রশ্ন পাওয়া যায়নি।";
+                $access_message = ($user_role === 'admin') ? "অ্যাডমিন ভিউ: এই কুইজে কোনো প্রশ্ন যোগ করা হয়নি।" : "এই কুইজে অনুশীলনের জন্য কোনো প্রশ্ন পাওয়া যায়নি।";
                 $can_take_quiz = false; 
             }
         }
@@ -216,7 +216,7 @@ if (!isset($_SESSION["loggedin"]) || $_SESSION["loggedin"] !== true) {
                 $show_quiz_interface = true; 
             } else {
                 error_log("Execute failed for start attempt: (" . $stmt_start_attempt->errno . ") " . $stmt_start_attempt->error);
-                $_SESSION['flash_message'] = "কুইজ শুরু করতে সমস্যা হয়েছে। অনুগ্রহ করে আবার চেষ্টা করুন। (Error: QPSE1)";
+                $_SESSION['flash_message'] = "কুইজ শুরু করতে সমস্যা হয়েছে। অনুগ্রহ করে আবার চেষ্টা করুন। (Error: QPSE1)";
                 $_SESSION['flash_message_type'] = "danger";
                 header("Location: quizzes.php");
                 exit;
@@ -239,6 +239,48 @@ $page_specific_styles = "
     .question-option-wrapper .form-check-label { cursor: pointer; transition: background-color 0.2s ease-in-out, border-color 0.2s ease-in-out; }
     .question-option-wrapper .form-check-label:hover { background-color: var(--question-option-hover-bg); }
     .question-option-wrapper label.selected-option-display { background-color: var(--primary-color) !important; border-color: var(--primary-color) !important; color: #fff !important; font-weight: bold; }
+
+    /* ==== Styles for Circular Option Prefix ==== */
+    .option-prefix-circle {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        width: 28px;
+        height: 28px;
+        border-radius: 50%;
+        background-color: var(--bs-tertiary-bg, #f0f0f0); /* Fallback color */
+        color: var(--bs-body-color, #212529); /* Fallback color */
+        font-weight: bold;
+        margin-right: 10px; /* Space between circle and option text */
+        border: 1px solid var(--bs-border-color, #ced4da); /* Fallback color */
+        flex-shrink: 0; /* Prevent circle from shrinking */
+    }
+    body.dark-mode .option-prefix-circle {
+        background-color: var(--bs-secondary-bg, #495057); /* Dark mode fallback */
+        color: var(--bs-body-color, #f8f9fa); /* Dark mode fallback */
+        border-color: var(--bs-border-color, #6c757d); /* Dark mode fallback */
+    }
+    .question-option-wrapper label.selected-option-display .option-prefix-circle {
+        background-color: var(--bs-white, #ffffff) !important;
+        color: var(--primary-color) !important; 
+        border-color: var(--primary-color) !important;
+    }
+    .option-text-content {
+        flex-grow: 1;
+        word-break: break-word; /* Ensure long text wraps */
+    }
+    .question-option-wrapper .form-check-label {
+        display: flex; /* Needed for aligning circle and text */
+        align-items: center; /* Vertically align circle and text */
+    }
+    /* Hide the actual radio button, but keep it accessible */
+    .question-option-wrapper .form-check-input.question-option-radio {
+        position: absolute;
+        opacity: 0;
+        width: 0;
+        height: 0;
+    }
+    /* ==== End of Styles for Circular Option Prefix ==== */
 ";
 
 require_once 'includes/header.php'; // HTML <head> and navbar are outputted here
@@ -252,16 +294,16 @@ require_once 'includes/header.php'; // HTML <head> and navbar are outputted here
                     <h5 class="modal-title" id="quizWarningModalLabel">গুরুত্বপূর্ণ নির্দেশাবলী</h5>
                 </div>
                 <div class="modal-body">
-                    <p>অনুগ্রহ করে কুইজ শুরু করার আগে নিচের নিয়মাবলী ভালোভাবে পড়ে নিন:</p>
+                    <p>অনুগ্রহ করে কুইজ শুরু করার আগে নিচের নিয়মাবলী ভালোভাবে পড়ে নিন:</p>
                     <ul>
-                        <li>এই কুইজের জন্য আপনার হাতে মোট <strong><?php echo $quiz_info_for_display['duration_minutes']; ?> মিনিট</strong> সময় থাকবে।</li>
+                        <li>এই কুইজের জন্য আপনার হাতে মোট <strong><?php echo $quiz_info_for_display['duration_minutes']; ?> মিনিট</strong> সময় থাকবে।</li>
                         <li>প্রতিটি প্রশ্নের জন্য চারটি অপশন থাকবে, যার মধ্যে একটি সঠিক উত্তর।</li>
                         <li>একবার উত্তর নির্বাচন করার পর তা পরিবর্তন করা যাবে না।</li>
-                        <li>কোনো প্রকার অসাধু উপায় (যেমন: অন্যের সাহায্য নেওয়া, ইন্টারনেট সার্চ করা, কপি-পেস্ট করা) অবলম্বন করলে সাক্ষী হিসেবে আল্লাহ তায়ালাই যথেষ্ট।</li>
-                        <li>সময় শেষ হওয়ার সাথে সাথে আপনার পরীক্ষা স্বয়ংক্রিয়ভাবে সাবমিট হয়ে যাবে।</li>
+                        <li>কোনো প্রকার অসাধু উপায় (যেমন: অন্যের সাহায্য নেওয়া, ইন্টারনেট সার্চ করা, কপি-পেস্ট করা) অবলম্বন করলে সাক্ষী হিসেবে আল্লাহ তায়ালাই যথেষ্ট।</li>
+                        <li>সময় শেষ হওয়ার সাথে সাথে আপনার পরীক্ষা স্বয়ংক্রিয়ভাবে সাবমিট হয়ে যাবে।</li>
                          <li>প্রতি ভুল উত্তরের জন্য ০.২০ নম্বর কাটা যাবে।</li>
                     </ul>
-                    <p class="text-danger fw-bold">আপনি কি উপরের সকল নিয়মের সাথে একমত এবং কুইজ শুরু করতে প্রস্তুত?</p>
+                    <p class="text-danger fw-bold">আপনি কি উপরের সকল নিয়মের সাথে একমত এবং কুইজ শুরু করতে প্রস্তুত?</p>
                 </div>
                 <div class="modal-footer">
                     <button type="button" class="btn btn-primary" id="agreeAndStartQuiz" data-bs-dismiss="modal">সম্মত ও শুরু করুন</button>
@@ -272,7 +314,7 @@ require_once 'includes/header.php'; // HTML <head> and navbar are outputted here
 
     <div class="timer-progress-bar py-2 px-3 mb-4">
         <div class="container d-flex justify-content-between align-items-center">
-            <div id="timer" class="fs-5 fw-bold">সময়: --:--</div>
+            <div id="timer" class="fs-5 fw-bold">সময়: --:--</div>
             <div id="progress_indicator" class="fs-5">উত্তর: 0/<?php echo $total_questions; ?></div>
         </div>
     </div>
@@ -292,12 +334,12 @@ require_once 'includes/header.php'; // HTML <head> and navbar are outputted here
                 </div>
                 <div class="card-body">
                     <?php if (!empty($question['image_url'])): ?>
-                        <div class="mb-3 text-center">
-                            <img src="<?php echo $base_url . escape_html($question['image_url']); ?>" alt="প্রশ্ন সম্পর্কিত ছবি" class="img-fluid question-image">
-                        </div>
+                    <div class="mb-3 text-center">
+                        <img src="<?php echo $base_url . escape_html($question['image_url']); ?>" alt="প্রশ্ন সম্পর্কিত ছবি" class="img-fluid question-image">
+                    </div>
                     <?php endif; ?>
                     <?php foreach ($question['options'] as $opt_index => $option): 
-                        $option_prefix = isset($bengali_options_map[$opt_index]) ? $bengali_options_map[$opt_index] . '. ' : '';
+                        // $option_prefix = isset($bengali_options_map[$opt_index]) ? $bengali_options_map[$opt_index] . '. ' : ''; // No longer needed here in this exact format
                     ?>
                     <div class="form-check question-option-wrapper mb-2">
                         <input class="form-check-input question-option-radio" type="radio"
@@ -306,7 +348,8 @@ require_once 'includes/header.php'; // HTML <head> and navbar are outputted here
                                value="<?php echo $option['id']; ?>"
                                data-question-id="<?php echo $question['id']; ?>">
                         <label class="form-check-label w-100 p-2 rounded border" for="option_<?php echo $option['id']; ?>">
-                            <?php echo $option_prefix . escape_html($option['option_text']); ?>
+                            <span class="option-prefix-circle"><?php echo isset($bengali_options_map[$opt_index]) ? escape_html($bengali_options_map[$opt_index]) : ''; ?></span>
+                            <span class="option-text-content"><?php echo escape_html($option['option_text']); ?></span>
                         </label>
                     </div>
                     <?php endforeach; ?>
@@ -327,10 +370,10 @@ require_once 'includes/header.php'; // HTML <head> and navbar are outputted here
             <div class="card-body">
                 <h5 class="card-subtitle mb-2 text-muted">কুইজের বিবরণ</h5>
                 <div class="quiz-description-display mb-3">
-                    <?php echo $quiz_info_for_display['description'] ? $quiz_info_for_display['description'] : '<p>এই কুইজের জন্য কোনো বিস্তারিত বিবরণ দেওয়া হয়নি।</p>'; ?>
+                    <?php echo $quiz_info_for_display['description'] ? $quiz_info_for_display['description'] : '<p>এই কুইজের জন্য কোনো বিস্তারিত বিবরণ দেওয়া হয়নি।</p>'; ?>
                 </div>
                 <ul class="list-group list-group-flush mb-3">
-                    <li class="list-group-item"><strong>কুইজের সময়:</strong> <?php echo $quiz_info_for_display['duration_minutes']; ?> মিনিট</li>
+                    <li class="list-group-item"><strong>কুইজের সময়:</strong> <?php echo $quiz_info_for_display['duration_minutes']; ?> মিনিট</li>
                     <li class="list-group-item"><strong>মোট প্রশ্ন:</strong> <?php echo $quiz_info_for_display['question_count']; ?> টি</li>
                     <?php
                     $status_display_text = ''; $status_text_class = 'text-muted'; $current_datetime_for_status_check = new DateTime();
@@ -351,7 +394,7 @@ require_once 'includes/header.php'; // HTML <head> and navbar are outputted here
                                 $live_end_dt_check = new DateTime($quiz_info_for_display['live_end_datetime']);
                                 if ($current_datetime_for_status_check > $live_end_dt_check) {
                                     $is_truly_live_for_display = false;
-                                    $status_display_text = 'শেষ হয়েছে';
+                                    $status_display_text = 'শেষ হয়েছে';
                                     $status_text_class = 'text-secondary';
                                 }
                             } catch (Exception $e) { $is_truly_live_for_display = false; $status_display_text = 'ত্রুটিপূর্ণ শেষের তারিখ'; $status_text_class = 'text-danger';}
@@ -426,11 +469,11 @@ document.addEventListener('DOMContentLoaded', function() {
             if (!timerDisplay) return;
             const minutes = Math.floor(timeLeft / 60);
             const seconds = timeLeft % 60;
-            timerDisplay.textContent = `সময়: ${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
+            timerDisplay.textContent = `সময়: ${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
             if (timeLeft <= 60 && timeLeft > 0) { timerDisplay.classList.add('critical'); }
             else if (timeLeft <= 0) {
                 timerDisplay.classList.remove('critical');
-                timerDisplay.textContent = "সময় শেষ!";
+                timerDisplay.textContent = "সময় শেষ!";
                 if (quizForm && !quizForm.dataset.submitted) { 
                     quizForm.dataset.submitted = 'true'; 
                     quizForm.submit();
@@ -444,7 +487,7 @@ document.addEventListener('DOMContentLoaded', function() {
             updateTimerDisplay(); 
             timerInterval = setInterval(updateTimerDisplay, 1000);
         } else if (totalQuestionsJS > 0 && timeLeft <= 0) { 
-             if(timerDisplay) timerDisplay.textContent = "সময়:সীমাহীন";
+             if(timerDisplay) timerDisplay.textContent = "সময়:সীমাহীন";
              if(progressIndicator) progressIndicator.textContent = `উত্তর: 0/${totalQuestionsJS}`;
         }
         else { 
@@ -465,7 +508,7 @@ document.addEventListener('DOMContentLoaded', function() {
                     if (this.checked && !answeredQuestionLocks.has(questionId)) {
                         const allLabelsInQuestion = questionCard.querySelectorAll('.question-option-wrapper label');
                         allLabelsInQuestion.forEach(lbl => {
-                            lbl.classList.remove('selected-option-display', 'border-primary', 'border-2');
+                            lbl.classList.remove('selected-option-display', 'border-primary', 'border-2'); // Bootstrap classes if any
                             lbl.style.opacity = '1'; 
                         });
 
@@ -473,7 +516,8 @@ document.addEventListener('DOMContentLoaded', function() {
                         if (parentWrapper) {
                             const labelForRadio = parentWrapper.querySelector('label');
                             if (labelForRadio) {
-                                labelForRadio.classList.add('selected-option-display', 'border-primary', 'border-2');
+                                labelForRadio.classList.add('selected-option-display'); // Main class for selection
+                                // The .selected-option-display CSS will handle specific styling for label and child .option-prefix-circle
                                 labelForRadio.style.opacity = '1'; 
                             }
                         }
