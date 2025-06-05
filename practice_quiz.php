@@ -297,7 +297,7 @@ require_once 'includes/header.php'; //
             </div>
             <div class="modal-body">
                 <p>অনুশীলন কুইজের জন্য আপনার নির্ধারিত সময় শেষ হয়ে গেছে।</p>
-                <p>আপনার উত্তর সাবমিট করতে নিচের বাটনে ক্লিক করুন।</p>
+                <p>আপনার উত্তর সাবমিট করে ফলাফল দেখতে নিচের বাটনে ক্লিক করুন।</p>
             </div>
             <div class="modal-footer">
                 <button type="button" class="btn btn-primary" id="submitFromModalBtn">ফলাফল দেখুন</button>
@@ -311,10 +311,10 @@ require_once 'includes/header.php'; //
 document.addEventListener('DOMContentLoaded', function() {
     const quizForm = document.getElementById('practiceQuizForm');
     const timerDisplay = document.getElementById('timerDisplayPractice');
-    const quizInterfaceContainer = document.getElementById('quizInterfaceContainer'); // Main quiz container
+    const quizInterfaceContainer = document.getElementById('quizInterfaceContainer');
     let timeLeft = <?php echo $quiz_duration_seconds > 0 ? $quiz_duration_seconds : -1; ?>;
     let timerInterval;
-    let timesUpModalInstance = null; // Modal instance
+    let timesUpModalInstance = null;
 
     if (document.getElementById('timesUpModal')) {
         timesUpModalInstance = new bootstrap.Modal(document.getElementById('timesUpModal'));
@@ -332,14 +332,12 @@ document.addEventListener('DOMContentLoaded', function() {
 
     function showTimesUpModal() {
         if (timesUpModalInstance && quizInterfaceContainer) {
-            quizInterfaceContainer.classList.add('blur-background'); // Blur background
+            quizInterfaceContainer.classList.add('blur-background');
             timesUpModalInstance.show();
-            // Disable further interactions with the quiz form if needed
             const quizElements = quizForm.elements;
             for (let i = 0; i < quizElements.length; i++) {
                 quizElements[i].disabled = true;
             }
-            // Also disable the main submit button
             const mainSubmitBtn = document.getElementById('submitPracticeQuizBtn');
             if(mainSubmitBtn) mainSubmitBtn.disabled = true;
         }
@@ -357,15 +355,14 @@ document.addEventListener('DOMContentLoaded', function() {
             timerDisplay.classList.remove('critical');
         }
 
-        if (timeLeft <= 0) { // যখন সময় একদম শেষ
+        if (timeLeft <= 0) {
             timerDisplay.textContent = "সময় শেষ!";
             timerDisplay.classList.remove('critical');
             timerDisplay.classList.add('text-danger');
 
             if (quizForm && !quizForm.dataset.submitted) {
-                // quizForm.dataset.submitted = 'true'; // Mark as submitted conceptually
-                // quizForm.submit(); // আগের মতো অটো সাবমিট না করে পপআপ দেখাবে
-                showTimesUpModal(); // Show the modal instead of auto-submitting
+                // quizForm.dataset.submitted = 'true'; // Conceptually submitted
+                showTimesUpModal(); // Show modal instead of auto-submit
             }
             if(timerInterval) clearInterval(timerInterval);
         }
@@ -382,6 +379,12 @@ document.addEventListener('DOMContentLoaded', function() {
         submitFromModalBtn.addEventListener('click', function() {
             if (!quizForm.dataset.submitted) {
                 quizForm.dataset.submitted = 'true'; // Prevent multiple submissions
+                // Manually set the 'submit_practice_quiz' value before submitting
+                let hiddenInput = document.createElement('input');
+                hiddenInput.type = 'hidden';
+                hiddenInput.name = 'submit_practice_quiz';
+                hiddenInput.value = '1'; // Or any truthy value recognized by practice_results.php
+                quizForm.appendChild(hiddenInput);
                 quizForm.submit();
             }
         });
