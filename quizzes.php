@@ -103,7 +103,7 @@ $page_specific_styles = "
     .quiz-card.status-archived { border-left-color: var(--bs-secondary); }
     .quiz-card.status-draft { border-left-color: var(--bs-warning); }
 
-    .quiz-title { font-weight: 600; font-size: 1.1rem; }
+    .quiz-title { font-weight: 600; }
     .quiz-meta { font-size: 0.85rem; color: var(--text-muted-color); }
     .quiz-meta-item { display: inline-flex; align-items: center; margin-right: 1rem; }
     .quiz-meta-item svg { margin-right: 0.3rem; }
@@ -113,30 +113,6 @@ $page_specific_styles = "
     }
     .action-buttons .btn:last-child {
         margin-right: 0;
-    }
-
-    /* Compact styles for mobile devices */
-    @media (max-width: 575.98px) {
-        .quiz-card .card-body {
-            padding: 0.8rem;
-        }
-        .quiz-title {
-            font-size: 1rem;
-        }
-        .quiz-meta {
-            font-size: 0.75rem;
-        }
-        .quiz-meta-item {
-            margin-right: 0.75rem;
-        }
-        .action-buttons .btn {
-            font-size: 0.8rem;
-            padding: 0.25rem 0.6rem;
-            margin-right: 0.25rem;
-        }
-        .d-md-flex > div:first-child {
-            margin-bottom: 0.75rem !important;
-        }
     }
 ";
 
@@ -226,7 +202,7 @@ require_once 'includes/header.php';
                                                 data-bs-target="#syllabusModal"
                                                 data-quiz-title="<?php echo escape_html($quiz['title']); ?>"
                                                 data-quiz-description="<?php echo escape_html($quiz['description']); ?>">
-                                            সিলেবাস
+                                            সিলেবাস দেখুন
                                         </button>
                                         <?php if ($effective_status == 'draft' || $effective_status == 'upcoming'): ?>
                                             <button class="btn btn-sm btn-secondary" disabled>অংশগ্রহণ করুন</button>
@@ -238,7 +214,7 @@ require_once 'includes/header.php';
                                                     <a href="quiz_page.php?id=<?php echo $quiz['id']; ?>" class="btn btn-sm btn-success">অংশগ্রহণ করুন</a>
                                                 <?php endif; ?>
                                             <?php else: ?>
-                                                <a href="login.php?redirect=<?php echo urlencode('quiz_page.php?id=' . $quiz['id']); ?>" class="btn btn-sm btn-primary">লগইন করুন</a>
+                                                <a href="login.php?redirect=<?php echo urlencode('quiz_page.php?id=' . $quiz['id']); ?>" class="btn btn-sm btn-primary">অংশগ্রহণের জন্য লগইন</a>
                                             <?php endif; ?>
                                         <?php endif; ?>
                                     </div>
