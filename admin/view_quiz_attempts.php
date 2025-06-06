@@ -44,7 +44,6 @@ $stmt_quiz_info->close();
 
 // Handle All Actions
 if (isset($_GET['action']) && (isset($_GET['attempt_id']) || isset($_GET['user_id']))) {
-    // ... (এই অংশের কোডে কোনো পরিবর্তন নেই) ...
     $action = $_GET['action'];
     $attempt_id_to_manage = isset($_GET['attempt_id']) ? intval($_GET['attempt_id']) : 0;
     $user_id_to_manage = isset($_GET['user_id']) ? intval($_GET['user_id']) : 0;
@@ -202,7 +201,59 @@ require_once 'includes/header.php';
 ?>
 
 <style>
-    /* ... (CSS কোডে কোনো পরিবর্তন নেই) ... */
+    @media print {
+        body * { visibility: hidden; }
+        #printableArea, #printableArea * { visibility: visible; }
+        #printableArea { position: absolute; left: 0; top: 0; width: 100%; padding: 20px; }
+        .admin-sidebar, .admin-header, .admin-footer, .no-print, .page-actions-header, .alert:not(.print-this-alert), #copyAllEmailsBtnViewAttempts { display: none !important; }
+        .card { border: 1px solid #ccc !important; box-shadow: none !important; margin-bottom: 15px !important; }
+        .table { font-size: 10pt; width: 100%; }
+        .table th, .table td { border: 1px solid #ddd !important; padding: 5px 8px; }
+        .table thead th { background-color: #f0f0f0 !important; color: #000 !important; }
+        .badge { border: 1px solid #ccc !important; padding: 0.2em 0.4em !important; font-size: 0.8em !important; background-color: transparent !important; color: #000 !important; font-weight: normal !important; }
+        .print-title { visibility: visible !important; display: block !important; text-align: center; font-size: 18pt; margin-bottom: 20px; color: #000; }
+        a[href]:after { content: none !important; }
+        
+        /* ### পরিবর্তিত CSS শুরু ### */
+        .participant-details-print-hide { display: none !important; }
+        .print-only-phone, .print-only-name { display: none !important; }
+        body:not(.print-privacy) .print-only-name { display: block !important; }
+        body.print-privacy .print-only-phone { display: block !important; }
+        /* ### পরিবর্তিত CSS শেষ ### */
+
+        tr.table-danger { display: none !important; }
+        .table tbody tr { page-break-inside: avoid; }
+        .rank-gold-row td, .rank-silver-row td, .rank-bronze-row td {
+            -webkit-print-color-adjust: exact !important;
+            color-adjust: exact !important;
+        }
+        .rank-gold-row td { background-color: rgba(255, 215, 0, 0.4) !important; }
+        .rank-silver-row td { background-color: rgba(192, 192, 192, 0.5) !important; }
+        .rank-bronze-row td { background-color: rgba(205, 127, 50, 0.4) !important; }
+        
+        .print-rank-gold { color: #856404 !important; font-weight: bold; }
+        .print-rank-silver { color: #383d41 !important; font-weight: bold; }
+        .print-rank-bronze { color: #8B4513 !important; font-weight: bold; }
+    }
+    .print-only-phone, .print-only-name { display: none; }
+    .ip-alert-icon { cursor: help; }
+    .device-details { font-size: 0.8em; color: #555; }
+    body.dark-mode .device-details { color: var(--bs-gray-500); }
+    .rank-gold-row td, body.dark-mode .rank-gold-row td { background-color: rgba(255, 215, 0, 0.2) !important; color: #856404; font-weight: bold; }
+    body.dark-mode .rank-gold-row td { color: #ffc107; }
+    .rank-gold-row .rank-cell, .rank-gold-row .print-rank-gold { color: #DAA520; }
+    body.dark-mode .rank-gold-row .rank-cell, body.dark-mode .rank-gold-row .print-rank-gold { color: #FFD700; }
+    .rank-silver-row td, body.dark-mode .rank-silver-row td { background-color: rgba(192, 192, 192, 0.25) !important; color: #383d41; font-weight: bold; }
+    body.dark-mode .rank-silver-row td { color: #c0c0c0; }
+    .rank-silver-row .rank-cell, .rank-silver-row .print-rank-silver { color: #A9A9A9; }
+    body.dark-mode .rank-silver-row .rank-cell, body.dark-mode .rank-silver-row .print-rank-silver { color: #C0C0C0; }
+    .rank-bronze-row td, body.dark-mode .rank-bronze-row td { background-color: rgba(205, 127, 50, 0.2) !important; color: #8B4513; font-weight: bold; }
+    body.dark-mode .rank-bronze-row td { color: #cd7f32; }
+    .rank-bronze-row .rank-cell, .rank-bronze-row .print-rank-bronze { color: #A0522D; }
+    body.dark-mode .rank-bronze-row .rank-cell, body.dark-mode .rank-bronze-row .print-rank-bronze { color: #CD7F32; }
+    .rank-medal { font-size: 1.2em; margin-right: 5px; }
+    .table-info-user td { background-color: var(--bs-table-active-bg) !important; color: var(--bs-table-active-color) !important; }
+    body.dark-mode .table-info-user td { background-color: var(--bs-info-bg-subtle) !important; color: var(--bs-info-text-emphasis) !important; }
 </style>
 
 <div class="container-fluid" id="main-content-area">
@@ -253,7 +304,6 @@ require_once 'includes/header.php';
                         </thead>
                         <tbody>
                             <?php
-                            // ### পরিবর্তিত কোড শুরু: র‍্যাংক গণনার পদ্ধতি আগের মতো লুপের ভেতরে ফিরিয়ে আনা হয়েছে ###
                             $rank = 0;
                             $last_score = -INF;
                             $last_time = -INF;
@@ -280,14 +330,18 @@ require_once 'includes/header.php';
 
                                 if($attempt['is_cancelled']) { $row_class .= ' table-danger opacity-75'; }
                                 if ($current_user_attempt_id && $attempt['attempt_id'] == $current_user_attempt_id) { $row_class = trim($row_class . ' table-info-user'); }
-                                // ### পরিবর্তিত কোড শেষ ###
                                 ?>
                                 <tr class="<?php echo $row_class; ?>">
                                     <td class="rank-cell"><?php echo (!$attempt['is_cancelled'] && $attempt['score'] !== null) ? $rank_prefix_icon . $display_rank : 'N/A'; ?></td>
+                                    
                                     <td>
-                                        <span class="<?php echo $name_class; ?>"><?php echo htmlspecialchars($attempt['user_name']); ?></span>
-                                        <small class="d-block text-muted no-print"><?php echo htmlspecialchars($attempt['user_email']); ?></small>
-                                        <small class="d-block text-muted no-print"><?php echo htmlspecialchars($attempt['user_mobile']); ?></small>
+                                        <div class="participant-details-print-hide">
+                                            <span class="<?php echo $name_class; ?>"><?php echo htmlspecialchars($attempt['user_name']); ?></span>
+                                            <small class="d-block text-muted no-print"><?php echo htmlspecialchars($attempt['user_email']); ?></small>
+                                            <small class="d-block text-muted no-print"><?php echo htmlspecialchars($attempt['user_mobile']); ?></small>
+                                        </div>
+                                        <span class="print-only-name <?php echo $name_class; ?>"><?php echo htmlspecialchars($attempt['user_name']); ?></span>
+                                        <span class="print-only-phone"><?php echo mask_phone_for_print($attempt['user_mobile']); ?></span>
                                     </td>
                                     <td class="no-print"><?php echo htmlspecialchars($attempt['user_address'] ?: 'N/A'); ?></td>
                                     <td><?php echo $attempt['score'] !== null ? number_format($attempt['score'], 2) : 'N/A'; ?></td>
