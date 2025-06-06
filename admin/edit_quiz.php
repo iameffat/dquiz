@@ -90,7 +90,7 @@ if (isset($_GET['action']) && $_GET['action'] == 'delete_question' && isset($_GE
 }
 
 // Fetch quiz
-$sql_quiz = "SELECT * FROM quizzes WHERE id = ?";
+$sql_quiz = "SELECT *, quiz_type FROM quizzes WHERE id = ?";
 if ($stmt_quiz_load = $conn->prepare($sql_quiz)) { 
     $stmt_quiz_load->bind_param("i", $quiz_id);
     $stmt_quiz_load->execute();
@@ -121,21 +121,23 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['update_full_quiz'])) {
         $quiz_description = trim($_POST['quiz_description']);
         $quiz_duration = intval($_POST['quiz_duration']);
         $quiz_status = trim($_POST['quiz_status']);
+        $quiz_type = trim($_POST['quiz_type']); // নতুন
         $quiz_live_start = !empty($_POST['quiz_live_start']) ? trim($_POST['quiz_live_start']) : NULL;
         $quiz_live_end = !empty($_POST['quiz_live_end']) ? trim($_POST['quiz_live_end']) : NULL;
 
         if (empty($quiz_title)) $errors[] = "কুইজের শিরোনাম আবশ্যক।";
         if ($quiz_duration <= 0) $errors[] = "কুইজের সময় অবশ্যই ০ মিনিটের বেশি হতে হবে।";
         if (!in_array($quiz_status, ['draft', 'live', 'archived', 'upcoming'])) $errors[] = "অবৈধ কুইজ স্ট্যাটাস।";
+        if (!in_array($quiz_type, ['general', 'weekly', 'monthly'])) $errors[] = "অবৈধ কুইজের ধরণ।"; // নতুন
         
         if ($quiz_live_start && $quiz_live_end && strtotime($quiz_live_start) >= strtotime($quiz_live_end)) {
             $errors[] = "লাইভ শেষের সময় অবশ্যই শুরুর সময়ের পরে হতে হবে।";
         }
 
         if (empty($errors)) {
-            $sql_update_meta = "UPDATE quizzes SET title = ?, description = ?, duration_minutes = ?, status = ?, live_start_datetime = ?, live_end_datetime = ?, updated_at = NOW() WHERE id = ?";
+            $sql_update_meta = "UPDATE quizzes SET title = ?, description = ?, duration_minutes = ?, status = ?, quiz_type = ?, live_start_datetime = ?, live_end_datetime = ?, updated_at = NOW() WHERE id = ?";
             $stmt_update_meta = $conn->prepare($sql_update_meta);
-            $stmt_update_meta->bind_param("ssisssi", $quiz_title, $quiz_description, $quiz_duration, $quiz_status, $quiz_live_start, $quiz_live_end, $quiz_id);
+            $stmt_update_meta->bind_param("ssissssi", $quiz_title, $quiz_description, $quiz_duration, $quiz_status, $quiz_type, $quiz_live_start, $quiz_live_end, $quiz_id);
             if (!$stmt_update_meta->execute()) throw new Exception("কুইজের বিবরণ আপডেট করতে সমস্যা: " . $stmt_update_meta->error);
             $stmt_update_meta->close();
         } else {
@@ -469,11 +471,11 @@ body.dark-mode .select2-container--bootstrap-5 .select2-selection--multiple .sel
                     <input type="hidden" name="quiz_description" id="quiz_description_hidden_edit">
                 </div>
                 <div class="row">
-                    <div class="col-md-4 mb-3">
+                    <div class="col-md-3 mb-3">
                         <label for="quiz_duration" class="form-label">সময় (মিনিট) <span class="text-danger">*</span></label>
                         <input type="number" class="form-control" id="quiz_duration" name="quiz_duration" value="<?php echo htmlspecialchars($quiz['duration_minutes']); ?>" min="1" required>
                     </div>
-                    <div class="col-md-4 mb-3">
+                    <div class="col-md-3 mb-3">
                         <label for="quiz_status" class="form-label">স্ট্যাটাস <span class="text-danger">*</span></label>
                         <select class="form-select" id="quiz_status" name="quiz_status" required>
                             <option value="draft" <?php echo ($quiz['status'] == 'draft') ? 'selected' : ''; ?>>ড্রাফট</option>
@@ -482,7 +484,15 @@ body.dark-mode .select2-container--bootstrap-5 .select2-selection--multiple .sel
                             <option value="archived" <?php echo ($quiz['status'] == 'archived') ? 'selected' : ''; ?>>আর্কাইভড</option>
                         </select>
                     </div>
-                     <div class="col-md-4 mb-3">
+                     <div class="col-md-3 mb-3">
+                        <label for="quiz_type" class="form-label">কুইজের ধরণ <span class="text-danger">*</span></label>
+                        <select class="form-select" id="quiz_type" name="quiz_type" required>
+                            <option value="general" <?php echo ($quiz['quiz_type'] == 'general') ? 'selected' : ''; ?>>সাধারণ</option>
+                            <option value="weekly" <?php echo ($quiz['quiz_type'] == 'weekly') ? 'selected' : ''; ?>>সাপ্তাহিক পরীক্ষা</option>
+                            <option value="monthly" <?php echo ($quiz['quiz_type'] == 'monthly') ? 'selected' : ''; ?>>মাসিক পরীক্ষা</option>
+                        </select>
+                    </div>
+                     <div class="col-md-3 mb-3">
                         <label for="quiz_live_start" class="form-label">লাইভ শুরু (ঐচ্ছিক)</label>
                         <input type="datetime-local" class="form-control" id="quiz_live_start" name="quiz_live_start" value="<?php echo !empty($quiz['live_start_datetime']) ? date('Y-m-d\TH:i', strtotime($quiz['live_start_datetime'])) : ''; ?>">
                     </div>
@@ -669,7 +679,7 @@ document.addEventListener('DOMContentLoaded', function () {
     
     const newQuestionsContainer = document.getElementById('new_questions_container');
     const addNewQuestionBtn = document.getElementById('add_new_question_btn_edit');
-    let newQuestionGlobalIndex = 0; 
+    let newQuestionGlobalIndex = 1; 
 
     // --- Suggestion Logic (AJAX) ---
     let suggestionDebounceTimeout;

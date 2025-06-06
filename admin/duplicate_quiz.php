@@ -21,7 +21,7 @@ $created_by_user_id = $_SESSION['user_id'];
 $conn->begin_transaction();
 try {
     // 1. Fetch original quiz
-    $sql_original_quiz = "SELECT * FROM quizzes WHERE id = ?";
+    $sql_original_quiz = "SELECT *, quiz_type FROM quizzes WHERE id = ?";
     $stmt_original_quiz = $conn->prepare($sql_original_quiz);
     if (!$stmt_original_quiz) throw new Exception("আসল কুইজের তথ্য আনতে সমস্যা (prepare): " . $conn->error);
     $stmt_original_quiz->bind_param("i", $original_quiz_id);
@@ -39,17 +39,18 @@ try {
     $new_live_start = null;     
     $new_live_end = null;
 
-    $sql_insert_new_quiz = "INSERT INTO quizzes (title, description, duration_minutes, status, live_start_datetime, live_end_datetime, created_by, created_at, updated_at)
-                            VALUES (?, ?, ?, ?, ?, ?, ?, NOW(), NOW())";
+    $sql_insert_new_quiz = "INSERT INTO quizzes (title, description, duration_minutes, status, quiz_type, live_start_datetime, live_end_datetime, created_by, created_at, updated_at)
+                            VALUES (?, ?, ?, ?, ?, ?, ?, ?, NOW(), NOW())";
     $stmt_new_quiz = $conn->prepare($sql_insert_new_quiz);
     if (!$stmt_new_quiz) throw new Exception("নতুন কুইজ তৈরি করতে সমস্যা (prepare): " . $conn->error);
 
     $stmt_new_quiz->bind_param(
-        "ssisssi",
+        "ssissssi",
         $new_quiz_title,
         $original_quiz_data['description'],
         $original_quiz_data['duration_minutes'],
         $new_quiz_status,
+        $original_quiz_data['quiz_type'],
         $new_live_start,
         $new_live_end,
         $created_by_user_id

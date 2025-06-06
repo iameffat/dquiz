@@ -16,7 +16,7 @@ if ($quiz_id <= 0) {
 
 // Fetch quiz details (title and live period for ranking context)
 $quiz_info = null;
-$sql_quiz_info = "SELECT id, title, status, live_end_datetime FROM quizzes WHERE id = ?";
+$sql_quiz_info = "SELECT id, title, status, quiz_type, live_end_datetime FROM quizzes WHERE id = ?";
 $stmt_quiz_info = $conn->prepare($sql_quiz_info);
 $stmt_quiz_info->bind_param("i", $quiz_id);
 $stmt_quiz_info->execute();
@@ -226,82 +226,119 @@ if ($live_cutoff_time === null && $quiz_info['status'] === 'live') {
                 ?>
             </div>
             <?php endif; ?>
+            
+            <?php
+            // র‍্যাংকিং তালিকা দেখানোর শর্ত
+            $show_ranking_table = false;
+            $ranking_unavailable_message = '';
 
-            <h3 class="mt-4 mb-3 text-center">
-                <?php 
-                if ($live_cutoff_time !== null && $quiz_info['status'] === 'live') {
-                    echo "লাইভ কুইজের র‍্যাংকিং তালিকা";
-                } elseif ($quiz_info['status'] === 'archived' || ($live_cutoff_time === null && $quiz_info['status'] !== 'draft' && $quiz_info['status'] !== 'upcoming')) {
-                    echo "সামগ্রিক র‍্যাংকিং তালিকা";
-                } else {
-                     echo "র‍্যাংকিং তালিকা";
+            if ($quiz_info) {
+                $quiz_type = $quiz_info['quiz_type'];
+                $quiz_status = $quiz_info['status'];
+                $is_admin = (isset($_SESSION['role']) && $_SESSION['role'] === 'admin');
+
+                if ($is_admin) {
+                    $show_ranking_table = true;
+                } elseif ($quiz_type === 'weekly') {
+                    $show_ranking_table = true;
+                } elseif ($quiz_type === 'monthly') {
+                    if ($quiz_status === 'archived') {
+                        $show_ranking_table = true;
+                    } else {
+                        $ranking_unavailable_message = "মাসিক পরীক্ষার র‍্যাংকিং তালিকা কুইজটি আর্কাইভ হওয়ার পর প্রকাশ করা হবে।";
+                    }
+                } elseif ($quiz_type === 'general') {
+                    if ($quiz_status === 'archived') {
+                        $show_ranking_table = true;
+                    } else {
+                        $ranking_unavailable_message = "সাধারণ কুইজের র‍্যাংকিং তালিকা কুইজটি আর্কাইভ হওয়ার পর প্রকাশ করা হবে।";
+                    }
                 }
-                ?>
-            </h3>
+            }
+            ?>
 
-            <?php if (!empty($official_live_ranking_data)): ?>
-            <div class="table-responsive">
-                <table class="table table-striped table-hover">
-                    <thead class="table-dark">
-                        <tr>
-                            <th scope="col"># র‍্যাংক</th>
-                            <th scope="col">অংশগ্রহণকারীর নাম</th>
-                            <th scope="col">স্কোর (দশমিক)</th>
-                            <th scope="col">সময় লেগেছে</th>
-                            <th scope="col">সাবমিটের সময়</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        <?php 
-                        $rank = 0;
-                        $last_score = -INF; // Initialize with a very small number
-                        $last_time = -INF;  // Initialize with a very small number
-                        $display_rank = 0;
-                        foreach ($official_live_ranking_data as $index => $data):
-                            $rank++; // Actual iteration count
-                            
-                            // For display rank (handles ties correctly)
-                            if ($data['score'] != $last_score || $data['time_taken_seconds'] != $last_time) {
-                                $display_rank = $rank;
-                            }
-                            // Update last score and time for next iteration's tie check
-                            $last_score = $data['score'];
-                            $last_time = $data['time_taken_seconds'];
+            <?php if ($show_ranking_table): ?>
+                <h3 class="mt-4 mb-3 text-center">
+                    <?php 
+                    if ($live_cutoff_time !== null && $quiz_info['status'] === 'live') {
+                        echo "লাইভ কুইজের র‍্যাংকিং তালিকা";
+                    } elseif ($quiz_info['status'] === 'archived' || ($live_cutoff_time === null && $quiz_info['status'] !== 'draft' && $quiz_info['status'] !== 'upcoming')) {
+                        echo "সামগ্রিক র‍্যাংকিং তালিকা";
+                    } else {
+                         echo "র‍্যাংকিং তালিকা";
+                    }
+                    ?>
+                </h3>
+
+                <?php if (!empty($official_live_ranking_data)): ?>
+                <div class="table-responsive">
+                    <table class="table table-striped table-hover">
+                        <thead class="table-dark">
+                            <tr>
+                                <th scope="col"># র‍্যাংক</th>
+                                <th scope="col">অংশগ্রহণকারীর নাম</th>
+                                <th scope="col">স্কোর (দশমিক)</th>
+                                <th scope="col">সময় লেগেছে</th>
+                                <th scope="col">সাবমিটের সময়</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <?php 
+                            $rank = 0;
+                            $last_score = -INF; // Initialize with a very small number
+                            $last_time = -INF;  // Initialize with a very small number
+                            $display_rank = 0;
+                            foreach ($official_live_ranking_data as $index => $data):
+                                $rank++; // Actual iteration count
+                                
+                                // For display rank (handles ties correctly)
+                                if ($data['score'] != $last_score || $data['time_taken_seconds'] != $last_time) {
+                                    $display_rank = $rank;
+                                }
+                                // Update last score and time for next iteration's tie check
+                                $last_score = $data['score'];
+                                $last_time = $data['time_taken_seconds'];
 
 
-                            // Determine row class and rank prefix
-                            $row_class = '';
-                            $rank_prefix_icon = '';
+                                // Determine row class and rank prefix
+                                $row_class = '';
+                                $rank_prefix_icon = '';
 
-                            if ($display_rank == 1) {
-                                $row_class = 'rank-gold-row';
-                                $rank_prefix_icon = '<span class="rank-medal">🥇</span>';
-                            } elseif ($display_rank == 2) {
-                                $row_class = 'rank-silver-row';
-                                $rank_prefix_icon = '<span class="rank-medal">🥈</span>';
-                            } elseif ($display_rank == 3) {
-                                $row_class = 'rank-bronze-row';
-                                $rank_prefix_icon = '<span class="rank-medal">🥉</span>';
-                            }
+                                if ($display_rank == 1) {
+                                    $row_class = 'rank-gold-row';
+                                    $rank_prefix_icon = '<span class="rank-medal">🥇</span>';
+                                } elseif ($display_rank == 2) {
+                                    $row_class = 'rank-silver-row';
+                                    $rank_prefix_icon = '<span class="rank-medal">🥈</span>';
+                                } elseif ($display_rank == 3) {
+                                    $row_class = 'rank-bronze-row';
+                                    $rank_prefix_icon = '<span class="rank-medal">🥉</span>';
+                                }
 
-                            if ($current_user_attempt_id && $data['attempt_id'] == $current_user_attempt_id) {
-                                // If user is current user, add table-info-user, but rank class takes precedence for bg
-                                $row_class = trim($row_class . ' table-info-user'); 
-                            }
-                        ?>
-                        <tr class="<?php echo $row_class; ?>">
-                            <th scope="row" class="rank-cell"><?php echo $rank_prefix_icon . $display_rank; ?></th>
-                            <td><?php echo htmlspecialchars($data['user_name']); ?></td>
-                            <td><?php echo number_format($data['score'], 2); ?></td>
-                            <td><?php echo gmdate("H:i:s", $data['time_taken_seconds']); ?></td>
-                            <td><?php echo date("d M Y, h:i A", strtotime($data['submitted_at'])); ?></td>
-                        </tr>
-                        <?php endforeach; ?>
-                    </tbody>
-                </table>
-            </div>
+                                if ($current_user_attempt_id && $data['attempt_id'] == $current_user_attempt_id) {
+                                    // If user is current user, add table-info-user, but rank class takes precedence for bg
+                                    $row_class = trim($row_class . ' table-info-user'); 
+                                }
+                            ?>
+                            <tr class="<?php echo $row_class; ?>">
+                                <th scope="row" class="rank-cell"><?php echo $rank_prefix_icon . $display_rank; ?></th>
+                                <td><?php echo htmlspecialchars($data['user_name']); ?></td>
+                                <td><?php echo number_format($data['score'], 2); ?></td>
+                                <td><?php echo gmdate("H:i:s", $data['time_taken_seconds']); ?></td>
+                                <td><?php echo date("d M Y, h:i A", strtotime($data['submitted_at'])); ?></td>
+                            </tr>
+                            <?php endforeach; ?>
+                        </tbody>
+                    </table>
+                </div>
+                <?php else: ?>
+                <p class="text-center alert alert-warning">এই কুইজের জন্য এখনও কোনো র‍্যাংকিং তৈরি হয়নি অথবা কেউ অংশগ্রহণ করেনি।</p>
+                <?php endif; ?>
             <?php else: ?>
-            <p class="text-center alert alert-warning">এই কুইজের জন্য এখনও কোনো র‍্যাংকিং তৈরি হয়নি অথবা কেউ অংশগ্রহণ করেনি।</p>
+                <div class="alert alert-info text-center mt-4">
+                    <h5><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" fill="currentColor" class="bi bi-bar-chart-line-fill me-2" viewBox="0 0 16 16"><path d="M11 2a1 1 0 0 1 1-1h2a1 1 0 0 1 1 1v12h.5a.5.5 0 0 1 0 1H.5a.5.5 0 0 1 0-1H1v-3a1 1 0 0 1 1-1h2a1 1 0 0 1 1 1v3h1V7a1 1 0 0 1 1-1h2a1 1 0 0 1 1 1v7h1z"/></svg>র‍্যাংকিং অপেক্ষমাণ</h5>
+                    <p><?php echo $ranking_unavailable_message; ?></p>
+                </div>
             <?php endif; ?>
 
             <div class="text-center mt-4">

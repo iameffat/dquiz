@@ -77,12 +77,14 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['prepare_questions_from
     $quiz_description = trim($_POST['quiz_description']);
     $quiz_duration = intval($_POST['quiz_duration']);
     $quiz_status = trim($_POST['quiz_status']);
+    $quiz_type = trim($_POST['quiz_type']); // নতুন
     $quiz_live_start = !empty($_POST['quiz_live_start']) ? trim($_POST['quiz_live_start']) : NULL;
     $quiz_live_end = !empty($_POST['quiz_live_end']) ? trim($_POST['quiz_live_end']) : NULL;
 
     if (empty($quiz_title)) $errors[] = "কুইজের শিরোনাম আবশ্যক।";
     if ($quiz_duration <= 0) $errors[] = "কুইজের সময় অবশ্যই ০ মিনিটের বেশি হতে হবে।";
     if (!in_array($quiz_status, ['draft', 'live', 'archived', 'upcoming'])) $errors[] = "অবৈধ কুইজ স্ট্যাটাস।";
+    if (!in_array($quiz_type, ['general', 'weekly', 'monthly'])) $errors[] = "অবৈধ কুইজের ধরণ।"; // নতুন
 
     if ($quiz_live_start && $quiz_live_end && strtotime($quiz_live_start) >= strtotime($quiz_live_end)) {
         $errors[] = "লাইভ শেষের সময় অবশ্যই শুরুর সময়ের পরে হতে হবে।";
@@ -97,11 +99,6 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['prepare_questions_from
             if (empty(trim($question_data['text']))) {
                 $errors[] = "প্রশ্ন #" . ($q_idx + 1) . ": প্রশ্নের লেখা খালি রাখা যাবে না।";
             }
-            // Category is now optional, so no validation needed for its presence
-            // if (!isset($question_data['category_ids']) || empty($question_data['category_ids'])) {
-            // $errors[] = "প্রশ্ন #" . ($q_idx + 1) . ": কমপক্ষে একটি ক্যাটাগরি নির্বাচন করতে হবে।";
-            // }
-
             // Image validation
             if (isset($_FILES['questions']['name'][$q_idx]['image_url']) && $_FILES['questions']['error'][$q_idx]['image_url'] == UPLOAD_ERR_OK) {
                 $file_name_check = $_FILES['questions']['name'][$q_idx]['image_url'];
@@ -142,12 +139,12 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['prepare_questions_from
     if (empty($errors)) {
         $conn->begin_transaction();
         try {
-            $sql_quiz = "INSERT INTO quizzes (title, description, duration_minutes, status, live_start_datetime, live_end_datetime, created_by) VALUES (?, ?, ?, ?, ?, ?, ?)";
+            $sql_quiz = "INSERT INTO quizzes (title, description, duration_minutes, status, quiz_type, live_start_datetime, live_end_datetime, created_by) VALUES (?, ?, ?, ?, ?, ?, ?, ?)";
             $stmt_quiz = $conn->prepare($sql_quiz);
             if (!$stmt_quiz) throw new Exception("কুইজ স্টেটমেন্ট প্রস্তুত করতে সমস্যা: " . $conn->error);
             
             $created_by_user_id = $_SESSION['user_id'];
-            $stmt_quiz->bind_param("ssisssi", $quiz_title, $quiz_description, $quiz_duration, $quiz_status, $quiz_live_start, $quiz_live_end, $created_by_user_id);
+            $stmt_quiz->bind_param("ssissssi", $quiz_title, $quiz_description, $quiz_duration, $quiz_status, $quiz_type, $quiz_live_start, $quiz_live_end, $created_by_user_id);
             
             if (!$stmt_quiz->execute()) {
                 throw new Exception("কুইজ সংরক্ষণ করতে সমস্যা হয়েছে: " . $stmt_quiz->error);
@@ -338,11 +335,11 @@ body.dark-mode .select2-container--bootstrap-5 .select2-selection--multiple .sel
                     <input type="hidden" name="quiz_description" id="quiz_description_hidden">
                 </div>
                 <div class="row">
-                    <div class="col-md-4 mb-3">
+                    <div class="col-md-3 mb-3">
                         <label for="quiz_duration" class="form-label">সময় (মিনিট) <span class="text-danger">*</span></label>
                         <input type="number" class="form-control" id="quiz_duration" name="quiz_duration" value="<?php echo isset($_POST['quiz_duration']) ? htmlspecialchars($_POST['quiz_duration']) : '10'; ?>" min="1" required>
                     </div>
-                    <div class="col-md-4 mb-3">
+                    <div class="col-md-3 mb-3">
                         <label for="quiz_status" class="form-label">স্ট্যাটাস <span class="text-danger">*</span></label>
                         <select class="form-select" id="quiz_status" name="quiz_status" required>
                             <option value="draft" <?php echo (!isset($_POST['quiz_status']) || (isset($_POST['quiz_status']) && $_POST['quiz_status'] == 'draft')) ? 'selected' : ''; ?>>ড্রাফট</option>
@@ -351,7 +348,15 @@ body.dark-mode .select2-container--bootstrap-5 .select2-selection--multiple .sel
                             <option value="archived" <?php echo (isset($_POST['quiz_status']) && $_POST['quiz_status'] == 'archived') ? 'selected' : ''; ?>>আর্কাইভড</option>
                         </select>
                     </div>
-                     <div class="col-md-4 mb-3">
+                    <div class="col-md-3 mb-3">
+                        <label for="quiz_type" class="form-label">কুইজের ধরণ <span class="text-danger">*</span></label>
+                        <select class="form-select" id="quiz_type" name="quiz_type" required>
+                            <option value="general" <?php echo (isset($_POST['quiz_type']) && $_POST['quiz_type'] == 'general') ? 'selected' : ''; ?>>সাধারণ</option>
+                            <option value="weekly" <?php echo (isset($_POST['quiz_type']) && $_POST['quiz_type'] == 'weekly') ? 'selected' : ''; ?>>সাপ্তাহিক পরীক্ষা</option>
+                            <option value="monthly" <?php echo (isset($_POST['quiz_type']) && $_POST['quiz_type'] == 'monthly') ? 'selected' : ''; ?>>মাসিক পরীক্ষা</option>
+                        </select>
+                    </div>
+                     <div class="col-md-3 mb-3">
                         <label for="quiz_live_start" class="form-label">লাইভ শুরু (ঐচ্ছিক)</label>
                         <input type="datetime-local" class="form-control" id="quiz_live_start" name="quiz_live_start" value="<?php echo isset($_POST['quiz_live_start']) ? htmlspecialchars($_POST['quiz_live_start']) : ''; ?>">
                     </div>
