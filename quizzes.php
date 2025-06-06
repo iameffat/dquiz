@@ -249,7 +249,7 @@ require_once 'includes/header.php';
                                                 data-bs-target="#syllabusModal"
                                                 data-quiz-title="<?php echo escape_html($quiz['title']); ?>"
                                                 data-quiz-description="<?php echo escape_html($quiz['description']); ?>">
-                                            সিলেবাস দেখুন
+                                            সিলেবাস
                                         </button>
                                         <?php if ($effective_status == 'draft' || $effective_status == 'upcoming'): ?>
                                             <button class="btn btn-sm btn-secondary" disabled>অংশগ্রহণ</button>
