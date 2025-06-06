@@ -214,12 +214,10 @@ require_once 'includes/header.php';
         .print-title { visibility: visible !important; display: block !important; text-align: center; font-size: 18pt; margin-bottom: 20px; color: #000; }
         a[href]:after { content: none !important; }
         
-        /* ### পরিবর্তিত CSS শুরু ### */
         .participant-details-print-hide { display: none !important; }
         .print-only-phone, .print-only-name { display: none !important; }
         body:not(.print-privacy) .print-only-name { display: block !important; }
         body.print-privacy .print-only-phone { display: block !important; }
-        /* ### পরিবর্তিত CSS শেষ ### */
 
         tr.table-danger { display: none !important; }
         .table tbody tr { page-break-inside: avoid; }
@@ -262,15 +260,17 @@ require_once 'includes/header.php';
     <div class="d-flex justify-content-between align-items-center mt-4 mb-3 page-actions-header flex-wrap">
         <h1>কুইজের বিস্তারিত ফলাফল</h1>
         <div class="d-flex flex-wrap gap-2">
+            <?php if (!empty($duplicate_ip_groups)): ?>
+                <button id="scrollToDuplicatesBtn" class="btn btn-warning">ডুপ্লিকেট আইপি দেখুন</button>
+            <?php endif; ?>
             <?php if (!empty($all_emails_string)): ?>
-                <button id="copyAllEmailsBtn" class="btn btn-success" data-emails="<?php echo htmlspecialchars($all_emails_string); ?>">ইমেইল কপি করুন</button>
+                <button id="copyAllEmailsBtn" class="btn btn-success">ইমেইল কপি করুন</button>
             <?php endif; ?>
             <button onclick="prepareAndPrint('name');" class="btn btn-info">প্রিন্ট (নাম সহ)</button>
             <button onclick="prepareAndPrint('phone');" class="btn btn-outline-info">প্রাইভেসি প্রিন্ট (ফোন)</button>
             <a href="manage_quizzes.php" class="btn btn-outline-secondary">সকল কুইজে ফিরে যান</a>
         </div>
     </div>
-    
     <div class="card my-3 no-print">
         <div class="card-body">
             <form action="view_quiz_attempts.php" method="get" class="row g-2 align-items-center">
@@ -343,6 +343,7 @@ require_once 'includes/header.php';
                                         <span class="print-only-name <?php echo $name_class; ?>"><?php echo htmlspecialchars($attempt['user_name']); ?></span>
                                         <span class="print-only-phone"><?php echo mask_phone_for_print($attempt['user_mobile']); ?></span>
                                     </td>
+                                    
                                     <td class="no-print"><?php echo htmlspecialchars($attempt['user_address'] ?: 'N/A'); ?></td>
                                     <td><?php echo $attempt['score'] !== null ? number_format($attempt['score'], 2) : 'N/A'; ?></td>
                                     <td><?php echo $attempt['time_taken_seconds'] ? format_seconds_to_hms($attempt['time_taken_seconds']) : 'N/A'; ?></td>
@@ -380,8 +381,8 @@ require_once 'includes/header.php';
     </div>
 
     <?php if (!empty($duplicate_ip_groups)): ?>
-    <div class="card my-4 no-print">
-        <div class="card-header bg-warning">
+    <div id="duplicate-ip-section" class="card my-4 no-print">
+    <div class="card-header bg-warning">
             <h4 class="mb-0 text-dark">ডুপ্লিকেট আইপি থেকে অংশগ্রহণকারীদের তালিকা</h4>
         </div>
         <div class="card-body">
@@ -413,7 +414,7 @@ require_once 'includes/header.php';
                                             if ($attempt['is_banned'] == 1) { echo ' <span class="badge bg-warning text-dark">নিষিদ্ধ</span>'; } ?>
                                         </td>
                                         <td>
-                                            <a href="../results.php?attempt_id=<?php echo $attempt['attempt_id']; ?>&quiz_id=<?php echo $quiz_id; ?>" target="_blank" class="btn btn-sm btn-outline-info mb-1" title="উত্তর দেখুন">উত্তর</a>
+                                           <a href="../results.php?attempt_id=<?php echo $attempt['attempt_id']; ?>&quiz_id=<?php echo $quiz_id; ?>" target="_blank" class="btn btn-sm btn-outline-info mb-1" title="উত্তর দেখুন">উত্তর</a>
                                             <?php if ($attempt['is_cancelled']): ?><a href="view_quiz_attempts.php?quiz_id=<?php echo $quiz_id; ?>&action=reinstate_attempt&attempt_id=<?php echo $attempt['attempt_id']; ?>&search=<?php echo urlencode($search_term);?>" class="btn btn-sm btn-warning mb-1" title="পুনঃবিবেচনা করুন">পুনঃবিবেচনা</a>
                                             <?php else: ?><a href="view_quiz_attempts.php?quiz_id=<?php echo $quiz_id; ?>&action=cancel_attempt&attempt_id=<?php echo $attempt['attempt_id']; ?>&search=<?php echo urlencode($search_term);?>" class="btn btn-sm btn-outline-secondary mb-1" title="বাতিল করুন">বাতিল</a><?php endif; ?>
                                             <?php if ($_SESSION['user_id'] != $attempt['user_id']): ?>
@@ -466,8 +467,19 @@ require_once 'includes/header.php';
             }
         });
     }
-</script>
 
+    // ডুপ্লিকেট আইপি সেকশনে স্ক্রল করার জন্য নতুন স্ক্রিপ্ট
+    const scrollToDuplicatesBtn = document.getElementById('scrollToDuplicatesBtn');
+    if (scrollToDuplicatesBtn) {
+        scrollToDuplicatesBtn.addEventListener('click', function(event) {
+            event.preventDefault(); 
+            const duplicateSection = document.getElementById('duplicate-ip-section');
+            if (duplicateSection) {
+                duplicateSection.scrollIntoView({ behavior: 'smooth', block: 'start' });
+            }
+        });
+    }
+</script>
 <?php
 if (isset($conn)) { $conn->close(); }
 require_once 'includes/footer.php';
