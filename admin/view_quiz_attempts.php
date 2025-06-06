@@ -278,7 +278,8 @@ require_once 'includes/header.php';
                                 <th class="no-print">ঠিকানা</th>
                                 <th>স্কোর</th>
                                 <th>সময় লেগেছে</th>
-                                <th class="no-print">ডিভাইস/ব্রাউজার</th>
+                                <th class="no-print">ডিভাইস/আইপি</th>
+                                <th class="no-print">সাবমিটের সময়</th>
                                 <th class="no-print">স্ট্যাটাস</th>
                                 <th class="no-print">একশন</th>
                             </tr>
@@ -307,7 +308,13 @@ require_once 'includes/header.php';
                                 <td class="no-print"><?php echo htmlspecialchars($attempt['user_address'] ?: 'N/A'); ?></td>
                                 <td><?php echo $attempt['score'] !== null ? number_format($attempt['score'], 2) : 'N/A'; ?></td>
                                 <td><?php echo $attempt['time_taken_seconds'] ? format_seconds_to_hms($attempt['time_taken_seconds']) : 'N/A'; ?></td>
-                                <td class="no-print device-details"><?php echo htmlspecialchars($attempt['browser_name'] ?: 'N/A') . ' (' . htmlspecialchars($attempt['os_platform'] ?: 'N/A') . ')'; ?></td>
+                                <td class="no-print device-details">
+                                    <?php echo htmlspecialchars($attempt['browser_name'] ?: 'N/A') . ' (' . htmlspecialchars($attempt['os_platform'] ?: 'N/A') . ')'; ?>
+                                    <br><small class="text-muted"><?php echo htmlspecialchars($attempt['ip_address'] ?: 'N/A'); ?></small>
+                                </td>
+                                <td class="no-print">
+                                    <?php echo $attempt['submitted_at'] ? format_datetime($attempt['submitted_at'], "d M Y, h:i A") : 'N/A'; ?>
+                                </td>
                                 <td class="no-print">
                                     <?php 
                                     if ($attempt['is_cancelled']) {
