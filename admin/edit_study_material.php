@@ -17,7 +17,6 @@ if ($material_id <= 0) {
 }
 
 // Fetch existing material details
-// Ensure your table uses 'google_drive_link'
 $sql_fetch_material = "SELECT id, title, description, google_drive_link FROM study_materials WHERE id = ?";
 if ($stmt_fetch = $conn->prepare($sql_fetch_material)) {
     $stmt_fetch->bind_param("i", $material_id);
@@ -47,17 +46,13 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
 
     if (empty($title)) $errors[] = "শিরোনাম আবশ্যক।";
     if (empty($google_drive_link)) {
-        $errors[] = "গুগল ড্রাইভ লিংক আবশ্যক।";
+        $errors[] = "ডাউনলোড লিংক আবশ্যক।";
     } elseif (!filter_var($google_drive_link, FILTER_VALIDATE_URL)) {
-        $errors[] = "একটি সঠিক গুগল ড্রাইভ লিংক প্রদান করুন।";
+        $errors[] = "একটি সঠিক লিংক প্রদান করুন।";
     }
-    elseif (strpos($google_drive_link, 'drive.google.com') === false && strpos($google_drive_link, 'docs.google.com') === false) {
-        $errors[] = "লিংকটি গুগল ড্রাইভের লিংক বলে মনে হচ্ছে না।";
-    }
-
 
     if (empty($errors)) {
-        // Update the database with the new google_drive_link
+        // Update the database
         $sql_update = "UPDATE study_materials SET title = ?, description = ?, google_drive_link = ? WHERE id = ?";
         if ($stmt_update = $conn->prepare($sql_update)) {
             $stmt_update->bind_param("sssi", $title, $description, $google_drive_link, $material_id);
@@ -107,9 +102,9 @@ require_once 'includes/header.php';
                     <input type="hidden" name="description" id="description_hidden_sm_edit">
                 </div>
                 <div class="mb-3">
-                    <label for="google_drive_link" class="form-label">গুগল ড্রাইভ শেয়ারেবল লিংক <span class="text-danger">*</span></label>
-                    <input type="url" class="form-control" id="google_drive_link" name="google_drive_link" value="<?php echo htmlspecialchars($material['google_drive_link']); ?>" placeholder="https://docs.google.com/document/d/..." required>
-                     <small class="form-text text-muted">আপনার গুগল ড্রাইভে আপলোড করা ফাইলের "Anyone with the link can view" পারমিশনসহ শেয়ারেবল লিংক দিন।</small>
+                    <label for="google_drive_link" class="form-label">ডাউনলোড লিংক <span class="text-danger">*</span></label>
+                    <input type="url" class="form-control" id="google_drive_link" name="google_drive_link" value="<?php echo htmlspecialchars($material['google_drive_link']); ?>" placeholder="https://example.com/file.pdf" required>
+                     <small class="form-text text-muted">এখানে ফাইলটির সরাসরি ডাউনলোড লিংক দিন।</small>
                 </div>
             </div>
         </div>
@@ -147,7 +142,6 @@ document.addEventListener('DOMContentLoaded', function () {
                 }
             });
         }
-        // Preserve content if form reloads with an error
         <?php if (isset($_POST['description']) && !empty($errors)): ?>
         if(quillEditDescriptionSM) {
             quillEditDescriptionSM.root.innerHTML = <?php echo json_encode($_POST['description']); ?>;

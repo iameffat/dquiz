@@ -6,28 +6,21 @@ require_once 'includes/auth_check.php';
 require_once '../includes/functions.php';
 
 $errors = [];
-// $success_message = ""; // success_message is less useful if we redirect immediately
 
 if ($_SERVER["REQUEST_METHOD"] == "POST") {
     $title = trim($_POST['title']);
-    $description = trim($_POST['description']); // Quill content will be HTML
+    $description = trim($_POST['description']);
     $google_drive_link = trim($_POST['google_drive_link']);
 
     if (empty($title)) $errors[] = "শিরোনাম আবশ্যক।";
     if (empty($google_drive_link)) {
-        $errors[] = "গুগল ড্রাইভ লিংক আবশ্যক।";
+        $errors[] = "ডাউনলোড লিংক আবশ্যক।";
     } elseif (!filter_var($google_drive_link, FILTER_VALIDATE_URL)) {
-        $errors[] = "একটি সঠিক গুগল ড্রাইভ লিংক প্রদান করুন।";
+        $errors[] = "একটি সঠিক লিংক প্রদান করুন।";
     }
-    // Basic check if it looks like a Google Drive link (optional, can be more sophisticated)
-    elseif (strpos($google_drive_link, 'drive.google.com') === false && strpos($google_drive_link, 'docs.google.com') === false) {
-        $errors[] = "লিংকটি গুগল ড্রাইভের লিংক বলে মনে হচ্ছে না।";
-    }
-
 
     if (empty($errors)) {
         $uploaded_by_user_id = $_SESSION['user_id'];
-        // Assuming your table now has 'google_drive_link' instead of file_name and file_path
         $sql_insert = "INSERT INTO study_materials (title, description, google_drive_link, uploaded_by) VALUES (?, ?, ?, ?)";
         if ($stmt_insert = $conn->prepare($sql_insert)) {
             $stmt_insert->bind_param("sssi", $title, $description, $google_drive_link, $uploaded_by_user_id);
@@ -78,9 +71,9 @@ require_once 'includes/header.php';
                     <input type="hidden" name="description" id="description_hidden_sm">
                 </div>
                 <div class="mb-3">
-                    <label for="google_drive_link" class="form-label">গুগল ড্রাইভ শেয়ারেবল লিংক <span class="text-danger">*</span></label>
-                    <input type="url" class="form-control" id="google_drive_link" name="google_drive_link" value="<?php echo isset($_POST['google_drive_link']) ? htmlspecialchars($_POST['google_drive_link']) : ''; ?>" placeholder="https://docs.google.com/document/d/..." required>
-                    <small class="form-text text-muted">আপনার গুগল ড্রাইভে আপলোড করা ফাইলের "Anyone with the link can view" পারমিশনসহ শেয়ারেবল লিংক দিন।</small>
+                    <label for="google_drive_link" class="form-label">ডাউনলোড লিংক <span class="text-danger">*</span></label>
+                    <input type="url" class="form-control" id="google_drive_link" name="google_drive_link" value="<?php echo isset($_POST['google_drive_link']) ? htmlspecialchars($_POST['google_drive_link']) : ''; ?>" placeholder="https://example.com/file.pdf" required>
+                    <small class="form-text text-muted">এখানে ফাইলটির সরাসরি ডাউনলোড লিংক দিন।</small>
                 </div>
             </div>
         </div>
@@ -118,7 +111,6 @@ document.addEventListener('DOMContentLoaded', function () {
                 }
             });
         }
-         // Preserve content if form reloads with an error
         <?php if (isset($_POST['description']) && !empty($errors)): ?>
         if(quillDescriptionSM) {
             quillDescriptionSM.root.innerHTML = <?php echo json_encode($_POST['description']); ?>;

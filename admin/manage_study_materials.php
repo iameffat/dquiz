@@ -9,7 +9,6 @@ require_once '../includes/functions.php';
 if (isset($_GET['action']) && $_GET['action'] == 'delete' && isset($_GET['id'])) {
     $material_id_to_delete = intval($_GET['id']);
     
-    // No file to delete from server, just delete from database
     $sql_delete_material = "DELETE FROM study_materials WHERE id = ?";
     if ($stmt_delete = $conn->prepare($sql_delete_material)) {
         $stmt_delete->bind_param("i", $material_id_to_delete);
@@ -32,7 +31,6 @@ if (isset($_GET['action']) && $_GET['action'] == 'delete' && isset($_GET['id']))
 require_once 'includes/header.php';
 
 $materials = [];
-// Fetch google_drive_link instead of file_name
 $sql_materials = "SELECT sm.id, sm.title, sm.google_drive_link, sm.created_at, u.name as uploader_name 
                   FROM study_materials sm 
                   LEFT JOIN users u ON sm.uploaded_by = u.id 
@@ -65,7 +63,7 @@ if ($result_materials && $result_materials->num_rows > 0) {
                         <tr>
                             <th>ID</th>
                             <th>শিরোনাম</th>
-                            <th>গুগল ড্রাইভ লিংক</th>
+                            <th>লিংক</th>
                             <th>আপলোডার</th>
                             <th>আপলোডের তারিখ</th>
                             <th>একশন</th>
