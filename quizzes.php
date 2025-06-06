@@ -100,7 +100,10 @@ $page_specific_styles = "
         transform: translateY(-5px);
         box-shadow: 0 .5rem 1rem rgba(0,0,0,.15);
     }
-    .quiz-card.status-live { border-left-color: var(--bs-success); }
+    .quiz-card.status-live { 
+        border-left-color: var(--bs-success); 
+        background-color: var(--bs-success-bg-subtle); /* নতুন আকর্ষণীয় ব্যাকগ্রাউন্ড */
+    }
     .quiz-card.status-upcoming { border-left-color: var(--bs-info); }
     .quiz-card.status-archived { border-left-color: var(--bs-secondary); }
     .quiz-card.status-draft { border-left-color: var(--bs-warning); }
