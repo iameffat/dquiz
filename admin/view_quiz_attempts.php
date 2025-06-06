@@ -5,6 +5,7 @@ require_once '../includes/db_connect.php';
 require_once 'includes/auth_check.php';
 require_once '../includes/functions.php';
 
+// ... (ফাইলের উপরের অংশে কোনো পরিবর্তন নেই) ...
 $quiz_id = isset($_GET['quiz_id']) ? intval($_GET['quiz_id']) : 0;
 $admin_base_url = '';
 $current_user_attempt_id = isset($_GET['highlight_attempt']) ? intval($_GET['highlight_attempt']) : null;
@@ -373,11 +374,10 @@ require_once 'includes/header.php';
                                     <br>
                                     <small class="text-muted"><?php echo htmlspecialchars($attempt['ip_address'] ?: 'N/A'); ?></small>
                                     <?php
-                                    // ডুপ্লিকেট আইপি চেক করে নোটিশ দেখানো হচ্ছে
+                                    // ডুপ্লিকেট আইপি চেক করে নোটিশ (ব্যাজ) দেখানো হচ্ছে
                                     if (!empty($attempt['ip_address']) && isset($ip_counts[$attempt['ip_address']]) && $ip_counts[$attempt['ip_address']] > 1) {
                                         $count = $ip_counts[$attempt['ip_address']];
-                                        $tooltip_text = "এই আইপি ঠিকানাটি মোট {$count} বার ব্যবহৃত হয়েছে।";
-                                        echo ' <span class="text-warning" data-bs-toggle="tooltip" data-bs-placement="top" title="' . htmlspecialchars($tooltip_text) . '"><i class="bi bi-exclamation-triangle-fill"></i></span>';
+                                        echo ' <span class="badge bg-warning text-dark ms-1">ডুপ্লিকেট আইপি (' . $count . ')</span>';
                                     }
                                     ?>
                                 </td>
@@ -458,11 +458,7 @@ require_once 'includes/header.php';
         });
     }
 
-    // বুটস্ট্র্যাপ টুলটিপ চালু করা হচ্ছে
-    var tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'));
-    var tooltipList = tooltipTriggerList.map(function (tooltipTriggerEl) {
-      return new bootstrap.Tooltip(tooltipTriggerEl);
-    });
+    // টুলটিপ চালু করার কোড অপ্রয়োজনীয় হওয়ায় সরিয়ে ফেলা হয়েছে।
 </script>
 <?php
 if (isset($conn)) { $conn->close(); }
