@@ -103,7 +103,7 @@ $page_specific_styles = "
     .quiz-card.status-archived { border-left-color: var(--bs-secondary); }
     .quiz-card.status-draft { border-left-color: var(--bs-warning); }
 
-    .quiz-title { font-weight: 600; }
+    .quiz-title { font-weight: 600; font-size: 1.1rem; }
     .quiz-meta { font-size: 0.85rem; color: var(--text-muted-color); }
     .quiz-meta-item { display: inline-flex; align-items: center; margin-right: 1rem; }
     .quiz-meta-item svg { margin-right: 0.3rem; }
@@ -113,6 +113,30 @@ $page_specific_styles = "
     }
     .action-buttons .btn:last-child {
         margin-right: 0;
+    }
+
+    /* Compact styles for mobile devices */
+    @media (max-width: 575.98px) {
+        .quiz-card .card-body {
+            padding: 0.8rem;
+        }
+        .quiz-title {
+            font-size: 1rem;
+        }
+        .quiz-meta {
+            font-size: 0.75rem;
+        }
+        .quiz-meta-item {
+            margin-right: 0.75rem;
+        }
+        .action-buttons .btn {
+            font-size: 0.8rem;
+            padding: 0.25rem 0.6rem;
+            margin-right: 0.25rem;
+        }
+        .d-md-flex > div:first-child {
+            margin-bottom: 0.75rem !important;
+        }
     }
 ";
 
