@@ -174,6 +174,7 @@ if ($stmt_attempts) {
     $result_attempts = $stmt_attempts->get_result();
     while ($row = $result_attempts->fetch_assoc()) {
         $attempts_data[] = $row;
+        // আইপি অ্যাড্রেসের গণনা
         if (!empty($row['ip_address'])) {
             if (!isset($ip_counts[$row['ip_address']])) $ip_counts[$row['ip_address']] = 0;
             $ip_counts[$row['ip_address']]++;
@@ -197,22 +198,18 @@ if (!empty($attempts_data)) {
     }
 }
 
-// ### পরিবর্তিত কোড শুরু ###
 // "ইমেইল কপি করুন" বাটনের জন্য শুধুমাত্র সক্রিয় অংশগ্রহণকারীদের (যাদের ফলাফল বাতিল হয়নি) ইউনিক ইমেইলের একটি স্ট্রিং তৈরি করা হচ্ছে
 $all_emails_string = '';
 if (!empty($attempts_data)) {
     $emails_array = [];
     foreach ($attempts_data as $attempt) {
-        // শুধুমাত্র যাদের ফলাফল বাতিল করা হয়নি, তাদের ইমেইল যুক্ত করা হবে
         if (!$attempt['is_cancelled']) {
             $emails_array[] = $attempt['user_email'];
         }
     }
-    // খালি ইমেইল বাদ দিয়ে ইউনিক ইমেইলের তালিকা তৈরি করা হচ্ছে
     $unique_emails = array_unique(array_filter($emails_array));
     $all_emails_string = implode(', ', $unique_emails);
 }
-// ### পরিবর্তিত কোড শেষ ###
 
 function mask_phone_for_print($phone) { if(empty($phone)) return 'N/A'; $l=strlen($phone); return $l>7?substr($phone,0,3).str_repeat('*',$l-6).substr($phone,-3):str_repeat('*',$l); }
 
@@ -249,7 +246,6 @@ require_once 'includes/header.php';
         .print-rank-silver { color: #383d41 !important; font-weight: bold; }
         .print-rank-bronze { color: #8B4513 !important; font-weight: bold; }
 
-        /* নতুন CSS নিয়ম: বাতিল করা ফলাফল প্রিন্টে দেখানো হবে না */
         tr.table-danger {
              display: none !important;
         }
@@ -274,6 +270,7 @@ require_once 'includes/header.php';
     .table-info-user td { background-color: var(--bs-table-active-bg) !important; color: var(--bs-table-active-color) !important; }
     body.dark-mode .table-info-user td { background-color: var(--bs-info-bg-subtle) !important; color: var(--bs-info-text-emphasis) !important; }
 </style>
+
 <div class="container-fluid" id="main-content-area">
     <h1 class="print-title" style="display:none;"><?php echo $page_title; ?></h1>
 
@@ -353,7 +350,6 @@ require_once 'includes/header.php';
                                 }
 
                                 if($attempt['is_cancelled']) {
-                                    // বাতিল করা ফলাফলের জন্য এই ক্লাসটি যোগ করা হয়, যা প্রিন্টে সারি লুকাতে ব্যবহৃত হবে
                                     $row_class .= ' table-danger opacity-75';
                                 }
 
@@ -371,9 +367,19 @@ require_once 'includes/header.php';
                                 <td class="no-print"><?php echo htmlspecialchars($attempt['user_address'] ?: 'N/A'); ?></td>
                                 <td><?php echo $attempt['score'] !== null ? number_format($attempt['score'], 2) : 'N/A'; ?></td>
                                 <td><?php echo $attempt['time_taken_seconds'] ? format_seconds_to_hms($attempt['time_taken_seconds']) : 'N/A'; ?></td>
+                                
                                 <td class="no-print device-details">
                                     <?php echo htmlspecialchars($attempt['browser_name'] ?: 'N/A') . ' (' . htmlspecialchars($attempt['os_platform'] ?: 'N/A') . ')'; ?>
-                                    <br><small class="text-muted"><?php echo htmlspecialchars($attempt['ip_address'] ?: 'N/A'); ?></small>
+                                    <br>
+                                    <small class="text-muted"><?php echo htmlspecialchars($attempt['ip_address'] ?: 'N/A'); ?></small>
+                                    <?php
+                                    // ডুপ্লিকেট আইপি চেক করে নোটিশ দেখানো হচ্ছে
+                                    if (!empty($attempt['ip_address']) && isset($ip_counts[$attempt['ip_address']]) && $ip_counts[$attempt['ip_address']] > 1) {
+                                        $count = $ip_counts[$attempt['ip_address']];
+                                        $tooltip_text = "এই আইপি ঠিকানাটি মোট {$count} বার ব্যবহৃত হয়েছে।";
+                                        echo ' <span class="text-warning" data-bs-toggle="tooltip" data-bs-placement="top" title="' . htmlspecialchars($tooltip_text) . '"><i class="bi bi-exclamation-triangle-fill"></i></span>';
+                                    }
+                                    ?>
                                 </td>
                                 <td class="no-print">
                                     <?php echo $attempt['submitted_at'] ? format_datetime($attempt['submitted_at'], "d M Y, h:i A") : 'N/A'; ?>
@@ -427,25 +433,22 @@ require_once 'includes/header.php';
         window.print();
     }
 
-    // "ইমেইল কপি করুন" বাটনের জন্য নতুন স্ক্রিপ্ট
+    // "ইমেইল কপি করুন" বাটনের জন্য স্ক্রিপ্ট
     const copyBtn = document.getElementById('copyAllEmailsBtn');
     if (copyBtn) {
         copyBtn.addEventListener('click', function() {
             const emails = this.getAttribute('data-emails');
             if (emails) {
                 navigator.clipboard.writeText(emails).then(() => {
-                    // সফল হলে বাটনের লেখা পরিবর্তন এবং বাটন নিষ্ক্রিয় করা হবে
                     const originalText = this.innerHTML;
                     this.innerHTML = 'সফলভাবে কপি হয়েছে!';
                     this.disabled = true;
 
-                    // ২.৫ সেকেন্ড পর বাটন আগের অবস্থায় ফিরিয়ে আনা হবে
                     setTimeout(() => {
                         this.innerHTML = originalText;
                         this.disabled = false;
                     }, 2500);
                 }).catch(err => {
-                    // ব্যর্থ হলে ব্যবহারকারীকে জানানো হবে
                     console.error('ইমেইল কপি করতে সমস্যা হয়েছে: ', err);
                     alert('ত্রুটি: ইমেইল কপি করা যায়নি।');
                 });
@@ -454,8 +457,13 @@ require_once 'includes/header.php';
             }
         });
     }
-</script>
 
+    // বুটস্ট্র্যাপ টুলটিপ চালু করা হচ্ছে
+    var tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'));
+    var tooltipList = tooltipTriggerList.map(function (tooltipTriggerEl) {
+      return new bootstrap.Tooltip(tooltipTriggerEl);
+    });
+</script>
 <?php
 if (isset($conn)) { $conn->close(); }
 require_once 'includes/footer.php';
