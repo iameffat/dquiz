@@ -80,11 +80,20 @@ if ($stmt_all) {
 
 $page_specific_styles = "
     .quiz-page-header {
-        background: linear-gradient(135deg, var(--secondary-bg-color) 0%, var(--tertiary-bg-color) 100%);
-        padding: 2.5rem 1rem;
+        background: var(--bs-tertiary-bg);
+        padding: 1.5rem 1rem; /* Padding কমানো হয়েছে */
         border-radius: .75rem;
-        margin-bottom: 2.5rem;
+        margin-bottom: 2rem; /* Margin কমানো হয়েছে */
         text-align: center;
+        border: 1px solid var(--border-color-translucent);
+    }
+    .quiz-page-header h1 {
+        font-size: 1.75rem; /* হেডিং এর ফন্ট সাইজ কমানো হয়েছে */
+        font-weight: 600;
+    }
+    .quiz-page-header .lead {
+        font-size: 1rem; /* প্যারাগ্রাফের ফন্ট সাইজ কমানো হয়েছে */
+        margin-bottom: 0;
     }
     .filter-bar {
         margin-bottom: 2rem;
@@ -139,6 +148,13 @@ $page_specific_styles = "
 
     /* Compact styles for mobile devices */
     @media (max-width: 575.98px) {
+        .quiz-page-header {
+            padding: 1.25rem 1rem;
+            margin-bottom: 1.5rem;
+        }
+        .quiz-page-header h1 {
+            font-size: 1.5rem;
+        }
         .quiz-card .card-body {
             padding: 0.8rem;
         }
@@ -175,7 +191,7 @@ require_once 'includes/header.php';
 <div class="container mt-4 mb-5">
     
     <div class="quiz-page-header">
-        <h1 class="display-5">আমাদের সকল কুইজ</h1>
+        <h1>আমাদের সকল কুইজ</h1>
         <p class="lead">আপনার জ্ঞান পরীক্ষা করুন এবং বৃদ্ধি করুন ইসলামিক বিভিন্ন বিষয়ে।</p>
     </div>
 
@@ -242,7 +258,6 @@ require_once 'includes/header.php';
                                     <div class="action-buttons">
                                         <button class="btn btn-sm btn-outline-dark" onclick="shareQuiz('<?php echo htmlspecialchars(addslashes($quiz['title']), ENT_QUOTES); ?>', '<?php echo $quiz_page_url; ?>', this)">
                                             <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-share-fill" viewBox="0 0 16 16"><path d="M11 2.5a2.5 2.5 0 1 1 .603 1.628l-6.718 3.12a2.5 2.5 0 0 1 0 1.504l6.718 3.12a2.5 2.5 0 1 1-.488.876l-6.718-3.12a2.5 2.5 0 1 1 0-3.256l6.718-3.12A2.5 2.5 0 0 1 11 2.5"/></svg>
-                                         
                                         </button>
                                         <button type="button" class="btn btn-sm btn-outline-secondary syllabus-btn" 
                                                 data-bs-toggle="modal" 
@@ -261,7 +276,7 @@ require_once 'includes/header.php';
                                                     <a href="quiz_page.php?id=<?php echo $quiz['id']; ?>" class="btn btn-sm btn-success">অংশগ্রহণ</a>
                                                 <?php endif; ?>
                                             <?php else: ?>
-                                                <a href="login.php?redirect=<?php echo urlencode('quiz_page.php?id=' . $quiz['id']); ?>" class="btn btn-sm btn-primary">অংশগ্রহণের জন্য লগইন</a>
+                                                <a href="login.php?redirect=<?php echo urlencode('quiz_page.php?id=' . $quiz['id']); ?>" class="btn btn-sm btn-primary">লগইন</a>
                                             <?php endif; ?>
                                         <?php endif; ?>
                                     </div>
