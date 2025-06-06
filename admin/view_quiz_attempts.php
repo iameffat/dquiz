@@ -424,7 +424,7 @@ require_once 'includes/header.php';
                                 <th class="no-print participant-details-print-hide">ঠিকানা</th>
                                 <th>স্কোর</th>
                                 <th>সময় লেগেছে</th>
-                                <th>সাবমিটের সময়</th>
+                                <th class="no-print">সাবমিটের সময়</th>
                                 <th class="no-print">আইপি অ্যাড্রেস</th>
                                 <th class="no-print">ডিভাইস/ব্রাউজার</th>
                                 <th class="no-print">স্ট্যাটাস</th>
@@ -520,7 +520,7 @@ require_once 'includes/header.php';
                                 <td class="no-print participant-details-print-hide"><?php echo htmlspecialchars($attempt['user_address'] ? $attempt['user_address'] : 'N/A'); ?></td>
                                 <td><?php echo $attempt['score'] !== null ? number_format($attempt['score'], 2) : 'N/A'; ?></td>
                                 <td><?php echo $attempt['time_taken_seconds'] ? format_seconds_to_hms($attempt['time_taken_seconds']) : 'N/A'; ?></td>
-                                <td><?php echo format_datetime($attempt['submitted_at']); ?></td>
+                                <td class="no-print"><?php echo format_datetime($attempt['submitted_at']); ?></td>
                                 <td class="no-print"><?php echo $ip_display . $ip_warning_icon; ?></td>
                                 <td class="no-print device-details"><?php echo $device_browser_info_screen; ?></td>
                                 <td class="no-print"><?php echo $status_text; ?></td>
