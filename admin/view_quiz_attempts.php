@@ -266,13 +266,18 @@ require_once 'includes/header.php';
         a[href]:after {
             content: none !important;
         }
-        .print-only-phone, .print-only-name { display: none; } 
+        
+        /* New and improved print visibility rules */
+        .print-only-phone, .print-only-name, .attempt-user-email { 
+            display: none !important; 
+        }
 
-        body.print-privacy .print-only-phone { display: table-cell !important; } 
-        body:not(.print-privacy) .print-only-name { display: table-cell !important; } 
-
-        body.print-privacy .participant-col-print-name { display: none !important; }
-        body:not(.print-privacy) .participant-col-print-phone { display: none !important; }
+        body.print-privacy .print-only-phone { 
+            display: table-cell !important; 
+        } 
+        body:not(.print-privacy) .print-only-name { 
+            display: table-cell !important; 
+        }
         
         tr.cancelled-attempt-for-print {
             display: none !important;
@@ -280,20 +285,13 @@ require_once 'includes/header.php';
         .participant-details-print-hide {
             display: none !important;
         }
-        .attempt-user-email { /* Hide email column in print by default */
-             display: none !important;
-        }
-        body.print-privacy .attempt-user-email { /* Show email if privacy print with phone */
-            /* display: table-cell !important; */ /* User requested not to show email in privacy print */
-        }
-         body:not(.print-privacy) .attempt-user-email { /* Show email if name print */
-            display: table-cell !important;
-        }
-
-
         .table tbody tr {
             page-break-inside: avoid; 
         }
+    }
+    /* On-screen style to hide phone column by default */
+    .print-only-phone {
+        display: none;
     }
     .ip-alert-icon {
         cursor: help;
@@ -417,8 +415,8 @@ require_once 'includes/header.php';
                         <thead>
                             <tr>
                                 <th># র‍্যাংক</th>
-                                <th class="participant-col-print-name">অংশগ্রহণকারীর নাম (ID)</th>
-                                <th class="participant-col-print-phone" style="display:none;">অংশগ্রহণকারী (ফোন)</th>
+                                <th class="print-only-name">অংশগ্রহণকারীর নাম (ID)</th>
+                                <th class="print-only-phone">অংশগ্রহণকারী (ফোন)</th>
                                 <th class="participant-details-print-hide attempt-user-email">ইমেইল</th>
                                 <th class="no-print participant-details-print-hide">মোবাইল</th>
                                 <th class="no-print participant-details-print-hide">ঠিকানা</th>
@@ -509,10 +507,10 @@ require_once 'includes/header.php';
                             ?>
                             <tr class="<?php echo trim($final_row_class_string); ?>">
                                 <td class="rank-cell"><?php echo (!$attempt['is_cancelled'] && $attempt['score'] !== null) ? ($display_rank == 1 ? '🥇' : ($display_rank == 2 ? '🥈' : ($display_rank == 3 ? '🥉' : ''))) . $display_rank : 'N/A'; ?></td>
-                                <td class="participant-col-print-name print-only-name">
+                                <td class="print-only-name">
                                     <?php echo htmlspecialchars($attempt['user_name']); ?> (ID: <?php echo $attempt['user_id']; ?>)
                                 </td>
-                                <td class="participant-col-print-phone print-only-phone" style="display:none;">
+                                <td class="print-only-phone">
                                     <?php echo htmlspecialchars(mask_phone_for_print($attempt['user_mobile'])); ?> (ID: <?php echo $attempt['user_id']; ?>)
                                 </td>
                                 <td class="participant-details-print-hide attempt-user-email"><?php echo htmlspecialchars($attempt['user_email']); ?></td>
@@ -555,9 +553,7 @@ require_once 'includes/header.php';
         }
         
         bodyElement.classList.remove('print-privacy'); 
-        document.querySelectorAll('.participant-col-print-name').forEach(el => el.style.display = ''); 
-        document.querySelectorAll('.participant-col-print-phone').forEach(el => el.style.display = 'none'); 
-
+        
         if (printMode === 'phone') {
             bodyElement.classList.add('print-privacy');
         }
