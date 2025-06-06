@@ -93,8 +93,8 @@ $page_specific_styles = "
         border: 1px solid var(--border-color);
         border-left-width: 4px;
         transition: transform 0.2s ease, box-shadow 0.2s ease;
-        position: relative; /* Added for positioning the badge */
-        overflow: hidden; /* Added to contain the badge */
+        position: relative; 
+        overflow: hidden; 
     }
     .quiz-card:hover {
         transform: translateY(-5px);
@@ -102,9 +102,12 @@ $page_specific_styles = "
     }
     .quiz-card.status-live { 
         border-left-color: var(--bs-success); 
-        background-color: var(--bs-success-bg-subtle); /* নতুন আকর্ষণীয় ব্যাকগ্রাউন্ড */
+        background-color: var(--bs-success-bg-subtle);
     }
-    .quiz-card.status-upcoming { border-left-color: var(--bs-info); }
+    .quiz-card.status-upcoming { 
+        border-left-color: var(--bs-info); 
+        background-color: var(--bs-info-bg-subtle); /* আপকামিং কুইজের জন্য হালকা ব্যাকগ্রাউন্ড */
+    }
     .quiz-card.status-archived { border-left-color: var(--bs-secondary); }
     .quiz-card.status-draft { border-left-color: var(--bs-warning); }
 
@@ -226,7 +229,7 @@ require_once 'includes/header.php';
                         <span class="d-none d-md-block badge text-bg-<?php echo $status_class; ?> status-badge-corner"><?php echo $status_text; ?></span>
                         <div class="card-body">
                             <div class="d-md-flex justify-content-between align-items-center">
-                                <div class="mb-3 mb-md-0">
+                                <div class="mb-2 mb-md-0">
                                     <span class="d-md-none badge rounded-pill text-bg-<?php echo $status_class; ?> status-badge mb-2"><?php echo $status_text; ?></span>
                                     <h5 class="card-title quiz-title mb-1"><?php echo escape_html($quiz['title']); ?></h5>
                                     <div class="quiz-meta">
