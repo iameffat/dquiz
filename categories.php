@@ -32,9 +32,6 @@ if ($result) {
 } else {
     // যদি কুয়েরিতে এরর হয়, তাহলে লগ করুন এবং ইউজারকে একটি বার্তা দেখান
     error_log("Error fetching categories: " . $conn->error);
-    // একটি সাধারণ এরর মেসেজ দেখানো যেতে পারে, অথবা পেইজটি একটি এরর বার্তা দিয়ে লোড হতে পারে
-    // যেমন: echo "ক্যাটাগরি আনতে সমস্যা হয়েছে। অনুগ্রহ করে পরে আবার চেষ্টা করুন।";
-    // exit; // অথবা এরর পেইজে রিডাইরেক্ট করা
 }
 
 $page_specific_styles = "
@@ -79,8 +76,8 @@ $page_specific_styles = "
         color: var(--bs-secondary-color);
         margin-bottom: 1rem;
     }
-    .home-category-card .btn {
-        font-size: 0.9rem;
+    .home-category-card .btn-group-custom .btn {
+        font-size: 0.85rem;
     }
 
     body.dark-mode .home-category-card {
@@ -179,7 +176,10 @@ require_once 'includes/header.php';
                             <h5 class="card-title"><?php echo htmlspecialchars($category['name']); ?></h5>
                             <p class="question-count">(<?php echo $category['question_count']; ?> টি প্রশ্ন)</p>
                         </div>
-                        <a href="practice_quiz.php?category_id=<?php echo $category['id']; ?>" class="btn btn-primary btn-sm mt-auto">অনুশীলন করুন</a>
+                        <div class="btn-group btn-group-custom mt-auto" role="group" aria-label="Category Actions">
+                            <a href="practice_quiz.php?category_id=<?php echo $category['id']; ?>" class="btn btn-primary">অনুশীলন করুন</a>
+                            <a href="view_questions.php?category_id=<?php echo $category['id']; ?>" class="btn btn-outline-secondary">প্রশ্ন পড়ুন</a>
+                        </div>
                     </div>
                 </div>
             <?php endforeach; ?>
