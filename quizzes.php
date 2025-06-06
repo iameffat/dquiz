@@ -249,7 +249,7 @@ require_once 'includes/header.php';
                                                 data-bs-target="#syllabusModal"
                                                 data-quiz-title="<?php echo escape_html($quiz['title']); ?>"
                                                 data-quiz-description="<?php echo escape_html($quiz['description']); ?>">
-                                            সিলেবাস
+                                            সিলেবাস দেখুন
                                         </button>
                                         <?php if ($effective_status == 'draft' || $effective_status == 'upcoming'): ?>
                                             <button class="btn btn-sm btn-secondary" disabled>অংশগ্রহণ</button>
@@ -261,7 +261,7 @@ require_once 'includes/header.php';
                                                     <a href="quiz_page.php?id=<?php echo $quiz['id']; ?>" class="btn btn-sm btn-success">অংশগ্রহণ</a>
                                                 <?php endif; ?>
                                             <?php else: ?>
-                                                <a href="login.php?redirect=<?php echo urlencode('quiz_page.php?id=' . $quiz['id']); ?>" class="btn btn-sm btn-primary">লগইন</a>
+                                                <a href="login.php?redirect=<?php echo urlencode('quiz_page.php?id=' . $quiz['id']); ?>" class="btn btn-sm btn-primary">অংশগ্রহণের জন্য লগইন</a>
                                             <?php endif; ?>
                                         <?php endif; ?>
                                     </div>
