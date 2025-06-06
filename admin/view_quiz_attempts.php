@@ -35,7 +35,7 @@ if ($result_quiz_info->num_rows === 1) {
     $quiz_info = $result_quiz_info->fetch_assoc();
     $page_title = "ফলাফল: " . htmlspecialchars($quiz_info['title']);
 } else {
-    $_SESSION['flash_message'] = "কুইজ (ID: {$quiz_id}) খুঁজে পাওয়া যায়নি।";
+    $_SESSION['flash_message'] = "কুইজ (ID: {$quiz_id}) খুঁজে পাওয়া যায়নি।";
     $_SESSION['flash_message_type'] = "danger";
     header("Location: manage_quizzes.php");
     exit;
@@ -54,10 +54,10 @@ if (isset($_GET['action']) && (isset($_GET['attempt_id']) || isset($_GET['user_i
         $stmt_cancel = $conn->prepare($sql_cancel);
         $stmt_cancel->bind_param("iii", $admin_user_id, $attempt_id_to_manage, $quiz_id);
         if ($stmt_cancel->execute()) {
-            $_SESSION['flash_message'] = "অংশগ্রহণটি (ID: {$attempt_id_to_manage}) সফলভাবে বাতিল করা হয়েছে।";
+            $_SESSION['flash_message'] = "অংশগ্রহণটি (ID: {$attempt_id_to_manage}) সফলভাবে বাতিল করা হয়েছে।";
             $_SESSION['flash_message_type'] = "success";
         } else {
-             $_SESSION['flash_message'] = "অংশগ্রহণটি বাতিল করতে সমস্যা হয়েছে: " . $stmt_cancel->error;
+             $_SESSION['flash_message'] = "অংশগ্রহণটি বাতিল করতে সমস্যা হয়েছে: " . $stmt_cancel->error;
              $_SESSION['flash_message_type'] = "danger";
         }
         $stmt_cancel->close();
@@ -67,10 +67,10 @@ if (isset($_GET['action']) && (isset($_GET['attempt_id']) || isset($_GET['user_i
         $stmt_reinstate = $conn->prepare($sql_reinstate);
         $stmt_reinstate->bind_param("ii", $attempt_id_to_manage, $quiz_id);
         if ($stmt_reinstate->execute()) {
-            $_SESSION['flash_message'] = "অংশগ্রহণটি (ID: {$attempt_id_to_manage}) সফলভাবে পুনরুদ্ধার করা হয়েছে।";
+            $_SESSION['flash_message'] = "অংশগ্রহণটি (ID: {$attempt_id_to_manage}) সফলভাবে পুনরুদ্ধার করা হয়েছে।";
             $_SESSION['flash_message_type'] = "info";
         } else {
-            $_SESSION['flash_message'] = "অংশগ্রহণটি পুনঃবিবেচনা করতে সমস্যা হয়েছে: " . $stmt_reinstate->error;
+            $_SESSION['flash_message'] = "অংশগ্রহণটি পুনঃবিবেচনা করতে সমস্যা হয়েছে: " . $stmt_reinstate->error;
             $_SESSION['flash_message_type'] = "danger";
         }
         $stmt_reinstate->close();
@@ -83,7 +83,7 @@ if (isset($_GET['action']) && (isset($_GET['attempt_id']) || isset($_GET['user_i
             $stmt_delete_answers = $conn->prepare($sql_delete_answers);
             if (!$stmt_delete_answers) throw new Exception("ব্যবহারকারীর উত্তর মোছার জন্য প্রস্তুতিতে সমস্যা: " . $conn->error);
             $stmt_delete_answers->bind_param("i", $attempt_id_to_manage);
-            if (!$stmt_delete_answers->execute()) throw new Exception("ব্যবহারকারীর উত্তরগুলো মুছতে সমস্যা হয়েছে: " . $stmt_delete_answers->error);
+            if (!$stmt_delete_answers->execute()) throw new Exception("ব্যবহারকারীর উত্তরগুলো মুছতে সমস্যা হয়েছে: " . $stmt_delete_answers->error);
             $stmt_delete_answers->close();
 
             // Then delete the attempt record
@@ -91,35 +91,35 @@ if (isset($_GET['action']) && (isset($_GET['attempt_id']) || isset($_GET['user_i
             $stmt_delete_attempt_record = $conn->prepare($sql_delete_attempt_record);
             if (!$stmt_delete_attempt_record) throw new Exception("অংশগ্রহণের রেকর্ড মোছার জন্য প্রস্তুতিতে সমস্যা: " . $conn->error);
             $stmt_delete_attempt_record->bind_param("ii", $attempt_id_to_manage, $quiz_id);
-            if (!$stmt_delete_attempt_record->execute()) throw new Exception("অংশগ্রহণের রেকর্ডটি মুছতে সমস্যা হয়েছে: " . $stmt_delete_attempt_record->error);
+            if (!$stmt_delete_attempt_record->execute()) throw new Exception("অংশগ্রহণের রেকর্ডটি মুছতে সমস্যা হয়েছে: " . $stmt_delete_attempt_record->error);
             $stmt_delete_attempt_record->close();
             
             $conn->commit();
-            $_SESSION['flash_message'] = "অংশগ্রহণটি (ID: {$attempt_id_to_manage}) এবং এর সম্পর্কিত উত্তরগুলো সফলভাবে ডিলিট করা হয়েছে।";
+            $_SESSION['flash_message'] = "অংশগ্রহণটি (ID: {$attempt_id_to_manage}) এবং এর সম্পর্কিত উত্তরগুলো সফলভাবে ডিলিট করা হয়েছে।";
             $_SESSION['flash_message_type'] = "success";
 
         } catch (Exception $e) {
             $conn->rollback();
-            $_SESSION['flash_message'] = "অংশগ্রহণটি ডিলিট করার সময় একটি ত্রুটি ঘটেছে: " . $e->getMessage();
+            $_SESSION['flash_message'] = "অংশগ্রহণটি ডিলিট করার সময় একটি ত্রুটি ঘটেছে: " . $e->getMessage();
             $_SESSION['flash_message_type'] = "danger";
             error_log("Attempt deletion error for attempt ID {$attempt_id_to_manage}: " . $e->getMessage());
         }
     } elseif (($action == 'ban_user' || $action == 'unban_user') && $user_id_to_manage > 0) {
         $new_status_is_banned = ($action == 'ban_user') ? 1 : 0;
-        $action_text = ($new_status_is_banned == 1) ? 'নিষিদ্ধ (banned)' : 'সক্রিয় (unbanned)';
+        $action_text = ($new_status_is_banned == 1) ? 'নিষিদ্ধ (banned)' : 'সক্রিয় (unbanned)';
 
         if ($user_id_to_manage == $_SESSION['user_id']) {
-            $_SESSION['flash_message'] = "আপনি নিজেকে নিষিদ্ধ বা সক্রিয় করতে পারবেন না।";
+            $_SESSION['flash_message'] = "আপনি নিজেকে নিষিদ্ধ বা সক্রিয় করতে পারবেন না।";
             $_SESSION['flash_message_type'] = "warning";
         } else {
             $sql_update_status = "UPDATE users SET is_banned = ? WHERE id = ?";
             $stmt_update = $conn->prepare($sql_update_status);
             $stmt_update->bind_param("ii", $new_status_is_banned, $user_id_to_manage);
             if ($stmt_update->execute()) {
-                $_SESSION['flash_message'] = "ইউজার (ID: {$user_id_to_manage}) সফলভাবে {$action_text} করা হয়েছে।";
+                $_SESSION['flash_message'] = "ইউজার (ID: {$user_id_to_manage}) সফলভাবে {$action_text} করা হয়েছে।";
                 $_SESSION['flash_message_type'] = "success";
             } else {
-                $_SESSION['flash_message'] = "ইউজারের স্ট্যাটাস পরিবর্তন করতে সমস্যা হয়েছে: " . $stmt_update->error;
+                $_SESSION['flash_message'] = "ইউজারের স্ট্যাটাস পরিবর্তন করতে সমস্যা হয়েছে: " . $stmt_update->error;
                 $_SESSION['flash_message_type'] = "danger";
             }
             $stmt_update->close();
@@ -195,6 +195,18 @@ if (!empty($attempts_data)) {
         $highest_score = max($non_cancelled_scores);
     }
 }
+
+// ### নতুন কোড শুরু ###
+// "ইমেইল কপি করুন" বাটনের জন্য সকল ইউনিক ইমেইলের একটি স্ট্রিং তৈরি করা হচ্ছে
+$all_emails_string = '';
+if (!empty($attempts_data)) {
+    $emails_array = array_column($attempts_data, 'user_email');
+    $unique_emails = array_unique(array_filter($emails_array)); // array_filter() খালি ইমেইল বাদ দেয়
+    $all_emails_string = implode(', ', $unique_emails);
+}
+// ### নতুন কোড শেষ ###
+
+
 function mask_phone_for_print($phone) { if(empty($phone)) return 'N/A'; $l=strlen($phone); return $l>7?substr($phone,0,3).str_repeat('*',$l-6).substr($phone,-3):str_repeat('*',$l); }
 
 require_once 'includes/header.php';
@@ -255,20 +267,22 @@ require_once 'includes/header.php';
 <div class="container-fluid" id="main-content-area">
     <h1 class="print-title" style="display:none;"><?php echo $page_title; ?></h1>
 
-    <div class="d-flex justify-content-between align-items-center mt-4 mb-3 page-actions-header">
+    <div class="d-flex justify-content-between align-items-center mt-4 mb-3 page-actions-header flex-wrap">
         <h1>কুইজের বিস্তারিত ফলাফল</h1>
-        <div>
+        <div class="d-flex flex-wrap gap-2">
+            <?php if (!empty($all_emails_string)): ?>
+                <button id="copyAllEmailsBtn" class="btn btn-success" data-emails="<?php echo htmlspecialchars($all_emails_string); ?>">ইমেইল কপি করুন</button>
+            <?php endif; ?>
             <button onclick="prepareAndPrint('name');" class="btn btn-info">প্রিন্ট (নাম সহ)</button>
-            <button onclick="prepareAndPrint('phone');" class="btn btn-outline-info ms-2">প্রাইভেসি প্রিন্ট (ফোন)</button>
-            <a href="manage_quizzes.php" class="btn btn-outline-secondary ms-2">সকল কুইজে ফিরে যান</a>
+            <button onclick="prepareAndPrint('phone');" class="btn btn-outline-info">প্রাইভেসি প্রিন্ট (ফোন)</button>
+            <a href="manage_quizzes.php" class="btn btn-outline-secondary">সকল কুইজে ফিরে যান</a>
         </div>
     </div>
-    
     <div class="card my-3 no-print">
         <div class="card-body">
             <form action="view_quiz_attempts.php" method="get" class="row g-2 align-items-center">
                 <input type="hidden" name="quiz_id" value="<?php echo $quiz_id; ?>">
-                <div class="col-md-10"><input type="text" class="form-control form-control-sm" id="search" name="search" placeholder="অংশগ্রহণকারীর নাম, ইমেইল বা মোবাইল নম্বর দিয়ে খুঁজুন..." value="<?php echo htmlspecialchars($search_term); ?>"></div>
+                <div class="col-md-10"><input type="text" class="form-control form-control-sm" id="search" name="search" placeholder="অংশগ্রহণকারীর নাম, ইমেইল বা মোবাইল নম্বর দিয়ে খুঁজুন..." value="<?php echo htmlspecialchars($search_term); ?>"></div>
                 <div class="col-md-2"><button type="submit" class="btn btn-primary btn-sm w-100">খুঁজুন</button></div>
             </form>
         </div>
@@ -288,9 +302,9 @@ require_once 'includes/header.php';
                                 <th>অংশগ্রহণকারী</th>
                                 <th class="no-print">ঠিকানা</th>
                                 <th>স্কোর</th>
-                                <th>সময় লেগেছে</th>
+                                <th>সময় লেগেছে</th>
                                 <th class="no-print">ডিভাইস/আইপি</th>
-                                <th class="no-print">সাবমিটের সময়</th>
+                                <th class="no-print">সাবমিটের সময়</th>
                                 <th class="no-print">স্ট্যাটাস</th>
                                 <th class="no-print">একশন</th>
                             </tr>
@@ -357,7 +371,7 @@ require_once 'includes/header.php';
                                     if ($attempt['is_cancelled']) {
                                         echo '<span class="badge bg-danger">বাতিলকৃত</span>';
                                     } else {
-                                        echo '<span class="badge bg-success">সক্রিয়</span>';
+                                        echo '<span class="badge bg-success">সক্রিয়</span>';
                                     }
                                     if ($attempt['is_banned'] == 1) {
                                         echo ' <span class="badge bg-warning text-dark">নিষিদ্ধ</span>';
@@ -376,10 +390,10 @@ require_once 'includes/header.php';
                                         <?php if ($attempt['is_banned'] == 0): ?>
                                             <a href="view_quiz_attempts.php?quiz_id=<?php echo $quiz_id; ?>&action=ban_user&user_id=<?php echo $attempt['user_id']; ?>&search=<?php echo urlencode($search_term);?>" class="btn btn-sm btn-warning mb-1" onclick="return confirm('আপনি কি নিশ্চিতভাবে এই ইউজারকে নিষিদ্ধ করতে চান?');">নিষিদ্ধ</a>
                                         <?php else: ?>
-                                            <a href="view_quiz_attempts.php?quiz_id=<?php echo $quiz_id; ?>&action=unban_user&user_id=<?php echo $attempt['user_id']; ?>&search=<?php echo urlencode($search_term);?>" class="btn btn-sm btn-success mb-1" onclick="return confirm('আপনি কি নিশ্চিতভাবে এই ইউজারের নিষেধাজ্ঞা তুলে নিতে চান?');">সক্রিয়</a>
+                                            <a href="view_quiz_attempts.php?quiz_id=<?php echo $quiz_id; ?>&action=unban_user&user_id=<?php echo $attempt['user_id']; ?>&search=<?php echo urlencode($search_term);?>" class="btn btn-sm btn-success mb-1" onclick="return confirm('আপনি কি নিশ্চিতভাবে এই ইউজারের নিষেধাজ্ঞা তুলে নিতে চান?');">সক্রিয়</a>
                                         <?php endif; ?>
                                     <?php endif; ?>
-                                    <a href="view_quiz_attempts.php?quiz_id=<?php echo $quiz_id; ?>&action=delete_attempt&attempt_id=<?php echo $attempt['attempt_id']; ?>&search=<?php echo urlencode($search_term);?>" class="btn btn-sm btn-danger mb-1" onclick="return confirm('আপনি কি নিশ্চিতভাবে এই অংশগ্রহণ এবং এর সম্পর্কিত সকল উত্তর স্থায়ীভাবে ডিলিট করতে চান?');" title="অংশগ্রহণ ডিলিট করুন">ডিলিট</a>
+                                    <a href="view_quiz_attempts.php?quiz_id=<?php echo $quiz_id; ?>&action=delete_attempt&attempt_id=<?php echo $attempt['attempt_id']; ?>&search=<?php echo urlencode($search_term);?>" class="btn btn-sm btn-danger mb-1" onclick="return confirm('আপনি কি নিশ্চিতভাবে এই অংশগ্রহণ এবং এর সম্পর্কিত সকল উত্তর স্থায়ীভাবে ডিলিট করতে চান?');" title="অংশগ্রহণ ডিলিট করুন">ডিলিট</a>
                                 </td>
                             </tr>
                             <?php endforeach; ?>
@@ -390,6 +404,7 @@ require_once 'includes/header.php';
         </div>
     </div>
 </div>
+
 <script>
     function prepareAndPrint(printMode){
         const bodyElement = document.body;
@@ -399,8 +414,35 @@ require_once 'includes/header.php';
         }
         window.print();
     }
-</script>
 
+    // "ইমেইল কপি করুন" বাটনের জন্য নতুন স্ক্রিপ্ট
+    const copyBtn = document.getElementById('copyAllEmailsBtn');
+    if (copyBtn) {
+        copyBtn.addEventListener('click', function() {
+            const emails = this.getAttribute('data-emails');
+            if (emails) {
+                navigator.clipboard.writeText(emails).then(() => {
+                    // সফল হলে বাটনের লেখা পরিবর্তন এবং বাটন নিষ্ক্রিয় করা হবে
+                    const originalText = this.innerHTML;
+                    this.innerHTML = 'সফলভাবে কপি হয়েছে!';
+                    this.disabled = true;
+
+                    // ২.৫ সেকেন্ড পর বাটন আগের অবস্থায় ফিরিয়ে আনা হবে
+                    setTimeout(() => {
+                        this.innerHTML = originalText;
+                        this.disabled = false;
+                    }, 2500);
+                }).catch(err => {
+                    // ব্যর্থ হলে ব্যবহারকারীকে জানানো হবে
+                    console.error('ইমেইল কপি করতে সমস্যা হয়েছে: ', err);
+                    alert('ত্রুটি: ইমেইল কপি করা যায়নি।');
+                });
+            } else {
+                alert('কপি করার জন্য কোনো ইমেইল পাওয়া যায়নি।');
+            }
+        });
+    }
+</script>
 <?php
 if (isset($conn)) { $conn->close(); }
 require_once 'includes/footer.php';
