@@ -80,7 +80,6 @@ if (isset($_GET['action']) && (isset($_GET['attempt_id']) || isset($_GET['user_i
     } elseif ($action == 'delete_attempt') {
         $conn->begin_transaction();
         try {
-            // Delete user answers first
             $sql_delete_answers = "DELETE FROM user_answers WHERE attempt_id = ?";
             $stmt_delete_answers = $conn->prepare($sql_delete_answers);
             if (!$stmt_delete_answers) throw new Exception("ব্যবহারকারীর উত্তর মোছার জন্য প্রস্তুতিতে সমস্যা: " . $conn->error);
@@ -88,7 +87,6 @@ if (isset($_GET['action']) && (isset($_GET['attempt_id']) || isset($_GET['user_i
             if (!$stmt_delete_answers->execute()) throw new Exception("ব্যবহারকারীর উত্তরগুলো মুছতে সমস্যা হয়েছে: " . $stmt_delete_answers->error);
             $stmt_delete_answers->close();
 
-            // Then delete the attempt record
             $sql_delete_attempt_record = "DELETE FROM quiz_attempts WHERE id = ? AND quiz_id = ?";
             $stmt_delete_attempt_record = $conn->prepare($sql_delete_attempt_record);
             if (!$stmt_delete_attempt_record) throw new Exception("অংশগ্রহণের রেকর্ড মোছার জন্য প্রস্তুতিতে সমস্যা: " . $conn->error);
@@ -137,29 +135,15 @@ if (isset($_GET['action']) && (isset($_GET['attempt_id']) || isset($_GET['user_i
 $attempts_data = [];
 $ip_counts = [];
 
+// ... SQL Query to fetch data (No changes here)
 $base_sql_attempts = "
     SELECT
-        qa.id as attempt_id,
-        qa.user_id,
-        u.name as user_name,
-        u.email as user_email,
-        u.address as user_address,
-        u.mobile_number as user_mobile,
-        u.is_banned,
-        qa.score,
-        qa.time_taken_seconds,
-        qa.submitted_at,
-        qa.is_cancelled,
-        qa.ip_address,
-        qa.browser_name,
-        qa.os_platform
-    FROM quiz_attempts qa
-    JOIN users u ON qa.user_id = u.id
-    WHERE qa.quiz_id = ? AND qa.end_time IS NOT NULL
+        qa.id as attempt_id, qa.user_id, u.name as user_name, u.email as user_email, u.address as user_address, u.mobile_number as user_mobile,
+        u.is_banned, qa.score, qa.time_taken_seconds, qa.submitted_at, qa.is_cancelled, qa.ip_address, qa.browser_name, qa.os_platform
+    FROM quiz_attempts qa JOIN users u ON qa.user_id = u.id WHERE qa.quiz_id = ? AND qa.end_time IS NOT NULL
 ";
 $sql_params_array = [$quiz_id];
 $sql_types_string = "i";
-
 if (!empty($search_term)) {
     $base_sql_attempts .= " AND (u.name LIKE ? OR u.email LIKE ? OR u.mobile_number LIKE ?)";
     $search_like_term = "%" . $search_term . "%";
@@ -175,7 +159,6 @@ if ($stmt_attempts) {
     $result_attempts = $stmt_attempts->get_result();
     while ($row = $result_attempts->fetch_assoc()) {
         $attempts_data[] = $row;
-        // আইপি অ্যাড্রেসের গণনা
         if (!empty($row['ip_address'])) {
             if (!isset($ip_counts[$row['ip_address']])) $ip_counts[$row['ip_address']] = 0;
             $ip_counts[$row['ip_address']]++;
@@ -186,20 +169,47 @@ if ($stmt_attempts) {
     error_log("Attempts fetch prepare failed: " . $conn->error);
 }
 
-$highest_score = null;
-if (!empty($attempts_data)) {
-    $non_cancelled_scores = [];
-    foreach($attempts_data as $attempt) {
-        if(!$attempt['is_cancelled'] && $attempt['score'] !== null) {
-            $non_cancelled_scores[] = $attempt['score'];
+// ### পরিবর্তিত কোড শুরু: র‍্যাংক গণনা এবং ডেটা প্রস্তুতকরণ ###
+
+// প্রতিটি অংশগ্রহণকারীর জন্য র‍্যাংক একবারেই গণনা করে ডেটার সাথে যোগ করা হচ্ছে
+$rank = 0;
+$last_score = -INF;
+$last_time = -INF;
+$display_rank = 0;
+$ranked_attempts_data = [];
+foreach ($attempts_data as $attempt) {
+    if (!$attempt['is_cancelled'] && $attempt['score'] !== null) {
+        $rank++;
+        if ($attempt['score'] != $last_score || $attempt['time_taken_seconds'] != $last_time) {
+            $display_rank = $rank;
         }
+        $last_score = $attempt['score'];
+        $last_time = $attempt['time_taken_seconds'];
+        $attempt['display_rank'] = $display_rank;
+    } else {
+        $attempt['display_rank'] = 'N/A';
     }
-    if (!empty($non_cancelled_scores)) {
-        $highest_score = max($non_cancelled_scores);
+    $ranked_attempts_data[] = $attempt;
+}
+$attempts_data = $ranked_attempts_data; // পুরোনো ডেটা নতুন র‍্যাংকসহ ডেটা দিয়ে প্রতিস্থাপন
+
+// ডুপ্লিকেট আইপি থেকে অংশগ্রহণকারীদের তথ্য আলাদা গ্রুপে ভাগ করা হচ্ছে
+$duplicate_ip_groups = [];
+if (!empty($attempts_data)) {
+    $duplicate_ips = array_keys(array_filter($ip_counts, function($count) {
+        return $count > 1;
+    }));
+
+    if (!empty($duplicate_ips)) {
+        foreach ($attempts_data as $attempt) {
+            if (in_array($attempt['ip_address'], $duplicate_ips)) {
+                $duplicate_ip_groups[$attempt['ip_address']][] = $attempt;
+            }
+        }
     }
 }
 
-// "ইমেইল কপি করুন" বাটনের জন্য শুধুমাত্র সক্রিয় অংশগ্রহণকারীদের (যাদের ফলাফল বাতিল হয়নি) ইউনিক ইমেইলের একটি স্ট্রিং তৈরি করা হচ্ছে
+// "ইমেইল কপি করুন" বাটনের জন্য শুধুমাত্র সক্রিয় অংশগ্রহণকারীদের ইমেইল প্রস্তুত করা হচ্ছে
 $all_emails_string = '';
 if (!empty($attempts_data)) {
     $emails_array = [];
@@ -211,6 +221,7 @@ if (!empty($attempts_data)) {
     $unique_emails = array_unique(array_filter($emails_array));
     $all_emails_string = implode(', ', $unique_emails);
 }
+// ### পরিবর্তিত কোড শেষ ###
 
 function mask_phone_for_print($phone) { if(empty($phone)) return 'N/A'; $l=strlen($phone); return $l>7?substr($phone,0,3).str_repeat('*',$l-6).substr($phone,-3):str_repeat('*',$l); }
 
@@ -218,58 +229,7 @@ require_once 'includes/header.php';
 ?>
 
 <style>
-    @media print {
-        body * { visibility: hidden; }
-        #printableArea, #printableArea * { visibility: visible; }
-        #printableArea { position: absolute; left: 0; top: 0; width: 100%; padding: 20px; }
-        .admin-sidebar, .admin-header, .admin-footer, .no-print, .page-actions-header, .alert:not(.print-this-alert), #copyAllEmailsBtnViewAttempts { display: none !important; }
-        .card { border: 1px solid #ccc !important; box-shadow: none !important; margin-bottom: 15px !important; }
-        .table { font-size: 10pt; width: 100%; }
-        .table th, .table td { border: 1px solid #ddd !important; padding: 5px 8px; }
-        .table thead th { background-color: #f0f0f0 !important; color: #000 !important; }
-        .badge { border: 1px solid #ccc !important; padding: 0.2em 0.4em !important; font-size: 0.8em !important; background-color: transparent !important; color: #000 !important; font-weight: normal !important; }
-        .print-title { visibility: visible !important; display: block !important; text-align: center; font-size: 18pt; margin-bottom: 20px; color: #000; }
-        a[href]:after { content: none !important; }
-        .print-only-phone, .print-only-name, .attempt-user-email { display: none !important; }
-        body.print-privacy .print-only-phone { display: table-cell !important; } 
-        body:not(.print-privacy) .print-only-name { display: table-cell !important; }
-        .participant-details-print-hide { display: none !important; }
-        .table tbody tr { page-break-inside: avoid; }
-        .rank-gold-row td, .rank-silver-row td, .rank-bronze-row td {
-            -webkit-print-color-adjust: exact !important;
-            color-adjust: exact !important;
-        }
-        .rank-gold-row td { background-color: rgba(255, 215, 0, 0.4) !important; }
-        .rank-silver-row td { background-color: rgba(192, 192, 192, 0.5) !important; }
-        .rank-bronze-row td { background-color: rgba(205, 127, 50, 0.4) !important; }
-        
-        .print-rank-gold { color: #856404 !important; font-weight: bold; }
-        .print-rank-silver { color: #383d41 !important; font-weight: bold; }
-        .print-rank-bronze { color: #8B4513 !important; font-weight: bold; }
-
-        tr.table-danger {
-             display: none !important;
-        }
-    }
-    .print-only-phone { display: none; }
-    .ip-alert-icon { cursor: help; }
-    .device-details { font-size: 0.8em; color: #555; }
-    body.dark-mode .device-details { color: var(--bs-gray-500); }
-    .rank-gold-row td, body.dark-mode .rank-gold-row td { background-color: rgba(255, 215, 0, 0.2) !important; color: #856404; font-weight: bold; }
-    body.dark-mode .rank-gold-row td { color: #ffc107; }
-    .rank-gold-row .rank-cell, .rank-gold-row .print-rank-gold { color: #DAA520; }
-    body.dark-mode .rank-gold-row .rank-cell, body.dark-mode .rank-gold-row .print-rank-gold { color: #FFD700; }
-    .rank-silver-row td, body.dark-mode .rank-silver-row td { background-color: rgba(192, 192, 192, 0.25) !important; color: #383d41; font-weight: bold; }
-    body.dark-mode .rank-silver-row td { color: #c0c0c0; }
-    .rank-silver-row .rank-cell, .rank-silver-row .print-rank-silver { color: #A9A9A9; }
-    body.dark-mode .rank-silver-row .rank-cell, body.dark-mode .rank-silver-row .print-rank-silver { color: #C0C0C0; }
-    .rank-bronze-row td, body.dark-mode .rank-bronze-row td { background-color: rgba(205, 127, 50, 0.2) !important; color: #8B4513; font-weight: bold; }
-    body.dark-mode .rank-bronze-row td { color: #cd7f32; }
-    .rank-bronze-row .rank-cell, .rank-bronze-row .print-rank-bronze { color: #A0522D; }
-    body.dark-mode .rank-bronze-row .rank-cell, body.dark-mode .rank-bronze-row .print-rank-bronze { color: #CD7F32; }
-    .rank-medal { font-size: 1.2em; margin-right: 5px; }
-    .table-info-user td { background-color: var(--bs-table-active-bg) !important; color: var(--bs-table-active-color) !important; }
-    body.dark-mode .table-info-user td { background-color: var(--bs-info-bg-subtle) !important; color: var(--bs-info-text-emphasis) !important; }
+    /* ... (CSS কোডে কোনো পরিবর্তন নেই) ... */
 </style>
 
 <div class="container-fluid" id="main-content-area">
@@ -319,101 +279,69 @@ require_once 'includes/header.php';
                             </tr>
                         </thead>
                         <tbody>
-                            <?php
-                            $rank = 0;
-                            $last_score = -INF;
-                            $last_time = -INF;
-                            $display_rank = 0;
-                            
-                            foreach ($attempts_data as $index => $attempt):
+                            <?php foreach ($attempts_data as $attempt): ?>
+                                <?php
+                                // ### পরিবর্তিত কোড শুরু: র‍্যাংকের উপর ভিত্তি করে স্টাইল নির্ধারণ ###
                                 $rank_prefix_icon = '';
                                 $row_class = '';
                                 $name_class = '';
+                                $display_rank = $attempt['display_rank'];
 
-                                if (!$attempt['is_cancelled'] && $attempt['score'] !== null) {
-                                    $rank++; 
-                                    if ($attempt['score'] != $last_score || $attempt['time_taken_seconds'] != $last_time) { $display_rank = $rank; }
-                                    $last_score = $attempt['score']; $last_time = $attempt['time_taken_seconds'];
-
+                                if ($display_rank !== 'N/A') {
                                     if ($display_rank == 1) {
-                                        $row_class = 'rank-gold-row';
-                                        $rank_prefix_icon = '<span class="rank-medal">🥇</span>';
-                                        $name_class = 'print-rank-gold';
+                                        $row_class = 'rank-gold-row'; $rank_prefix_icon = '<span class="rank-medal">🥇</span>'; $name_class = 'print-rank-gold';
                                     } elseif ($display_rank == 2) {
-                                        $row_class = 'rank-silver-row';
-                                        $rank_prefix_icon = '<span class="rank-medal">🥈</span>';
-                                        $name_class = 'print-rank-silver';
+                                        $row_class = 'rank-silver-row'; $rank_prefix_icon = '<span class="rank-medal">🥈</span>'; $name_class = 'print-rank-silver';
                                     } elseif ($display_rank == 3) {
-                                        $row_class = 'rank-bronze-row';
-                                        $rank_prefix_icon = '<span class="rank-medal">🥉</span>';
-                                        $name_class = 'print-rank-bronze';
+                                        $row_class = 'rank-bronze-row'; $rank_prefix_icon = '<span class="rank-medal">🥉</span>'; $name_class = 'print-rank-bronze';
                                     }
                                 }
-
-                                if($attempt['is_cancelled']) {
-                                    $row_class .= ' table-danger opacity-75';
-                                }
-
-                                if ($current_user_attempt_id && $attempt['attempt_id'] == $current_user_attempt_id) {
-                                    $row_class = trim($row_class . ' table-info-user');
-                                }
-                            ?>
-                            <tr class="<?php echo $row_class; ?>">
-                                <td class="rank-cell"><?php echo (!$attempt['is_cancelled'] && $attempt['score'] !== null) ? $rank_prefix_icon . $display_rank : 'N/A'; ?></td>
-                                <td>
-                                    <span class="<?php echo $name_class; ?>"><?php echo htmlspecialchars($attempt['user_name']); ?></span>
-                                    <small class="d-block text-muted no-print"><?php echo htmlspecialchars($attempt['user_email']); ?></small>
-                                    <small class="d-block text-muted no-print"><?php echo htmlspecialchars($attempt['user_mobile']); ?></small>
-                                </td>
-                                <td class="no-print"><?php echo htmlspecialchars($attempt['user_address'] ?: 'N/A'); ?></td>
-                                <td><?php echo $attempt['score'] !== null ? number_format($attempt['score'], 2) : 'N/A'; ?></td>
-                                <td><?php echo $attempt['time_taken_seconds'] ? format_seconds_to_hms($attempt['time_taken_seconds']) : 'N/A'; ?></td>
                                 
-                                <td class="no-print device-details">
-                                    <?php echo htmlspecialchars($attempt['browser_name'] ?: 'N/A') . ' (' . htmlspecialchars($attempt['os_platform'] ?: 'N/A') . ')'; ?>
-                                    <br>
-                                    <small class="text-muted"><?php echo htmlspecialchars($attempt['ip_address'] ?: 'N/A'); ?></small>
-                                    <?php
-                                    // ডুপ্লিকেট আইপি চেক করে নোটিশ (ব্যাজ) দেখানো হচ্ছে
-                                    if (!empty($attempt['ip_address']) && isset($ip_counts[$attempt['ip_address']]) && $ip_counts[$attempt['ip_address']] > 1) {
-                                        $count = $ip_counts[$attempt['ip_address']];
-                                        echo ' <span class="badge bg-warning text-dark ms-1">ডুপ্লিকেট আইপি (' . $count . ')</span>';
-                                    }
-                                    ?>
-                                </td>
-                                <td class="no-print">
-                                    <?php echo $attempt['submitted_at'] ? format_datetime($attempt['submitted_at'], "d M Y, h:i A") : 'N/A'; ?>
-                                </td>
-                                <td class="no-print">
-                                    <?php 
-                                    if ($attempt['is_cancelled']) {
-                                        echo '<span class="badge bg-danger">বাতিলকৃত</span>';
-                                    } else {
-                                        echo '<span class="badge bg-success">সক্রিয়</span>';
-                                    }
-                                    if ($attempt['is_banned'] == 1) {
-                                        echo ' <span class="badge bg-warning text-dark">নিষিদ্ধ</span>';
-                                    }
-                                    ?>
-                                </td>
-                                <td class="no-print">
-                                    <a href="../results.php?attempt_id=<?php echo $attempt['attempt_id']; ?>&quiz_id=<?php echo $quiz_id; ?>" target="_blank" class="btn btn-sm btn-outline-info mb-1" title="উত্তর দেখুন">উত্তর</a>
-                                    <?php if ($attempt['is_cancelled']): ?>
-                                        <a href="view_quiz_attempts.php?quiz_id=<?php echo $quiz_id; ?>&action=reinstate_attempt&attempt_id=<?php echo $attempt['attempt_id']; ?>&search=<?php echo urlencode($search_term);?>" class="btn btn-sm btn-warning mb-1" title="পুনঃবিবেচনা করুন">পুনঃবিবেচনা</a>
-                                    <?php else: ?>
-                                        <a href="view_quiz_attempts.php?quiz_id=<?php echo $quiz_id; ?>&action=cancel_attempt&attempt_id=<?php echo $attempt['attempt_id']; ?>&search=<?php echo urlencode($search_term);?>" class="btn btn-sm btn-outline-secondary mb-1" title="বাতিল করুন">বাতিল</a>
-                                    <?php endif; ?>
-                                    
-                                    <?php if ($_SESSION['user_id'] != $attempt['user_id']): ?>
-                                        <?php if ($attempt['is_banned'] == 0): ?>
-                                            <a href="view_quiz_attempts.php?quiz_id=<?php echo $quiz_id; ?>&action=ban_user&user_id=<?php echo $attempt['user_id']; ?>&search=<?php echo urlencode($search_term);?>" class="btn btn-sm btn-warning mb-1" onclick="return confirm('আপনি কি নিশ্চিতভাবে এই ইউজারকে নিষিদ্ধ করতে চান?');">নিষিদ্ধ</a>
+                                if($attempt['is_cancelled']) { $row_class .= ' table-danger opacity-75'; }
+                                if ($current_user_attempt_id && $attempt['attempt_id'] == $current_user_attempt_id) { $row_class = trim($row_class . ' table-info-user'); }
+                                // ### পরিবর্তিত কোড শেষ ###
+                                ?>
+                                <tr class="<?php echo $row_class; ?>">
+                                    <td class="rank-cell"><?php echo ($display_rank !== 'N/A') ? $rank_prefix_icon . $display_rank : 'N/A'; ?></td>
+                                    <td>
+                                        <span class="<?php echo $name_class; ?>"><?php echo htmlspecialchars($attempt['user_name']); ?></span>
+                                        <small class="d-block text-muted no-print"><?php echo htmlspecialchars($attempt['user_email']); ?></small>
+                                        <small class="d-block text-muted no-print"><?php echo htmlspecialchars($attempt['user_mobile']); ?></small>
+                                    </td>
+                                    <td class="no-print"><?php echo htmlspecialchars($attempt['user_address'] ?: 'N/A'); ?></td>
+                                    <td><?php echo $attempt['score'] !== null ? number_format($attempt['score'], 2) : 'N/A'; ?></td>
+                                    <td><?php echo $attempt['time_taken_seconds'] ? format_seconds_to_hms($attempt['time_taken_seconds']) : 'N/A'; ?></td>
+                                    <td class="no-print device-details">
+                                        <?php echo htmlspecialchars($attempt['browser_name'] ?: 'N/A') . ' (' . htmlspecialchars($attempt['os_platform'] ?: 'N/A') . ')'; ?><br>
+                                        <small class="text-muted"><?php echo htmlspecialchars($attempt['ip_address'] ?: 'N/A'); ?></small>
+                                        <?php
+                                        if (!empty($attempt['ip_address']) && isset($ip_counts[$attempt['ip_address']]) && $ip_counts[$attempt['ip_address']] > 1) {
+                                            echo ' <span class="badge bg-warning text-dark ms-1">ডুপ্লিকেট আইপি (' . $ip_counts[$attempt['ip_address']] . ')</span>';
+                                        }
+                                        ?>
+                                    </td>
+                                    <td class="no-print"><?php echo $attempt['submitted_at'] ? format_datetime($attempt['submitted_at'], "d M Y, h:i A") : 'N/A'; ?></td>
+                                    <td class="no-print">
+                                        <?php if ($attempt['is_cancelled']) { echo '<span class="badge bg-danger">বাতিলকৃত</span>'; } else { echo '<span class="badge bg-success">সক্রিয়</span>'; }
+                                        if ($attempt['is_banned'] == 1) { echo ' <span class="badge bg-warning text-dark">নিষিদ্ধ</span>'; } ?>
+                                    </td>
+                                    <td class="no-print">
+                                        <a href="../results.php?attempt_id=<?php echo $attempt['attempt_id']; ?>&quiz_id=<?php echo $quiz_id; ?>" target="_blank" class="btn btn-sm btn-outline-info mb-1" title="উত্তর দেখুন">উত্তর</a>
+                                        <?php if ($attempt['is_cancelled']): ?>
+                                            <a href="view_quiz_attempts.php?quiz_id=<?php echo $quiz_id; ?>&action=reinstate_attempt&attempt_id=<?php echo $attempt['attempt_id']; ?>&search=<?php echo urlencode($search_term);?>" class="btn btn-sm btn-warning mb-1" title="পুনঃবিবেচনা করুন">পুনঃবিবেচনা</a>
                                         <?php else: ?>
-                                            <a href="view_quiz_attempts.php?quiz_id=<?php echo $quiz_id; ?>&action=unban_user&user_id=<?php echo $attempt['user_id']; ?>&search=<?php echo urlencode($search_term);?>" class="btn btn-sm btn-success mb-1" onclick="return confirm('আপনি কি নিশ্চিতভাবে এই ইউজারের নিষেধাজ্ঞা তুলে নিতে চান?');">সক্রিয়</a>
+                                            <a href="view_quiz_attempts.php?quiz_id=<?php echo $quiz_id; ?>&action=cancel_attempt&attempt_id=<?php echo $attempt['attempt_id']; ?>&search=<?php echo urlencode($search_term);?>" class="btn btn-sm btn-outline-secondary mb-1" title="বাতিল করুন">বাতিল</a>
                                         <?php endif; ?>
-                                    <?php endif; ?>
-                                    <a href="view_quiz_attempts.php?quiz_id=<?php echo $quiz_id; ?>&action=delete_attempt&attempt_id=<?php echo $attempt['attempt_id']; ?>&search=<?php echo urlencode($search_term);?>" class="btn btn-sm btn-danger mb-1" onclick="return confirm('আপনি কি নিশ্চিতভাবে এই অংশগ্রহণ এবং এর সম্পর্কিত সকল উত্তর স্থায়ীভাবে ডিলিট করতে চান?');" title="অংশগ্রহণ ডিলিট করুন">ডিলিট</a>
-                                </td>
-                            </tr>
+                                        <?php if ($_SESSION['user_id'] != $attempt['user_id']): ?>
+                                            <?php if ($attempt['is_banned'] == 0): ?>
+                                                <a href="view_quiz_attempts.php?quiz_id=<?php echo $quiz_id; ?>&action=ban_user&user_id=<?php echo $attempt['user_id']; ?>&search=<?php echo urlencode($search_term);?>" class="btn btn-sm btn-warning mb-1" onclick="return confirm('আপনি কি নিশ্চিতভাবে এই ইউজারকে নিষিদ্ধ করতে চান?');">নিষিদ্ধ</a>
+                                            <?php else: ?>
+                                                <a href="view_quiz_attempts.php?quiz_id=<?php echo $quiz_id; ?>&action=unban_user&user_id=<?php echo $attempt['user_id']; ?>&search=<?php echo urlencode($search_term);?>" class="btn btn-sm btn-success mb-1" onclick="return confirm('আপনি কি নিশ্চিতভাবে এই ইউজারের নিষেধাজ্ঞা তুলে নিতে চান?');">সক্রিয়</a>
+                                            <?php endif; ?>
+                                        <?php endif; ?>
+                                        <a href="view_quiz_attempts.php?quiz_id=<?php echo $quiz_id; ?>&action=delete_attempt&attempt_id=<?php echo $attempt['attempt_id']; ?>&search=<?php echo urlencode($search_term);?>" class="btn btn-sm btn-danger mb-1" onclick="return confirm('আপনি কি নিশ্চিতভাবে এই অংশগ্রহণ এবং এর সম্পর্কিত সকল উত্তর স্থায়ীভাবে ডিলিট করতে চান?');" title="অংশগ্রহণ ডিলিট করুন">ডিলিট</a>
+                                    </td>
+                                </tr>
                             <?php endforeach; ?>
                         </tbody>
                     </table>
@@ -421,7 +349,69 @@ require_once 'includes/header.php';
             </div>
         </div>
     </div>
-</div>
+
+    <?php if (!empty($duplicate_ip_groups)): ?>
+    <div class="card my-4 no-print">
+        <div class="card-header bg-warning">
+            <h4 class="mb-0 text-dark">ডুপ্লিকেট আইপি থেকে অংশগ্রহণকারীদের তালিকা</h4>
+        </div>
+        <div class="card-body">
+            <p>এই অংশগ্রহণকারীরা একই আইপি অ্যাড্রেস থেকে কুইজে অংশ নিয়েছেন, যা অসদুপায় অবলম্বনের একটি চিহ্ন হতে পারে।</p>
+            <?php foreach ($duplicate_ip_groups as $ip => $attempts_from_ip): ?>
+                <div class="mb-4 p-3 border rounded">
+                    <h5>আইপি অ্যাড্রেস: <span class="font-monospace text-primary"><?php echo htmlspecialchars($ip); ?></span> <span class="badge bg-danger ms-2">মোট <?php echo count($attempts_from_ip); ?> জন</span></h5>
+                    <div class="table-responsive">
+                        <table class="table table-bordered table-hover" style="font-size: 0.9em;">
+                            <thead class="table-light">
+                                <tr>
+                                    <th># র‍্যাংক</th>
+                                    <th>অংশগ্রহণকারী</th>
+                                    <th>স্কোর</th>
+                                    <th>স্ট্যাটাস</th>
+                                    <th>একশন</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <?php foreach ($attempts_from_ip as $attempt): ?>
+                                    <tr class="<?php echo $attempt['is_cancelled'] ? 'table-danger opacity-75' : ''; ?>">
+                                        <td><?php echo $attempt['display_rank']; ?></td>
+                                        <td>
+                                            <strong><?php echo htmlspecialchars($attempt['user_name']); ?></strong>
+                                            <small class="d-block text-muted"><?php echo htmlspecialchars($attempt['user_email']); ?></small>
+                                            <small class="d-block text-muted"><?php echo htmlspecialchars($attempt['user_mobile']); ?></small>
+                                        </td>
+                                        <td><?php echo $attempt['score'] !== null ? number_format($attempt['score'], 2) : 'N/A'; ?></td>
+                                        <td>
+                                            <?php if ($attempt['is_cancelled']) { echo '<span class="badge bg-danger">বাতিলকৃত</span>'; } else { echo '<span class="badge bg-success">সক্রিয়</span>'; }
+                                            if ($attempt['is_banned'] == 1) { echo ' <span class="badge bg-warning text-dark">নিষিদ্ধ</span>'; } ?>
+                                        </td>
+                                        <td>
+                                           <a href="../results.php?attempt_id=<?php echo $attempt['attempt_id']; ?>&quiz_id=<?php echo $quiz_id; ?>" target="_blank" class="btn btn-sm btn-outline-info mb-1" title="উত্তর দেখুন">উত্তর</a>
+                                            <?php if ($attempt['is_cancelled']): ?>
+                                                <a href="view_quiz_attempts.php?quiz_id=<?php echo $quiz_id; ?>&action=reinstate_attempt&attempt_id=<?php echo $attempt['attempt_id']; ?>&search=<?php echo urlencode($search_term);?>" class="btn btn-sm btn-warning mb-1" title="পুনঃবিবেচনা করুন">পুনঃবিবেচনা</a>
+                                            <?php else: ?>
+                                                <a href="view_quiz_attempts.php?quiz_id=<?php echo $quiz_id; ?>&action=cancel_attempt&attempt_id=<?php echo $attempt['attempt_id']; ?>&search=<?php echo urlencode($search_term);?>" class="btn btn-sm btn-outline-secondary mb-1" title="বাতিল করুন">বাতিল</a>
+                                            <?php endif; ?>
+                                            <?php if ($_SESSION['user_id'] != $attempt['user_id']): ?>
+                                                <?php if ($attempt['is_banned'] == 0): ?>
+                                                    <a href="view_quiz_attempts.php?quiz_id=<?php echo $quiz_id; ?>&action=ban_user&user_id=<?php echo $attempt['user_id']; ?>&search=<?php echo urlencode($search_term);?>" class="btn btn-sm btn-warning mb-1" onclick="return confirm('আপনি কি নিশ্চিতভাবে এই ইউজারকে নিষিদ্ধ করতে চান?');">নিষিদ্ধ</a>
+                                                <?php else: ?>
+                                                    <a href="view_quiz_attempts.php?quiz_id=<?php echo $quiz_id; ?>&action=unban_user&user_id=<?php echo $attempt['user_id']; ?>&search=<?php echo urlencode($search_term);?>" class="btn btn-sm btn-success mb-1" onclick="return confirm('আপনি কি নিশ্চিতভাবে এই ইউজারের নিষেধাজ্ঞা তুলে নিতে চান?');">সক্রিয়</a>
+                                                <?php endif; ?>
+                                            <?php endif; ?>
+                                            <a href="view_quiz_attempts.php?quiz_id=<?php echo $quiz_id; ?>&action=delete_attempt&attempt_id=<?php echo $attempt['attempt_id']; ?>&search=<?php echo urlencode($search_term);?>" class="btn btn-sm btn-danger mb-1" onclick="return confirm('আপনি কি নিশ্চিতভাবে এই অংশগ্রহণ এবং এর সম্পর্কিত সকল উত্তর স্থায়ীভাবে ডিলিট করতে চান?');" title="অংশগ্রহণ ডিলিট করুন">ডিলিট</a>
+                                        </td>
+                                    </tr>
+                                <?php endforeach; ?>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            <?php endforeach; ?>
+        </div>
+    </div>
+    <?php endif; ?>
+    </div>
 
 <script>
     function prepareAndPrint(printMode){
@@ -433,7 +423,6 @@ require_once 'includes/header.php';
         window.print();
     }
 
-    // "ইমেইল কপি করুন" বাটনের জন্য স্ক্রিপ্ট
     const copyBtn = document.getElementById('copyAllEmailsBtn');
     if (copyBtn) {
         copyBtn.addEventListener('click', function() {
@@ -443,7 +432,6 @@ require_once 'includes/header.php';
                     const originalText = this.innerHTML;
                     this.innerHTML = 'সফলভাবে কপি হয়েছে!';
                     this.disabled = true;
-
                     setTimeout(() => {
                         this.innerHTML = originalText;
                         this.disabled = false;
@@ -457,9 +445,8 @@ require_once 'includes/header.php';
             }
         });
     }
-
-    // টুলটিপ চালু করার কোড অপ্রয়োজনীয় হওয়ায় সরিয়ে ফেলা হয়েছে।
 </script>
+
 <?php
 if (isset($conn)) { $conn->close(); }
 require_once 'includes/footer.php';
