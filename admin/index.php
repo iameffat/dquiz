@@ -17,6 +17,11 @@ $total_users = ($result_total_users && $result_total_users->num_rows > 0) ? $res
 
 // --- New Data Fetching ---
 
+// Total Unique Participants
+$sql_unique_participants = "SELECT COUNT(DISTINCT user_id) as total FROM quiz_attempts";
+$result_unique_participants = $conn->query($sql_unique_participants);
+$unique_participants_count = ($result_unique_participants && $result_unique_participants->num_rows > 0) ? $result_unique_participants->fetch_assoc()['total'] : 0;
+
 // 1. Total Quiz Attempts
 $sql_total_attempts = "SELECT COUNT(id) as total FROM quiz_attempts WHERE end_time IS NOT NULL"; // Assuming end_time means completed
 $result_total_attempts = $conn->query($sql_total_attempts);
@@ -108,6 +113,23 @@ $banned_users_count = ($result_banned_users && $result_banned_users->num_rows > 
         </div>
 
         <div class="col-xl-3 col-md-6 mb-4">
+            <div class="card border-left-primary shadow h-100 py-2">
+                <div class="card-body">
+                    <div class="row no-gutters align-items-center">
+                        <div class="col mr-2">
+                            <div class="text-xs font-weight-bold text-primary text-uppercase mb-1">মোট অংশগ্রহণকারী</div>
+                            <div class="h5 mb-0 font-weight-bold text-gray-800"><?php echo $unique_participants_count; ?> জন</div>
+                        </div>
+                        <div class="col-auto">
+                            <i class="fas fa-user-check fa-2x text-gray-300"></i>
+                        </div>
+                    </div>
+                    <a href="manage_users.php" class="stretched-link text-decoration-none"><small class="text-muted">ইউজার ম্যানেজমেন্টে যান &rarr;</small></a>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-xl-3 col-md-6 mb-4">
             <div class="card border-left-info shadow h-100 py-2">
                 <div class="card-body">
                     <div class="row no-gutters align-items-center">
@@ -121,22 +143,6 @@ $banned_users_count = ($result_banned_users && $result_banned_users->num_rows > 
                     </div>
                      <a href="manage_quizzes.php" class="stretched-link text-decoration-none"><small class="text-muted">এটেম্পট বিস্তারিত দেখতে কুইজ ম্যানেজমেন্টে যান</small></a>
                 </div>
-            </div>
-        </div>
-
-        <div class="col-xl-3 col-md-6 mb-4">
-            <div class="card border-left-warning shadow h-100 py-2">
-                <div class="card-body">
-                    <div class="row no-gutters align-items-center">
-                        <div class="col mr-2">
-                            <div class="text-xs font-weight-bold text-warning text-uppercase mb-1">মোট প্রশ্ন সংখ্যা (সকল)</div>
-                            <div class="h5 mb-0 font-weight-bold text-gray-800"><?php echo $total_questions_system; ?> টি</div>
-                        </div>
-                        <div class="col-auto">
-                            <i class="fas fa-question-circle fa-2x text-gray-300"></i>
-                        </div>
-                    </div>
-                     </div>
             </div>
         </div>
     </div>
@@ -226,6 +232,23 @@ $banned_users_count = ($result_banned_users && $result_banned_users->num_rows > 
         </div>
 
         <div class="col-xl-3 col-md-6 mb-4">
+            <div class="card border-left-warning shadow h-100 py-2">
+                <div class="card-body">
+                    <div class="row no-gutters align-items-center">
+                        <div class="col mr-2">
+                            <div class="text-xs font-weight-bold text-warning text-uppercase mb-1">মোট প্রশ্ন সংখ্যা (সকল)</div>
+                            <div class="h5 mb-0 font-weight-bold text-gray-800"><?php echo $total_questions_system; ?> টি</div>
+                        </div>
+                        <div class="col-auto">
+                            <i class="fas fa-question-circle fa-2x text-gray-300"></i>
+                        </div>
+                    </div>
+                     </div>
+            </div>
+        </div>
+        
+
+        <div class="col-xl-3 col-md-6 mb-4">
             <div class="card border-left-primary shadow h-100 py-2">
                 <div class="card-body">
                     <div class="row no-gutters align-items-center">
@@ -305,7 +328,7 @@ $banned_users_count = ($result_banned_users && $result_banned_users->num_rows > 
     .font-weight-bold { font-weight: 700!important; }
     /* Font Awesome icons (ensure you have Font Awesome linked in header.php for these to work) */
     /* Alternatively, use Bootstrap Icons or SVG if preferred */
-    .fa-list, .fa-users, .fa-file-alt, .fa-question-circle, .fa-broadcast-tower, .fa-pencil-ruler, .fa-archive, .fa-book-open, .fa-tags, .fa-file-signature, .fa-user-slash {
+    .fa-list, .fa-users, .fa-file-alt, .fa-question-circle, .fa-broadcast-tower, .fa-pencil-ruler, .fa-archive, .fa-book-open, .fa-tags, .fa-file-signature, .fa-user-slash, .fa-user-check {
         /* Basic styling if you use Font Awesome classes directly */
     }
 </style>
