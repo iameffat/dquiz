@@ -93,6 +93,8 @@ $page_specific_styles = "
         border: 1px solid var(--border-color);
         border-left-width: 4px;
         transition: transform 0.2s ease, box-shadow 0.2s ease;
+        position: relative; /* Added for positioning the badge */
+        overflow: hidden; /* Added to contain the badge */
     }
     .quiz-card:hover {
         transform: translateY(-5px);
@@ -103,16 +105,55 @@ $page_specific_styles = "
     .quiz-card.status-archived { border-left-color: var(--bs-secondary); }
     .quiz-card.status-draft { border-left-color: var(--bs-warning); }
 
-    .quiz-title { font-weight: 600; }
+    .quiz-title { font-weight: 600; font-size: 1.1rem; }
     .quiz-meta { font-size: 0.85rem; color: var(--text-muted-color); }
     .quiz-meta-item { display: inline-flex; align-items: center; margin-right: 1rem; }
     .quiz-meta-item svg { margin-right: 0.3rem; }
-    .status-badge { font-size: 0.75rem; font-weight: 700; padding: .35em .65em; }
+    .status-badge-corner {
+        position: absolute;
+        top: -1px;
+        right: -1px;
+        font-size: 0.7rem;
+        font-weight: 700;
+        padding: .4em .8em;
+        border-bottom-left-radius: .5rem;
+    }
     .action-buttons .btn {
         margin-right: 0.5rem;
     }
     .action-buttons .btn:last-child {
         margin-right: 0;
+    }
+
+    /* Compact styles for mobile devices */
+    @media (max-width: 575.98px) {
+        .quiz-card .card-body {
+            padding: 0.8rem;
+        }
+        .quiz-title {
+            font-size: 1rem;
+        }
+        .quiz-meta {
+            font-size: 0.75rem;
+        }
+        .quiz-meta-item {
+            margin-right: 0.75rem;
+        }
+        .action-buttons .btn {
+            font-size: 0.8rem;
+            padding: 0.25rem 0.6rem;
+            margin-right: 0.25rem;
+        }
+        .d-md-flex > div:first-child {
+            margin-bottom: 0.75rem !important;
+        }
+        /* Mobile specific status badge position */
+        .status-badge-corner {
+            position: static;
+            display: inline-block;
+            margin-bottom: 0.5rem;
+            border-radius: var(--bs-border-radius-pill);
+        }
     }
 ";
 
@@ -179,9 +220,11 @@ require_once 'includes/header.php';
                 ?>
                 <div class="col-12">
                     <div class="card quiz-card status-<?php echo $effective_status; ?>">
+                        <span class="d-none d-md-block badge text-bg-<?php echo $status_class; ?> status-badge-corner"><?php echo $status_text; ?></span>
                         <div class="card-body">
                             <div class="d-md-flex justify-content-between align-items-center">
                                 <div class="mb-3 mb-md-0">
+                                    <span class="d-md-none badge rounded-pill text-bg-<?php echo $status_class; ?> status-badge mb-2"><?php echo $status_text; ?></span>
                                     <h5 class="card-title quiz-title mb-1"><?php echo escape_html($quiz['title']); ?></h5>
                                     <div class="quiz-meta">
                                         <span class="quiz-meta-item">
@@ -194,15 +237,14 @@ require_once 'includes/header.php';
                                         </span>
                                     </div>
                                 </div>
-                                <div class="text-md-end">
-                                    <span class="badge rounded-pill text-bg-<?php echo $status_class; ?> status-badge mb-2"><?php echo $status_text; ?></span>
+                                <div class="text-md-end mt-2 mt-md-0">
                                     <div class="action-buttons">
                                         <button type="button" class="btn btn-sm btn-outline-secondary syllabus-btn" 
                                                 data-bs-toggle="modal" 
                                                 data-bs-target="#syllabusModal"
                                                 data-quiz-title="<?php echo escape_html($quiz['title']); ?>"
                                                 data-quiz-description="<?php echo escape_html($quiz['description']); ?>">
-                                            সিলেবাস দেখুন
+                                            সিলেবাস
                                         </button>
                                         <?php if ($effective_status == 'draft' || $effective_status == 'upcoming'): ?>
                                             <button class="btn btn-sm btn-secondary" disabled>অংশগ্রহণ করুন</button>
@@ -214,7 +256,7 @@ require_once 'includes/header.php';
                                                     <a href="quiz_page.php?id=<?php echo $quiz['id']; ?>" class="btn btn-sm btn-success">অংশগ্রহণ করুন</a>
                                                 <?php endif; ?>
                                             <?php else: ?>
-                                                <a href="login.php?redirect=<?php echo urlencode('quiz_page.php?id=' . $quiz['id']); ?>" class="btn btn-sm btn-primary">অংশগ্রহণের জন্য লগইন</a>
+                                                <a href="login.php?redirect=<?php echo urlencode('quiz_page.php?id=' . $quiz['id']); ?>" class="btn btn-sm btn-primary">লগইন করুন</a>
                                             <?php endif; ?>
                                         <?php endif; ?>
                                     </div>
