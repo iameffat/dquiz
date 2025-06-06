@@ -130,6 +130,12 @@ $page_specific_styles = "
     .action-buttons .btn:last-child {
         margin-right: 0;
     }
+    .action-buttons {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.5rem;
+        align-items: center;
+    }
 
     /* Compact styles for mobile devices */
     @media (max-width: 575.98px) {
@@ -190,7 +196,6 @@ require_once 'includes/header.php';
                 <?php
                     list($attempted, $attempt_id) = hasUserAttemptedQuiz($conn, $user_id_for_check, $quiz['id']);
                     
-                    // Determine the effective status for display
                     $effective_status = $quiz['status'];
                     if ($quiz['status'] == 'live') {
                         $now = new DateTime();
@@ -206,23 +211,13 @@ require_once 'includes/header.php';
                     $status_text = '';
                     $status_class = '';
                     switch ($effective_status) {
-                        case 'live':
-                            $status_text = 'লাইভ';
-                            $status_class = 'success';
-                            break;
-                        case 'upcoming':
-                            $status_text = 'আপকামিং';
-                            $status_class = 'info';
-                            break;
-                        case 'archived':
-                            $status_text = 'আর্কাইভ';
-                            $status_class = 'secondary';
-                            break;
-                        case 'draft':
-                            $status_text = 'ড্রাফট';
-                            $status_class = 'warning';
-                            break;
+                        case 'live': $status_text = 'লাইভ'; $status_class = 'success'; break;
+                        case 'upcoming': $status_text = 'আপকামিং'; $status_class = 'info'; break;
+                        case 'archived': $status_text = 'আর্কাইভ'; $status_class = 'secondary'; break;
+                        case 'draft': $status_text = 'ড্রাফট'; $status_class = 'warning'; break;
                     }
+                    
+                    $quiz_page_url = rtrim((isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] === 'on' ? "https" : "http") . "://" . $_SERVER['HTTP_HOST'] . dirname($_SERVER['PHP_SELF']), '/') . '/quiz_page.php?id=' . $quiz['id'];
                 ?>
                 <div class="col-12">
                     <div class="card quiz-card status-<?php echo $effective_status; ?>">
@@ -245,6 +240,10 @@ require_once 'includes/header.php';
                                 </div>
                                 <div class="text-md-end mt-2 mt-md-0">
                                     <div class="action-buttons">
+                                        <button class="btn btn-sm btn-outline-dark" onclick="shareQuiz('<?php echo htmlspecialchars(addslashes($quiz['title']), ENT_QUOTES); ?>', '<?php echo $quiz_page_url; ?>', this)">
+                                            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-share-fill" viewBox="0 0 16 16"><path d="M11 2.5a2.5 2.5 0 1 1 .603 1.628l-6.718 3.12a2.5 2.5 0 0 1 0 1.504l6.718 3.12a2.5 2.5 0 1 1-.488.876l-6.718-3.12a2.5 2.5 0 1 1 0-3.256l6.718-3.12A2.5 2.5 0 0 1 11 2.5"/></svg>
+                                            শেয়ার
+                                        </button>
                                         <button type="button" class="btn btn-sm btn-outline-secondary syllabus-btn" 
                                                 data-bs-toggle="modal" 
                                                 data-bs-target="#syllabusModal"
@@ -253,16 +252,16 @@ require_once 'includes/header.php';
                                             সিলেবাস
                                         </button>
                                         <?php if ($effective_status == 'draft' || $effective_status == 'upcoming'): ?>
-                                            <button class="btn btn-sm btn-secondary" disabled>অংশগ্রহণ করুন</button>
+                                            <button class="btn btn-sm btn-secondary" disabled>অংশগ্রহণ</button>
                                         <?php else: ?>
                                             <?php if (isset($_SESSION["loggedin"]) && $_SESSION["loggedin"] === true): ?>
                                                 <?php if ($attempted): ?>
-                                                    <a href="results.php?attempt_id=<?php echo $attempt_id; ?>&quiz_id=<?php echo $quiz['id']; ?>" class="btn btn-sm btn-info">ফলাফল দেখুন</a>
+                                                    <a href="results.php?attempt_id=<?php echo $attempt_id; ?>&quiz_id=<?php echo $quiz['id']; ?>" class="btn btn-sm btn-info">ফলাফল</a>
                                                 <?php else: ?>
-                                                    <a href="quiz_page.php?id=<?php echo $quiz['id']; ?>" class="btn btn-sm btn-success">অংশগ্রহণ করুন</a>
+                                                    <a href="quiz_page.php?id=<?php echo $quiz['id']; ?>" class="btn btn-sm btn-success">অংশগ্রহণ</a>
                                                 <?php endif; ?>
                                             <?php else: ?>
-                                                <a href="login.php?redirect=<?php echo urlencode('quiz_page.php?id=' . $quiz['id']); ?>" class="btn btn-sm btn-primary">লগইন করুন</a>
+                                                <a href="login.php?redirect=<?php echo urlencode('quiz_page.php?id=' . $quiz['id']); ?>" class="btn btn-sm btn-primary">লগইন</a>
                                             <?php endif; ?>
                                         <?php endif; ?>
                                     </div>
