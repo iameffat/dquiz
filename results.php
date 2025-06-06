@@ -547,175 +547,207 @@ require_once 'includes/header.php';
 
 <div class="container mt-5">
     <?php display_flash_message('flash_message', 'flash_message_type'); ?>
-    <div class="card shadow-sm">
-        <div class="card-header bg-light">
-            <h2 class="text-center mb-0"><?php echo $page_title; ?></h2>
-        </div>
-        <div class="card-body p-4">
-            <div class="text-center mb-4">
-                 <h3>আপনি পেয়েছেন: <strong class="text-primary">
-                    <?php echo ($total_score !== null) ? number_format($total_score, 2) : 'N/A'; ?> / <?php echo $total_questions_in_quiz; ?>
-                 </strong></h3>
-                <p class="feedback-message <?php echo $feedback_class; ?>"><?php echo $feedback_message; // feedback_message itself will be set if score is null by prepare_results_data ?></p>
-                <?php if ($time_taken_seconds !== null): ?>
-                <p class="text-muted">সময় লেগেছে: <?php echo format_seconds_to_hms($time_taken_seconds); ?> (ঘন্টা:মিনিট:সেকেন্ড)</p>
-                <?php else: ?>
-                <p class="text-muted">সময় লেগেছে: N/A</p>
-                <?php endif; ?>
-            </div>
 
-            <div id="quizResultChartContainer" class="mb-4">
-                <canvas id="quizResultChart"></canvas>
+    <?php
+    // নতুন শর্ত যুক্ত করা হলো
+    $is_monthly_and_not_archived = (
+        isset($quiz_info_result['quiz_type']) &&
+        $quiz_info_result['quiz_type'] === 'monthly' &&
+        isset($quiz_info_result['status']) &&
+        $quiz_info_result['status'] !== 'archived' &&
+        (!isset($_SESSION['role']) || $_SESSION['role'] !== 'admin') // অ্যাডমিন সবসময় ফলাফল দেখতে পারবেন
+    );
+
+    if ($is_monthly_and_not_archived):
+    ?>
+        <div class="card shadow-sm">
+            <div class="card-header bg-light">
+                <h2 class="text-center mb-0"><?php echo $page_title; ?></h2>
             </div>
-            <div class="text-center mb-4">
+            <div class="card-body p-4">
+                <div class="alert alert-info text-center">
+                    <h4 class="alert-heading">ফলাফল অপেক্ষমাণ</h4>
+                    <p>মাসিক পরীক্ষার ফলাফল কুইজটি শেষ হওয়ার পর নির্দিষ্ট সময়ে প্রকাশ করা হবে। আপনার অংশগ্রহণ সফলভাবে সম্পন্ন হয়েছে।</p>
+                    <hr>
+                    <p class="mb-0">অনুগ্রহ করে পরবর্তী আপডেটের জন্য অপেক্ষা করুন। ধন্যবাদ!</p>
+                </div>
+                <div class="text-center mt-4">
+                    <a href="quizzes.php" class="btn btn-secondary">সকল কুইজে ফিরে যান</a>
+                    <a href="profile.php" class="btn btn-outline-info">আমার প্রোফাইল</a>
+                </div>
+            </div>
+        </div>
+    <?php else: ?>
+        <div class="card shadow-sm">
+            <div class="card-header bg-light">
+                <h2 class="text-center mb-0"><?php echo $page_title; ?></h2>
+            </div>
+            <div class="card-body p-4">
+                <div class="text-center mb-4">
+                     <h3>আপনি পেয়েছেন: <strong class="text-primary">
+                        <?php echo ($total_score !== null) ? number_format($total_score, 2) : 'N/A'; ?> / <?php echo $total_questions_in_quiz; ?>
+                     </strong></h3>
+                    <p class="feedback-message <?php echo $feedback_class; ?>"><?php echo $feedback_message; ?></p>
+                    <?php if ($time_taken_seconds !== null): ?>
+                    <p class="text-muted">সময় লেগেছে: <?php echo format_seconds_to_hms($time_taken_seconds); ?> (ঘন্টা:মিনিট:সেকেন্ড)</p>
+                    <?php else: ?>
+                    <p class="text-muted">সময় লেগেছে: N/A</p>
+                    <?php endif; ?>
+                </div>
+
+                <div id="quizResultChartContainer" class="mb-4">
+                    <canvas id="quizResultChart"></canvas>
+                </div>
+                <div class="text-center mb-4">
+                    <?php
+                    // র‍্যাংকিং বাটন দেখানোর শর্ত
+                    $show_ranking_button = false;
+                    $ranking_button_disabled = false;
+                    $ranking_unavailable_message_btn = '';
+
+                    if ($quiz_info_result) {
+                        $quiz_type = $quiz_info_result['quiz_type'];
+                        $quiz_status = $quiz_info_result['status'];
+                        $is_admin = (isset($_SESSION['role']) && $_SESSION['role'] === 'admin');
+
+                        if ($is_admin || $quiz_type === 'weekly') {
+                            $show_ranking_button = true;
+                        } elseif ($quiz_type === 'monthly' || $quiz_type === 'general') {
+                            $show_ranking_button = true;
+                            if ($quiz_status !== 'archived') {
+                                $ranking_button_disabled = true;
+                                $ranking_unavailable_message_btn = ($quiz_type === 'monthly')
+                                    ? 'মাসিক পরীক্ষার র‍্যাংকিং তালিকা কুইজটি আর্কাইভ হওয়ার পর প্রকাশ করা হবে।'
+                                    : 'সাধারণ কুইজের র‍্যাংকিং তালিকা কুইজটি আর্কাইভ হওয়ার পর প্রকাশ করা হবে।';
+                            }
+                        }
+                    }
+
+                    if ($show_ranking_button) {
+                        if ($ranking_button_disabled) {
+                            echo '<button class="btn btn-info" disabled>আপনার র‍্যাংকিং দেখুন</button>';
+                            echo '<p class="mt-2 text-muted small">' . $ranking_unavailable_message_btn . '</p>';
+                        } else {
+                            echo '<a href="ranking.php?quiz_id=' . $quiz_id . '&attempt_id=' . $attempt_id . '" class="btn btn-info">আপনার র‍্যাংকিং দেখুন</a>';
+                        }
+                    }
+                    ?>
+                </div>
+
                 <?php
-                // র‍্যাংকিং বাটন দেখানোর শর্ত
-                $show_ranking_button = false;
-                $ranking_button_disabled = false;
-                $ranking_unavailable_message_btn = '';
+                // ফলাফল পর্যালোচনা দেখানোর শর্ত
+                $show_review_section = false;
+                $review_unavailable_message = '';
 
                 if ($quiz_info_result) {
                     $quiz_type = $quiz_info_result['quiz_type'];
                     $quiz_status = $quiz_info_result['status'];
                     $is_admin = (isset($_SESSION['role']) && $_SESSION['role'] === 'admin');
 
-                    if ($is_admin || $quiz_type === 'weekly') {
-                        $show_ranking_button = true;
-                    } elseif ($quiz_type === 'monthly' || $quiz_type === 'general') {
-                        $show_ranking_button = true;
-                        if ($quiz_status !== 'archived') {
-                            $ranking_button_disabled = true;
-                            $ranking_unavailable_message_btn = ($quiz_type === 'monthly')
-                                ? 'মাসিক পরীক্ষার র‍্যাংকিং তালিকা কুইজটি আর্কাইভ হওয়ার পর প্রকাশ করা হবে।'
-                                : 'সাধারণ কুইজের র‍্যাংকিং তালিকা কুইজটি আর্কাইভ হওয়ার পর প্রকাশ করা হবে।';
+                    if ($is_admin) {
+                        $show_review_section = true;
+                    } elseif ($quiz_type === 'weekly' || $quiz_type === 'general') {
+                        $show_review_section = true;
+                    } elseif ($quiz_type === 'monthly') {
+                        if ($quiz_status === 'archived') {
+                            $show_review_section = true;
+                        } else {
+                            $review_unavailable_message = "এই কুইজের ফলাফল ও উত্তর পর্যালোচনা তালিকাটি কুইজটি আর্কাইভ হওয়ার পর প্রকাশ করা হবে।";
                         }
                     }
                 }
-
-                if ($show_ranking_button) {
-                    if ($ranking_button_disabled) {
-                        echo '<button class="btn btn-info" disabled>আপনার র‍্যাংকিং দেখুন</button>';
-                        echo '<p class="mt-2 text-muted small">' . $ranking_unavailable_message_btn . '</p>';
-                    } else {
-                        echo '<a href="ranking.php?quiz_id=' . $quiz_id . '&attempt_id=' . $attempt_id . '" class="btn btn-info">আপনার র‍্যাংকিং দেখুন</a>';
-                    }
-                }
                 ?>
-            </div>
 
-            <?php
-            // ফলাফল পর্যালোচনা দেখানোর শর্ত
-            $show_review_section = false;
-            $review_unavailable_message = '';
-
-            if ($quiz_info_result) {
-                $quiz_type = $quiz_info_result['quiz_type'];
-                $quiz_status = $quiz_info_result['status'];
-                $is_admin = (isset($_SESSION['role']) && $_SESSION['role'] === 'admin');
-
-                if ($is_admin) {
-                    $show_review_section = true;
-                } elseif ($quiz_type === 'weekly' || $quiz_type === 'general') {
-                    $show_review_section = true;
-                } elseif ($quiz_type === 'monthly') {
-                    if ($quiz_status === 'archived') {
-                        $show_review_section = true;
-                    } else {
-                        $review_unavailable_message = "এই কুইজের ফলাফল ও উত্তর পর্যালোচনা তালিকাটি কুইজটি আর্কাইভ হওয়ার পর প্রকাশ করা হবে।";
-                    }
-                }
-            }
-            ?>
-
-            <?php if ($show_review_section): ?>
-                <hr>
-                <div id="printableArea">
-                    <div class="print-header">
-                        কুইজের নাম: <?php echo isset($quiz_info_result['title']) ? htmlspecialchars($quiz_info_result['title']) : 'কুইজের ফলাফল'; ?>
-                    </div>
-                    <h3 class="mt-4 mb-3">উত্তর পর্যালোচনা</h3>
-                    <div class="answer-review">
-                        <?php if (!empty($review_questions)): ?>
-                            <?php foreach ($review_questions as $index => $question): ?>
-                            <div class="card mb-3">
-                                <div class="card-header">
-                                    <strong>প্রশ্ন <?php echo $index + 1; ?>:</strong> <?php echo nl2br(htmlspecialchars($question['question_text'])); ?>
-                                </div>
-                                <div class="card-body">
-                                    <?php if (!empty($question['image_url'])): ?>
-                                        <div class="mb-2 text-center">
-                                            <img src="<?php echo $base_url . escape_html($question['image_url']); ?>" alt="প্রশ্ন সম্পর্কিত ছবি" class="img-fluid question-image-review">
-                                        </div>
-                                    <?php endif; ?>
-                                    <ul class="list-group list-group-flush">
-                                        <?php
-                                        $user_correct_for_this_q = false;
-                                        $correct_option_id_for_this_q = null;
-                                        foreach ($question['options_list'] as $option) {
-                                            if ($option['is_correct'] == 1) {
-                                                $correct_option_id_for_this_q = $option['id'];
-                                                break;
-                                            }
-                                        }
-                                        if ($question['user_selected_option_id'] !== null && $question['user_selected_option_id'] == $correct_option_id_for_this_q) {
-                                            $user_correct_for_this_q = true;
-                                        }
-                                        ?>
-                                        <?php foreach ($question['options_list'] as $option): ?>
+                <?php if ($show_review_section): ?>
+                    <hr>
+                    <div id="printableArea">
+                        <div class="print-header">
+                            কুইজের নাম: <?php echo isset($quiz_info_result['title']) ? htmlspecialchars($quiz_info_result['title']) : 'কুইজের ফলাফল'; ?>
+                        </div>
+                        <h3 class="mt-4 mb-3">উত্তর পর্যালোচনা</h3>
+                        <div class="answer-review">
+                            <?php if (!empty($review_questions)): ?>
+                                <?php foreach ($review_questions as $index => $question): ?>
+                                <div class="card mb-3">
+                                    <div class="card-header">
+                                        <strong>প্রশ্ন <?php echo $index + 1; ?>:</strong> <?php echo nl2br(htmlspecialchars($question['question_text'])); ?>
+                                    </div>
+                                    <div class="card-body">
+                                        <?php if (!empty($question['image_url'])): ?>
+                                            <div class="mb-2 text-center">
+                                                <img src="<?php echo $base_url . escape_html($question['image_url']); ?>" alt="প্রশ্ন সম্পর্কিত ছবি" class="img-fluid question-image-review">
+                                            </div>
+                                        <?php endif; ?>
+                                        <ul class="list-group list-group-flush">
                                             <?php
-                                            $option_class = 'list-group-item';
-                                            $option_label = '';
-                                            if ($option['id'] == $question['user_selected_option_id']) {
+                                            $user_correct_for_this_q = false;
+                                            $correct_option_id_for_this_q = null;
+                                            foreach ($question['options_list'] as $option) {
                                                 if ($option['is_correct'] == 1) {
-                                                    $option_class .= ' correct-user-answer';
-                                                    $option_label = ' <span class="badge bg-success-subtle text-success-emphasis rounded-pill">আপনার সঠিক উত্তর</span>';
-                                                } else {
-                                                    $option_class .= ' incorrect-user-answer';
-                                                    $option_label = ' <span class="badge bg-danger-subtle text-danger-emphasis rounded-pill">আপনার ভুল উত্তর</span>';
+                                                    $correct_option_id_for_this_q = $option['id'];
+                                                    break;
                                                 }
-                                            } elseif ($option['is_correct'] == 1) {
-                                                $option_class .= ' actual-correct-answer';
-                                                $option_label = ' <span class="badge bg-warning-subtle text-warning-emphasis rounded-pill">সঠিক উত্তর</span>';
+                                            }
+                                            if ($question['user_selected_option_id'] !== null && $question['user_selected_option_id'] == $correct_option_id_for_this_q) {
+                                                $user_correct_for_this_q = true;
                                             }
                                             ?>
-                                        <li class="<?php echo $option_class; ?>">
-                                            <?php echo htmlspecialchars($option['text']); ?>
-                                            <?php echo $option_label; ?>
-                                        </li>
-                                        <?php endforeach; ?>
-                                    </ul>
-                                    <?php if ($question['user_selected_option_id'] === null && !$user_correct_for_this_q) : ?>
-                                         <p class="mt-2 mb-0 text-warning print-header-message">আপনি এই প্রশ্নের উত্তর দেননি।</p>
-                                    <?php endif; ?>
+                                            <?php foreach ($question['options_list'] as $option): ?>
+                                                <?php
+                                                $option_class = 'list-group-item';
+                                                $option_label = '';
+                                                if ($option['id'] == $question['user_selected_option_id']) {
+                                                    if ($option['is_correct'] == 1) {
+                                                        $option_class .= ' correct-user-answer';
+                                                        $option_label = ' <span class="badge bg-success-subtle text-success-emphasis rounded-pill">আপনার সঠিক উত্তর</span>';
+                                                    } else {
+                                                        $option_class .= ' incorrect-user-answer';
+                                                        $option_label = ' <span class="badge bg-danger-subtle text-danger-emphasis rounded-pill">আপনার ভুল উত্তর</span>';
+                                                    }
+                                                } elseif ($option['is_correct'] == 1) {
+                                                    $option_class .= ' actual-correct-answer';
+                                                    $option_label = ' <span class="badge bg-warning-subtle text-warning-emphasis rounded-pill">সঠিক উত্তর</span>';
+                                                }
+                                                ?>
+                                            <li class="<?php echo $option_class; ?>">
+                                                <?php echo htmlspecialchars($option['text']); ?>
+                                                <?php echo $option_label; ?>
+                                            </li>
+                                            <?php endforeach; ?>
+                                        </ul>
+                                        <?php if ($question['user_selected_option_id'] === null && !$user_correct_for_this_q) : ?>
+                                             <p class="mt-2 mb-0 text-warning print-header-message">আপনি এই প্রশ্নের উত্তর দেননি।</p>
+                                        <?php endif; ?>
 
-                                    <?php if (!empty($question['explanation'])): ?>
-                                    <div class="mt-3 p-2 bg-light border rounded">
-                                        <strong>ব্যাখ্যা:</strong> <?php echo nl2br(htmlspecialchars($question['explanation'])); ?>
+                                        <?php if (!empty($question['explanation'])): ?>
+                                        <div class="mt-3 p-2 bg-light border rounded">
+                                            <strong>ব্যাখ্যা:</strong> <?php echo nl2br(htmlspecialchars($question['explanation'])); ?>
+                                        </div>
+                                        <?php endif; ?>
                                     </div>
-                                    <?php endif; ?>
                                 </div>
-                            </div>
-                            <?php endforeach; ?>
-                        <?php else: ?>
-                            <p class="alert alert-info print-header-message">এই ফলাফলের জন্য উত্তর পর্যালোচনা উপলব্ধ নয় অথবা কোনো প্রশ্ন পাওয়া যায়নি।</p>
-                        <?php endif; ?>
+                                <?php endforeach; ?>
+                            <?php else: ?>
+                                <p class="alert alert-info print-header-message">এই ফলাফলের জন্য উত্তর পর্যালোচনা উপলব্ধ নয় অথবা কোনো প্রশ্ন পাওয়া যায়নি।</p>
+                            <?php endif; ?>
+                        </div>
                     </div>
-                </div>
-                 <div class="text-center mt-4">
-                    <button onclick="printAnswerSheet()" class="btn btn-outline-primary">উত্তরপত্র প্রিন্ট করুন</button>
-                    <a href="quizzes.php" class="btn btn-secondary">সকল কুইজে ফিরে যান</a>
-                    <a href="profile.php" class="btn btn-outline-info">আমার প্রোফাইল</a>
-                </div>
-            <?php else: ?>
-                <hr>
-                <div class="alert alert-info text-center mt-4">
-                    <h5><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" fill="currentColor" class="bi bi-hourglass-split me-2" viewBox="0 0 16 16"><path d="M2.5 15a.5.5 0 1 1 0-1h1v-1a4.5 4.5 0 0 1 2.557-4.06c.29-.138.443-.377.443-.64V4.5a.5.5 0 0 1 .5-.5h2a.5.5 0 0 1 .5.5v.218c0 .263.153.502.443.64A4.5 4.5 0 0 1 12.5 9h1v1a.5.5 0 0 1 0 1h-1v1a.5.5 0 0 1-1 0v-1a.5.5 0 0 1-.5-.5h-1a.5.5 0 0 1-.5.5v1a.5.5 0 0 1-1 0v-1a.5.5 0 0 1-.5-.5h-1a.5.5 0 0 1-.5.5v1a.5.5 0 0 1-1 0zM12 1v1h1a.5.5 0 0 1 0 1h-1v1a.5.5 0 0 1-1 0V3a.5.5 0 0 1-.5-.5h-2a.5.5 0 0 1-.5.5v1a.5.5 0 0 1-1 0V3a.5.5 0 0 1-.5-.5h-1a.5.5 0 0 1-.5.5v1a.5.5 0 0 1-1 0V2h-1a.5.5 0 0 1 0-1z"/></svg>ফলাফল অপেক্ষমাণ</h5>
-                    <p><?php echo $review_unavailable_message; ?></p>
-                    <a href="quizzes.php" class="btn btn-secondary mt-2">অন্যান্য কুইজ দেখুন</a>
-                </div>
-            <?php endif; ?>
+                     <div class="text-center mt-4">
+                        <button onclick="printAnswerSheet()" class="btn btn-outline-primary">উত্তরপত্র প্রিন্ট করুন</button>
+                        <a href="quizzes.php" class="btn btn-secondary">সকল কুইজে ফিরে যান</a>
+                        <a href="profile.php" class="btn btn-outline-info">আমার প্রোফাইল</a>
+                    </div>
+                <?php else: ?>
+                    <hr>
+                    <div class="alert alert-info text-center mt-4">
+                        <h5><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" fill="currentColor" class="bi bi-hourglass-split me-2" viewBox="0 0 16 16"><path d="M2.5 15a.5.5 0 1 1 0-1h1v-1a4.5 4.5 0 0 1 2.557-4.06c.29-.138.443-.377.443-.64V4.5a.5.5 0 0 1 .5-.5h2a.5.5 0 0 1 .5.5v.218c0 .263.153.502.443.64A4.5 4.5 0 0 1 12.5 9h1v1a.5.5 0 0 1 0 1h-1v1a.5.5 0 0 1-1 0v-1a.5.5 0 0 1-.5-.5h-1a.5.5 0 0 1-.5.5v1a.5.5 0 0 1-1 0v-1a.5.5 0 0 1-.5-.5h-1a.5.5 0 0 1-.5.5v1a.5.5 0 0 1-1 0zM12 1v1h1a.5.5 0 0 1 0 1h-1v1a.5.5 0 0 1-1 0V3a.5.5 0 0 1-.5-.5h-2a.5.5 0 0 1-.5.5v1a.5.5 0 0 1-1 0V3a.5.5 0 0 1-.5-.5h-1a.5.5 0 0 1-.5.5v1a.5.5 0 0 1-1 0V2h-1a.5.5 0 0 1 0-1z"/></svg>ফলাফল অপেক্ষমাণ</h5>
+                        <p><?php echo $review_unavailable_message; ?></p>
+                        <a href="quizzes.php" class="btn btn-secondary mt-2">অন্যান্য কুইজ দেখুন</a>
+                    </div>
+                <?php endif; ?>
+            </div>
         </div>
-    </div>
+    <?php endif; ?>
 </div>
 
 <script>
