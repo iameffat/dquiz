@@ -222,11 +222,14 @@ require_once 'includes/header.php';
         .rank-gold-row td, .rank-silver-row td, .rank-bronze-row td {
             -webkit-print-color-adjust: exact !important;
             color-adjust: exact !important;
-            color: #000 !important; /* Ensure text is readable on printed colored background */
         }
         .rank-gold-row td { background-color: rgba(255, 215, 0, 0.4) !important; }
         .rank-silver-row td { background-color: rgba(192, 192, 192, 0.5) !important; }
         .rank-bronze-row td { background-color: rgba(205, 127, 50, 0.4) !important; }
+        
+        .print-rank-gold { color: #856404 !important; font-weight: bold; }
+        .print-rank-silver { color: #383d41 !important; font-weight: bold; }
+        .print-rank-bronze { color: #8B4513 !important; font-weight: bold; }
     }
     .print-only-phone { display: none; }
     .ip-alert-icon { cursor: help; }
@@ -234,16 +237,16 @@ require_once 'includes/header.php';
     body.dark-mode .device-details { color: var(--bs-gray-500); }
     .rank-gold-row td, body.dark-mode .rank-gold-row td { background-color: rgba(255, 215, 0, 0.2) !important; color: #856404; font-weight: bold; }
     body.dark-mode .rank-gold-row td { color: #ffc107; }
-    .rank-gold-row .rank-cell { color: #DAA520; }
-    body.dark-mode .rank-gold-row .rank-cell { color: #FFD700; }
+    .rank-gold-row .rank-cell, .rank-gold-row .print-rank-gold { color: #DAA520; }
+    body.dark-mode .rank-gold-row .rank-cell, body.dark-mode .rank-gold-row .print-rank-gold { color: #FFD700; }
     .rank-silver-row td, body.dark-mode .rank-silver-row td { background-color: rgba(192, 192, 192, 0.25) !important; color: #383d41; font-weight: bold; }
     body.dark-mode .rank-silver-row td { color: #c0c0c0; }
-    .rank-silver-row .rank-cell { color: #A9A9A9; }
-    body.dark-mode .rank-silver-row .rank-cell { color: #C0C0C0; }
+    .rank-silver-row .rank-cell, .rank-silver-row .print-rank-silver { color: #A9A9A9; }
+    body.dark-mode .rank-silver-row .rank-cell, body.dark-mode .rank-silver-row .print-rank-silver { color: #C0C0C0; }
     .rank-bronze-row td, body.dark-mode .rank-bronze-row td { background-color: rgba(205, 127, 50, 0.2) !important; color: #8B4513; font-weight: bold; }
     body.dark-mode .rank-bronze-row td { color: #cd7f32; }
-    .rank-bronze-row .rank-cell { color: #A0522D; }
-    body.dark-mode .rank-bronze-row .rank-cell { color: #CD7F32; }
+    .rank-bronze-row .rank-cell, .rank-bronze-row .print-rank-bronze { color: #A0522D; }
+    body.dark-mode .rank-bronze-row .rank-cell, body.dark-mode .rank-bronze-row .print-rank-bronze { color: #CD7F32; }
     .rank-medal { font-size: 1.2em; margin-right: 5px; }
     .table-info-user td { background-color: var(--bs-table-active-bg) !important; color: var(--bs-table-active-color) !important; }
     body.dark-mode .table-info-user td { background-color: var(--bs-info-bg-subtle) !important; color: var(--bs-info-text-emphasis) !important; }
@@ -302,7 +305,8 @@ require_once 'includes/header.php';
                             foreach ($attempts_data as $index => $attempt):
                                 $rank_prefix_icon = '';
                                 $row_class = '';
-                                
+                                $name_class = '';
+
                                 if (!$attempt['is_cancelled'] && $attempt['score'] !== null) {
                                     $rank++; 
                                     if ($attempt['score'] != $last_score || $attempt['time_taken_seconds'] != $last_time) { $display_rank = $rank; }
@@ -311,12 +315,15 @@ require_once 'includes/header.php';
                                     if ($display_rank == 1) {
                                         $row_class = 'rank-gold-row';
                                         $rank_prefix_icon = '<span class="rank-medal">🥇</span>';
+                                        $name_class = 'print-rank-gold';
                                     } elseif ($display_rank == 2) {
                                         $row_class = 'rank-silver-row';
                                         $rank_prefix_icon = '<span class="rank-medal">🥈</span>';
+                                        $name_class = 'print-rank-silver';
                                     } elseif ($display_rank == 3) {
                                         $row_class = 'rank-bronze-row';
                                         $rank_prefix_icon = '<span class="rank-medal">🥉</span>';
+                                        $name_class = 'print-rank-bronze';
                                     }
                                 }
 
@@ -331,7 +338,7 @@ require_once 'includes/header.php';
                             <tr class="<?php echo $row_class; ?>">
                                 <td class="rank-cell"><?php echo (!$attempt['is_cancelled'] && $attempt['score'] !== null) ? $rank_prefix_icon . $display_rank : 'N/A'; ?></td>
                                 <td>
-                                    <?php echo htmlspecialchars($attempt['user_name']); ?>
+                                    <span class="<?php echo $name_class; ?>"><?php echo htmlspecialchars($attempt['user_name']); ?></span>
                                     <small class="d-block text-muted no-print"><?php echo htmlspecialchars($attempt['user_email']); ?></small>
                                     <small class="d-block text-muted no-print"><?php echo htmlspecialchars($attempt['user_mobile']); ?></small>
                                 </td>
