@@ -105,6 +105,9 @@ $page_specific_styles = "
         border-left: 5px solid #198754;
         font-weight: bold;
     }
+    body.dark-mode .card-header {
+    background-color: #0028504a!important;
+}
     body.dark-mode .correct-answer-highlight {
         background-color: var(--bs-success-bg-subtle) !important;
         color: var(--bs-success-text-emphasis) !important;
