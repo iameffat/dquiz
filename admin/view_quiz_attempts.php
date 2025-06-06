@@ -78,6 +78,7 @@ if (isset($_GET['action']) && (isset($_GET['attempt_id']) || isset($_GET['user_i
     } elseif ($action == 'delete_attempt') {
         $conn->begin_transaction();
         try {
+            // Delete user answers first
             $sql_delete_answers = "DELETE FROM user_answers WHERE attempt_id = ?";
             $stmt_delete_answers = $conn->prepare($sql_delete_answers);
             if (!$stmt_delete_answers) throw new Exception("ব্যবহারকারীর উত্তর মোছার জন্য প্রস্তুতিতে সমস্যা: " . $conn->error);
@@ -85,6 +86,7 @@ if (isset($_GET['action']) && (isset($_GET['attempt_id']) || isset($_GET['user_i
             if (!$stmt_delete_answers->execute()) throw new Exception("ব্যবহারকারীর উত্তরগুলো মুছতে সমস্যা হয়েছে: " . $stmt_delete_answers->error);
             $stmt_delete_answers->close();
 
+            // Then delete the attempt record
             $sql_delete_attempt_record = "DELETE FROM quiz_attempts WHERE id = ? AND quiz_id = ?";
             $stmt_delete_attempt_record = $conn->prepare($sql_delete_attempt_record);
             if (!$stmt_delete_attempt_record) throw new Exception("অংশগ্রহণের রেকর্ড মোছার জন্য প্রস্তুতিতে সমস্যা: " . $conn->error);
@@ -246,6 +248,7 @@ require_once 'includes/header.php';
         <h1>কুইজের বিস্তারিত ফলাফল</h1>
         <div>
             <button onclick="prepareAndPrint('name');" class="btn btn-info">প্রিন্ট (নাম সহ)</button>
+            <button onclick="prepareAndPrint('phone');" class="btn btn-outline-info ms-2">প্রাইভেসি প্রিন্ট (ফোন)</button>
             <a href="manage_quizzes.php" class="btn btn-outline-secondary ms-2">সকল কুইজে ফিরে যান</a>
         </div>
     </div>
@@ -270,12 +273,11 @@ require_once 'includes/header.php';
                     <table class="table table-striped table-hover" id="quizAttemptsTable">
                         <thead>
                             <tr>
-                                <th class="rank-cell"># র‍্যাংক</th>
+                                <th># র‍্যাংক</th>
                                 <th>অংশগ্রহণকারী</th>
+                                <th class="no-print">ঠিকানা</th>
                                 <th>স্কোর</th>
                                 <th>সময় লেগেছে</th>
-                                <th class="no-print">সাবমিটের সময়</th>
-                                <th class="no-print">আইপি অ্যাড্রেস</th>
                                 <th class="no-print">ডিভাইস/ব্রাউজার</th>
                                 <th class="no-print">স্ট্যাটাস</th>
                                 <th class="no-print">একশন</th>
@@ -289,73 +291,51 @@ require_once 'includes/header.php';
                             $display_rank = 0;
                             
                             foreach ($attempts_data as $index => $attempt):
-                                $row_classes_array = [];
-                                
                                 if (!$attempt['is_cancelled'] && $attempt['score'] !== null) {
                                     $rank++; 
-                                    if ($attempt['score'] != $last_score || $attempt['time_taken_seconds'] != $last_time) {
-                                        $display_rank = $rank;
-                                    }
-                                    $last_score = $attempt['score'];
-                                    $last_time = $attempt['time_taken_seconds'];
-
-                                    if ($display_rank == 1) $row_classes_array[] = 'rank-gold-row';
-                                    elseif ($display_rank == 2) $row_classes_array[] = 'rank-silver-row';
-                                    elseif ($display_rank == 3) $row_classes_array[] = 'rank-bronze-row';
-                                    elseif ($highest_score > 0 && $attempt['score'] == $highest_score) $row_classes_array[] = 'table-success';
+                                    if ($attempt['score'] != $last_score || $attempt['time_taken_seconds'] != $last_time) { $display_rank = $rank; }
+                                    $last_score = $attempt['score']; $last_time = $attempt['time_taken_seconds'];
                                 }
-
-                                if ($attempt['is_cancelled']) {
-                                    $row_classes_array[] = 'table-danger opacity-75 cancelled-attempt-for-print';
-                                }
-                                
-                                if ($current_user_attempt_id && $attempt['attempt_id'] == $current_user_attempt_id) {
-                                    if (!in_array('rank-gold-row', $row_classes_array) && !in_array('rank-silver-row', $row_classes_array) && !in_array('rank-bronze-row', $row_classes_array)) {
-                                        $row_classes_array[] = 'table-info-user';
-                                    }
-                                }
-
-                                if (!empty($attempt['ip_address']) && isset($ip_counts[$attempt['ip_address']]) && $ip_counts[$attempt['ip_address']] > 1) {
-                                    if(!in_array('table-warning', $row_classes_array)) $row_classes_array[] = 'table-warning';
-                                }
-
-                                $final_row_class_string = implode(' ', array_unique($row_classes_array));
                             ?>
-                            <tr class="<?php echo $final_row_class_string; ?>">
-                                <td class="rank-cell"><?php echo (!$attempt['is_cancelled'] && $attempt['score'] !== null) ? ($display_rank == 1 ? '🥇' : ($display_rank == 2 ? '🥈' : ($display_rank == 3 ? '🥉' : ''))) . $display_rank : 'N/A'; ?></td>
+                            <tr class="<?php if($attempt['is_cancelled']) echo 'table-danger opacity-75'; ?>">
+                                <td><?php echo (!$attempt['is_cancelled'] && $attempt['score'] !== null) ? $display_rank : 'N/A'; ?></td>
                                 <td>
                                     <?php echo htmlspecialchars($attempt['user_name']); ?>
                                     <small class="d-block text-muted no-print"><?php echo htmlspecialchars($attempt['user_email']); ?></small>
                                     <small class="d-block text-muted no-print"><?php echo htmlspecialchars($attempt['user_mobile']); ?></small>
                                 </td>
+                                <td class="no-print"><?php echo htmlspecialchars($attempt['user_address'] ?: 'N/A'); ?></td>
                                 <td><?php echo $attempt['score'] !== null ? number_format($attempt['score'], 2) : 'N/A'; ?></td>
                                 <td><?php echo $attempt['time_taken_seconds'] ? format_seconds_to_hms($attempt['time_taken_seconds']) : 'N/A'; ?></td>
-                                <td class="no-print"><?php echo format_datetime($attempt['submitted_at']); ?></td>
-                                <td class="no-print">
-                                    <?php echo htmlspecialchars($attempt['ip_address'] ?: 'N/A'); ?>
-                                    <?php if (!empty($attempt['ip_address']) && isset($ip_counts[$attempt['ip_address']]) && $ip_counts[$attempt['ip_address']] > 1): ?>
-                                    <span class="ip-alert-icon" title="এই আইপি থেকে <?php echo $ip_counts[$attempt['ip_address']]; ?> বার পরীক্ষা দেওয়া হয়েছে।">⚠️</span>
-                                    <?php endif; ?>
-                                </td>
                                 <td class="no-print device-details"><?php echo htmlspecialchars($attempt['browser_name'] ?: 'N/A') . ' (' . htmlspecialchars($attempt['os_platform'] ?: 'N/A') . ')'; ?></td>
                                 <td class="no-print">
                                     <?php 
-                                    if ($attempt['is_cancelled']) echo '<span class="badge bg-danger">বাতিলকৃত</span>';
-                                    else echo '<span class="badge bg-success">সক্রিয়</span>';
-                                    if ($attempt['is_banned'] == 1) echo ' <span class="badge bg-warning text-dark">নিষিদ্ধ</span>';
+                                    if ($attempt['is_cancelled']) {
+                                        echo '<span class="badge bg-danger">বাতিলকৃত</span>';
+                                    } else {
+                                        echo '<span class="badge bg-success">সক্রিয়</span>';
+                                    }
+                                    if ($attempt['is_banned'] == 1) {
+                                        echo ' <span class="badge bg-warning text-dark">নিষিদ্ধ</span>';
+                                    }
                                     ?>
                                 </td>
                                 <td class="no-print">
-                                    <div class="btn-group" role="group">
-                                        <a href="../results.php?attempt_id=<?php echo $attempt['attempt_id']; ?>&quiz_id=<?php echo $quiz_id; ?>" target="_blank" class="btn btn-sm btn-outline-info" title="উত্তর দেখুন">উত্তর</a>
-                                        <?php if ($_SESSION['user_id'] != $attempt['user_id']): ?>
-                                            <?php if ($attempt['is_banned'] == 0): ?>
-                                                <a href="view_quiz_attempts.php?action=ban_user&quiz_id=<?php echo $quiz_id; ?>&user_id=<?php echo $attempt['user_id']; ?>&search=<?php echo urlencode($search_term);?>" class="btn btn-sm btn-warning" onclick="return confirm('আপনি কি নিশ্চিতভাবে এই ইউজারকে নিষিদ্ধ করতে চান?');">নিষিদ্ধ</a>
-                                            <?php else: ?>
-                                                <a href="view_quiz_attempts.php?action=unban_user&quiz_id=<?php echo $quiz_id; ?>&user_id=<?php echo $attempt['user_id']; ?>&search=<?php echo urlencode($search_term);?>" class="btn btn-sm btn-success" onclick="return confirm('আপনি কি নিশ্চিতভাবে এই ইউজারের নিষেধাজ্ঞা তুলে নিতে চান?');">সক্রিয়</a>
-                                            <?php endif; ?>
+                                    <a href="../results.php?attempt_id=<?php echo $attempt['attempt_id']; ?>&quiz_id=<?php echo $quiz_id; ?>" target="_blank" class="btn btn-sm btn-outline-info mb-1" title="উত্তর দেখুন">উত্তর</a>
+                                    <?php if ($attempt['is_cancelled']): ?>
+                                        <a href="view_quiz_attempts.php?quiz_id=<?php echo $quiz_id; ?>&action=reinstate_attempt&attempt_id=<?php echo $attempt['attempt_id']; ?>&search=<?php echo urlencode($search_term);?>" class="btn btn-sm btn-warning mb-1" title="পুনঃবিবেচনা করুন">পুনঃবিবেচনা</a>
+                                    <?php else: ?>
+                                        <a href="view_quiz_attempts.php?quiz_id=<?php echo $quiz_id; ?>&action=cancel_attempt&attempt_id=<?php echo $attempt['attempt_id']; ?>&search=<?php echo urlencode($search_term);?>" class="btn btn-sm btn-outline-secondary mb-1" title="বাতিল করুন">বাতিল</a>
+                                    <?php endif; ?>
+                                    
+                                    <?php if ($_SESSION['user_id'] != $attempt['user_id']): ?>
+                                        <?php if ($attempt['is_banned'] == 0): ?>
+                                            <a href="view_quiz_attempts.php?quiz_id=<?php echo $quiz_id; ?>&action=ban_user&user_id=<?php echo $attempt['user_id']; ?>&search=<?php echo urlencode($search_term);?>" class="btn btn-sm btn-warning mb-1" onclick="return confirm('আপনি কি নিশ্চিতভাবে এই ইউজারকে নিষিদ্ধ করতে চান?');">নিষিদ্ধ</a>
+                                        <?php else: ?>
+                                            <a href="view_quiz_attempts.php?quiz_id=<?php echo $quiz_id; ?>&action=unban_user&user_id=<?php echo $attempt['user_id']; ?>&search=<?php echo urlencode($search_term);?>" class="btn btn-sm btn-success mb-1" onclick="return confirm('আপনি কি নিশ্চিতভাবে এই ইউজারের নিষেধাজ্ঞা তুলে নিতে চান?');">সক্রিয়</a>
                                         <?php endif; ?>
-                                    </div>
+                                    <?php endif; ?>
+                                    <a href="view_quiz_attempts.php?quiz_id=<?php echo $quiz_id; ?>&action=delete_attempt&attempt_id=<?php echo $attempt['attempt_id']; ?>&search=<?php echo urlencode($search_term);?>" class="btn btn-sm btn-danger mb-1" onclick="return confirm('আপনি কি নিশ্চিতভাবে এই অংশগ্রহণ এবং এর সম্পর্কিত সকল উত্তর স্থায়ীভাবে ডিলিট করতে চান?');" title="অংশগ্রহণ ডিলিট করুন">ডিলিট</a>
                                 </td>
                             </tr>
                             <?php endforeach; ?>
