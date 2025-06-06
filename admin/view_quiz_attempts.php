@@ -219,6 +219,14 @@ require_once 'includes/header.php';
         tr.cancelled-attempt-for-print { display: none !important; }
         .participant-details-print-hide { display: none !important; }
         .table tbody tr { page-break-inside: avoid; }
+        .rank-gold-row td, .rank-silver-row td, .rank-bronze-row td {
+            -webkit-print-color-adjust: exact !important;
+            color-adjust: exact !important;
+            color: #000 !important; /* Ensure text is readable on printed colored background */
+        }
+        .rank-gold-row td { background-color: rgba(255, 215, 0, 0.4) !important; }
+        .rank-silver-row td { background-color: rgba(192, 192, 192, 0.5) !important; }
+        .rank-bronze-row td { background-color: rgba(205, 127, 50, 0.4) !important; }
     }
     .print-only-phone { display: none; }
     .ip-alert-icon { cursor: help; }
@@ -292,14 +300,36 @@ require_once 'includes/header.php';
                             $display_rank = 0;
                             
                             foreach ($attempts_data as $index => $attempt):
+                                $rank_prefix_icon = '';
+                                $row_class = '';
+                                
                                 if (!$attempt['is_cancelled'] && $attempt['score'] !== null) {
                                     $rank++; 
                                     if ($attempt['score'] != $last_score || $attempt['time_taken_seconds'] != $last_time) { $display_rank = $rank; }
                                     $last_score = $attempt['score']; $last_time = $attempt['time_taken_seconds'];
+
+                                    if ($display_rank == 1) {
+                                        $row_class = 'rank-gold-row';
+                                        $rank_prefix_icon = '<span class="rank-medal">🥇</span>';
+                                    } elseif ($display_rank == 2) {
+                                        $row_class = 'rank-silver-row';
+                                        $rank_prefix_icon = '<span class="rank-medal">🥈</span>';
+                                    } elseif ($display_rank == 3) {
+                                        $row_class = 'rank-bronze-row';
+                                        $rank_prefix_icon = '<span class="rank-medal">🥉</span>';
+                                    }
+                                }
+
+                                if($attempt['is_cancelled']) {
+                                    $row_class .= ' table-danger opacity-75';
+                                }
+
+                                if ($current_user_attempt_id && $attempt['attempt_id'] == $current_user_attempt_id) {
+                                    $row_class = trim($row_class . ' table-info-user');
                                 }
                             ?>
-                            <tr class="<?php if($attempt['is_cancelled']) echo 'table-danger opacity-75'; ?>">
-                                <td><?php echo (!$attempt['is_cancelled'] && $attempt['score'] !== null) ? $display_rank : 'N/A'; ?></td>
+                            <tr class="<?php echo $row_class; ?>">
+                                <td class="rank-cell"><?php echo (!$attempt['is_cancelled'] && $attempt['score'] !== null) ? $rank_prefix_icon . $display_rank : 'N/A'; ?></td>
                                 <td>
                                     <?php echo htmlspecialchars($attempt['user_name']); ?>
                                     <small class="d-block text-muted no-print"><?php echo htmlspecialchars($attempt['user_email']); ?></small>
