@@ -76,7 +76,7 @@ if ($result_questions) {
             $options[] = $opt_row;
         }
         $q_row['options'] = $options;
-        $questions[] = $q_row;
+        questions[] = $q_row;
         $stmt_options->close();
     }
 }
@@ -89,6 +89,10 @@ $page_specific_styles = "
     .question-view-card .card-header {
         font-weight: 600;
         background-color: var(--bs-tertiary-bg);
+    }
+    body.dark-mode .question-view-card .card-header {
+        background-color: var(--bs-secondary-bg);
+        color: var(--bs-light-text-emphasis);
     }
     .option-item {
         transition: background-color 0.3s ease;
@@ -193,21 +197,16 @@ require_once 'includes/header.php';
 
 <script>
 document.addEventListener('DOMContentLoaded', function() {
-    // Show Correct Answer
+    // Show/Hide Correct Answer (Toggle)
     document.querySelectorAll('.show-answer-btn').forEach(button => {
         button.addEventListener('click', function() {
             const questionId = this.dataset.questionId;
             const questionCard = document.getElementById('question-card-' + questionId);
-            
-            // Remove highlight from all options first
-            questionCard.querySelectorAll('.option-item').forEach(opt => {
-                opt.classList.remove('correct-answer-highlight');
-            });
-
-            // Add highlight to the correct option
             const correctOption = questionCard.querySelector('.option-item[data-is-correct="true"]');
+
             if (correctOption) {
-                correctOption.classList.add('correct-answer-highlight');
+                // Toggle the highlight class
+                correctOption.classList.toggle('correct-answer-highlight');
             }
         });
     });
