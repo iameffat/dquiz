@@ -47,7 +47,6 @@ $sql_total_study_materials = "SELECT COUNT(id) as total FROM study_materials";
 $result_total_study_materials = $conn->query($sql_total_study_materials);
 $total_study_materials = ($result_total_study_materials && $result_total_study_materials->num_rows > 0) ? $result_total_study_materials->fetch_assoc()['total'] : 0;
 
-// ****** নতুন তথ্য যুক্ত করা হচ্ছে ******
 // 7. Total Categories
 $sql_total_categories = "SELECT COUNT(id) as total FROM categories";
 $result_total_categories = $conn->query($sql_total_categories);
@@ -57,6 +56,11 @@ $total_categories = ($result_total_categories && $result_total_categories->num_r
 $sql_total_manual_questions = "SELECT COUNT(id) as total FROM questions WHERE quiz_id IS NULL";
 $result_total_manual_questions = $conn->query($sql_total_manual_questions);
 $total_manual_questions = ($result_total_manual_questions && $result_total_manual_questions->num_rows > 0) ? $result_total_manual_questions->fetch_assoc()['total'] : 0;
+
+// 9. Total Banned Users
+$sql_banned_users = "SELECT COUNT(id) as total FROM users WHERE is_banned = 1";
+$result_banned_users = $conn->query($sql_banned_users);
+$banned_users_count = ($result_banned_users && $result_banned_users->num_rows > 0) ? $result_banned_users->fetch_assoc()['total'] : 0;
 // ****** নতুন তথ্য যুক্ত করা শেষ ******
 
 ?>
@@ -237,7 +241,24 @@ $total_manual_questions = ($result_total_manual_questions && $result_total_manua
                 </div>
             </div>
         </div>
+
+        <div class="col-xl-3 col-md-6 mb-4">
+            <div class="card border-left-danger shadow h-100 py-2">
+                <div class="card-body">
+                    <div class="row no-gutters align-items-center">
+                        <div class="col mr-2">
+                            <div class="text-xs font-weight-bold text-danger text-uppercase mb-1">নিষিদ্ধ ইউজার</div>
+                            <div class="h5 mb-0 font-weight-bold text-gray-800"><?php echo $banned_users_count; ?> জন</div>
+                        </div>
+                        <div class="col-auto">
+                             <i class="fas fa-user-slash fa-2x text-gray-300"></i>
+                        </div>
+                    </div>
+                    <a href="manage_users.php?status_filter=banned" class="stretched-link text-decoration-none"><small class="text-muted">নিষিদ্ধ ইউজার দেখুন &rarr;</small></a>
+                </div>
+            </div>
         </div>
+    </div>
 
     <div class="row mt-3">
         <div class="col-lg-12">
@@ -284,7 +305,7 @@ $total_manual_questions = ($result_total_manual_questions && $result_total_manua
     .font-weight-bold { font-weight: 700!important; }
     /* Font Awesome icons (ensure you have Font Awesome linked in header.php for these to work) */
     /* Alternatively, use Bootstrap Icons or SVG if preferred */
-    .fa-list, .fa-users, .fa-file-alt, .fa-question-circle, .fa-broadcast-tower, .fa-pencil-ruler, .fa-archive, .fa-book-open, .fa-tags, .fa-file-signature {
+    .fa-list, .fa-users, .fa-file-alt, .fa-question-circle, .fa-broadcast-tower, .fa-pencil-ruler, .fa-archive, .fa-book-open, .fa-tags, .fa-file-signature, .fa-user-slash {
         /* Basic styling if you use Font Awesome classes directly */
     }
 </style>
