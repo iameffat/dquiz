@@ -8,27 +8,15 @@ require_once '../includes/functions.php';
 // Handle Delete Action
 if (isset($_GET['action']) && $_GET['action'] == 'delete' && isset($_GET['user_id'])) {
     $user_id_to_delete = intval($_GET['user_id']);
+    $current_filter = isset($_GET['status_filter']) ? $_GET['status_filter'] : '';
+    $current_search = isset($_GET['search']) ? $_GET['search'] : '';
     
     if ($user_id_to_delete == $_SESSION['user_id']) {
         $_SESSION['flash_message'] = "আপনি নিজেকে ডিলিট করতে পারবেন না।";
         $_SESSION['flash_message_type'] = "warning";
     } else {
-        // First, delete related records from quiz_attempts
-        // This is important to avoid foreign key constraint errors if they exist
-        // Note: user_answers are typically linked to quiz_attempts or questions,
-        // so deleting attempts or questions (if quiz is deleted) should handle them.
-        // If user_answers are directly linked to users.id without ON DELETE CASCADE,
-        // you might need to delete from user_answers first.
-        
         $conn->begin_transaction();
         try {
-            // Delete user_answers related to attempts by this user
-            // This might be complex depending on your exact schema.
-            // A simpler approach if direct user_id link exists in user_answers:
-            // $sql_delete_user_answers_direct = "DELETE FROM user_answers WHERE attempt_id IN (SELECT id FROM quiz_attempts WHERE user_id = ?)";
-            // If user_answers are only linked via question_id and attempt_id, deleting attempts covers it.
-
-            // Delete from quiz_attempts
             $sql_delete_attempts = "DELETE FROM quiz_attempts WHERE user_id = ?";
             $stmt_delete_attempts = $conn->prepare($sql_delete_attempts);
             if (!$stmt_delete_attempts) throw new Exception("ডাটাবেস সমস্যা (এটেম্পট ডিলিট প্রস্তুতি): " . $conn->error);
@@ -36,13 +24,11 @@ if (isset($_GET['action']) && $_GET['action'] == 'delete' && isset($_GET['user_i
             if (!$stmt_delete_attempts->execute()) throw new Exception("ইউজারের কুইজ এটেম্পট ডিলিট করতে সমস্যা: " . $stmt_delete_attempts->error);
             $stmt_delete_attempts->close();
 
-            // Now delete the user
             $sql_delete_user = "DELETE FROM users WHERE id = ?";
             $stmt_delete_user = $conn->prepare($sql_delete_user);
             if (!$stmt_delete_user) throw new Exception("ডাটাবেস সমস্যা (ইউজার ডিলিট প্রস্তুতি): " . $conn->error);
             $stmt_delete_user->bind_param("i", $user_id_to_delete);
             if (!$stmt_delete_user->execute()) {
-                 // Check for specific foreign key error (e.g., MySQL error code 1451)
                 if ($conn->errno == 1451) {
                      throw new Exception("ইউজার ডিলিট করা যায়নি কারণ এই ইউজারের সাথে অন্যান্য ডেটা (যেমন অ্যাডমিন হিসেবে কুইজ তৈরি) সংযুক্ত রয়েছে।");
                 } else {
@@ -61,35 +47,22 @@ if (isset($_GET['action']) && $_GET['action'] == 'delete' && isset($_GET['user_i
             $_SESSION['flash_message_type'] = "danger";
         }
     }
-    header("Location: manage_users.php" . (isset($_GET['search']) ? '?search=' . urlencode($_GET['search']) : ''));
+    $redirect_url = "manage_users.php?status_filter=" . urlencode($current_filter) . "&search=" . urlencode($current_search);
+    header("Location: " . $redirect_url);
     exit;
 }
 // Handle Ban/Unban Action
 else if (isset($_GET['action']) && ($_GET['action'] == 'ban_user' || $_GET['action'] == 'unban_user') && isset($_GET['user_id'])) {
     $user_id_to_modify = intval($_GET['user_id']);
-    $new_status_is_banned = ($_GET['action'] == 'ban_user') ? 1 : 0; // 1 for banned, 0 for not banned
+    $new_status_is_banned = ($_GET['action'] == 'ban_user') ? 1 : 0;
     $action_text = ($new_status_is_banned == 1) ? 'নিষিদ্ধ (banned)' : 'সক্রিয় (unbanned)';
+    $current_filter = isset($_GET['status_filter']) ? $_GET['status_filter'] : '';
+    $current_search = isset($_GET['search']) ? $_GET['search'] : '';
 
     if ($user_id_to_modify == $_SESSION['user_id']) {
         $_SESSION['flash_message'] = "আপনি নিজেকে নিষিদ্ধ বা সক্রিয় করতে পারবেন না।";
         $_SESSION['flash_message_type'] = "warning";
     } else {
-        // Check current role of the user to be banned/unbanned
-        $sql_check_role = "SELECT role FROM users WHERE id = ?";
-        $stmt_check_role = $conn->prepare($sql_check_role);
-        $stmt_check_role->bind_param("i", $user_id_to_modify);
-        $stmt_check_role->execute();
-        $result_role = $stmt_check_role->get_result();
-        $user_to_modify_data = $result_role->fetch_assoc();
-        $stmt_check_role->close();
-
-        if ($user_to_modify_data && $user_to_modify_data['role'] === 'admin' && $new_status_is_banned == 1) {
-            // Optional: Add an extra confirmation or prevent banning other admins directly if needed.
-            // For now, allowing admin to ban other admins (except self).
-            // $_SESSION['flash_message'] = "এডমিন ইউজারকে নিষিদ্ধ করা যাবে না। প্রথমে ভূমিকা পরিবর্তন করুন।";
-            // $_SESSION['flash_message_type'] = "warning";
-        }
-        // Proceed with ban/unban
         $sql_update_status = "UPDATE users SET is_banned = ? WHERE id = ?";
         if ($stmt_update = $conn->prepare($sql_update_status)) {
             $stmt_update->bind_param("ii", $new_status_is_banned, $user_id_to_modify);
@@ -106,42 +79,61 @@ else if (isset($_GET['action']) && ($_GET['action'] == 'ban_user' || $_GET['acti
             $_SESSION['flash_message_type'] = "danger";
         }
     }
-    header("Location: manage_users.php" . (isset($_GET['search']) ? '?search=' . urlencode($_GET['search']) : ''));
+    $redirect_url = "manage_users.php?status_filter=" . urlencode($current_filter) . "&search=" . urlencode($current_search);
+    header("Location: " . $redirect_url);
     exit;
 }
 
 
 require_once 'includes/header.php';
 
-// --- সার্চ লজিক ---
+// --- Filter & Search Logic ---
 $search_term = isset($_GET['search']) ? trim($_GET['search']) : '';
+$status_filter = isset($_GET['status_filter']) ? $_GET['status_filter'] : '';
+
 $users = [];
-$sql_base = "SELECT id, name, email, mobile_number, role, created_at, is_banned FROM users"; // Added is_banned
+$sql_base = "SELECT id, name, email, mobile_number, role, created_at, is_banned FROM users";
+$where_clauses = [];
 $params = [];
 $types = "";
 
+// Status Filter
+if ($status_filter === 'active') {
+    $where_clauses[] = "is_banned = 0";
+} elseif ($status_filter === 'banned') {
+    $where_clauses[] = "is_banned = 1";
+}
+
+// Search Filter
 if (!empty($search_term)) {
-    $sql_users = $sql_base . " WHERE name LIKE ? OR email LIKE ? OR mobile_number LIKE ? ORDER BY created_at DESC";
-    if ($stmt_search = $conn->prepare($sql_users)) {
-        $search_like = "%" . $search_term . "%";
-        $stmt_search->bind_param("sss", $search_like, $search_like, $search_like);
-        $stmt_search->execute();
-        $result_users = $stmt_search->get_result();
-        while ($row = $result_users->fetch_assoc()) {
-            $users[] = $row;
-        }
-        $stmt_search->close();
-    } else {
-        echo '<div class="alert alert-danger">সার্চ করতে ডাটাবেস সমস্যা হয়েছে: ' . $conn->error . '</div>';
+    $where_clauses[] = "(name LIKE ? OR email LIKE ? OR mobile_number LIKE ?)";
+    $search_like = "%" . $search_term . "%";
+    array_push($params, $search_like, $search_like, $search_like);
+    $types .= "sss";
+}
+
+$sql_users = $sql_base;
+if (!empty($where_clauses)) {
+    $sql_users .= " WHERE " . implode(" AND ", $where_clauses);
+}
+$sql_users .= " ORDER BY created_at DESC";
+
+$stmt_users = $conn->prepare($sql_users);
+
+if ($stmt_users) {
+    if (!empty($params)) {
+        $stmt_users->bind_param($types, ...$params);
     }
+    if(!$stmt_users->execute()){
+         echo '<div class="alert alert-danger">ইউজার আনতে ডাটাবেস সমস্যা হয়েছে: ' . $stmt_users->error . '</div>';
+    }
+    $result_users = $stmt_users->get_result();
+    while ($row = $result_users->fetch_assoc()) {
+        $users[] = $row;
+    }
+    $stmt_users->close();
 } else {
-    $sql_users = $sql_base . " ORDER BY created_at DESC";
-    $result_users = $conn->query($sql_users);
-    if ($result_users && $result_users->num_rows > 0) {
-        while ($row = $result_users->fetch_assoc()) {
-            $users[] = $row;
-        }
-    }
+    echo '<div class="alert alert-danger">ইউজার স্টেটমেন্ট প্রস্তুত করতে সমস্যা: ' . $conn->error . '</div>';
 }
 ?>
 
@@ -161,22 +153,30 @@ if (!empty($search_term)) {
 
     <div class="card mb-4">
         <div class="card-header">
-            ইউজার খুঁজুন
+            ইউজার ফিল্টার ও সার্চ
         </div>
         <div class="card-body">
-            <form action="manage_users.php" method="get" class="row g-3 align-items-center">
-                <div class="col-md-10">
-                    <label for="search" class="visually-hidden">সার্চ করুন (নাম, ইমেইল, মোবাইল)</label>
-                    <input type="text" class="form-control" id="search" name="search" placeholder="নাম, ইমেইল বা মোবাইল নম্বর দিয়ে খুঁজুন..." value="<?php echo htmlspecialchars($search_term); ?>">
+            <form action="manage_users.php" method="get" class="row g-3 align-items-end">
+                <div class="col-md-6">
+                    <label for="search" class="form-label">সার্চ করুন (নাম, ইমেইল, মোবাইল)</label>
+                    <input type="text" class="form-control" id="search" name="search" placeholder="..." value="<?php echo htmlspecialchars($search_term); ?>">
+                </div>
+                <div class="col-md-4">
+                    <label for="status_filter" class="form-label">স্ট্যাটাস অনুযায়ী ফিল্টার</label>
+                    <select name="status_filter" id="status_filter" class="form-select">
+                        <option value="all" <?php if ($status_filter == 'all' || $status_filter == '') echo 'selected'; ?>>সকল ইউজার</option>
+                        <option value="active" <?php if ($status_filter == 'active') echo 'selected'; ?>>সক্রিয় ইউজার</option>
+                        <option value="banned" <?php if ($status_filter == 'banned') echo 'selected'; ?>>নিষিদ্ধ ইউজার</option>
+                    </select>
                 </div>
                 <div class="col-md-2">
-                    <button type="submit" class="btn btn-primary w-100">খুঁজুন</button>
+                    <button type="submit" class="btn btn-primary w-100">ফিল্টার</button>
                 </div>
             </form>
-             <?php if (!empty($search_term) && empty($users)): ?>
+             <?php if (!empty($search_term) && empty($users) && $status_filter === ''): ?>
                 <p class="mt-3 text-center text-warning">"<?php echo htmlspecialchars($search_term); ?>" এর জন্য কোনো ইউজার খুঁজে পাওয়া যায়নি।</p>
-            <?php elseif (!empty($search_term) && !empty($users)): ?>
-                 <p class="mt-3 text-muted">"<?php echo htmlspecialchars($search_term); ?>" এর জন্য <?php echo count($users); ?> টি ফলাফল পাওয়া গেছে। <a href="manage_users.php">সকল ইউজার দেখুন</a></p>
+            <?php elseif (!empty($users)): ?>
+                 <p class="mt-3 text-muted"><small>মোট <?php echo count($users); ?> টি ফলাফল পাওয়া গেছে। <?php if(!empty($search_term) || !empty($status_filter)) echo '<a href="manage_users.php">ফিল্টার মুছুন</a>'; ?></small></p>
             <?php endif; ?>
         </div>
     </div>
@@ -227,12 +227,15 @@ if (!empty($search_term)) {
                                 <a href="edit_user.php?id=<?php echo $user['id']; ?>" class="btn btn-sm btn-info mb-1">এডিট</a>
                                 <a href="send_email.php?user_id=<?php echo $user['id']; ?>" class="btn btn-sm btn-outline-success mb-1" title="এই ইউজারকে ইমেইল করুন">ইমেইল</a>
                                 <?php if ($user['id'] != $_SESSION['user_id']): ?>
-                                    <?php if ($user['is_banned'] == 0): ?>
-                                        <a href="manage_users.php?action=ban_user&user_id=<?php echo $user['id']; ?>&search=<?php echo urlencode($search_term); ?>" class="btn btn-sm btn-warning mb-1" onclick="return confirm('আপনি কি নিশ্চিতভাবে এই ইউজারকে নিষিদ্ধ করতে চান?');">নিষিদ্ধ করুন</a>
+                                    <?php 
+                                    $filter_query_string = "status_filter=" . urlencode($status_filter) . "&search=" . urlencode($search_term);
+                                    if ($user['is_banned'] == 0): 
+                                    ?>
+                                        <a href="manage_users.php?action=ban_user&user_id=<?php echo $user['id']; ?>&<?php echo $filter_query_string; ?>" class="btn btn-sm btn-warning mb-1" onclick="return confirm('আপনি কি নিশ্চিতভাবে এই ইউজারকে নিষিদ্ধ করতে চান?');">নিষিদ্ধ করুন</a>
                                     <?php else: ?>
-                                        <a href="manage_users.php?action=unban_user&user_id=<?php echo $user['id']; ?>&search=<?php echo urlencode($search_term); ?>" class="btn btn-sm btn-success mb-1" onclick="return confirm('আপনি কি নিশ্চিতভাবে এই ইউজারের উপর থেকে নিষেধাজ্ঞা তুলে নিতে চান?');">সক্রিয় করুন</a>
+                                        <a href="manage_users.php?action=unban_user&user_id=<?php echo $user['id']; ?>&<?php echo $filter_query_string; ?>" class="btn btn-sm btn-success mb-1" onclick="return confirm('আপনি কি নিশ্চিতভাবে এই ইউজারের উপর থেকে নিষেধাজ্ঞা তুলে নিতে চান?');">সক্রিয় করুন</a>
                                     <?php endif; ?>
-                                    <a href="manage_users.php?action=delete&user_id=<?php echo $user['id']; ?>&search=<?php echo urlencode($search_term); ?>" class="btn btn-sm btn-danger mb-1" onclick="return confirm('আপনি কি নিশ্চিতভাবে এই ইউজারকে ডিলিট করতে চান? এই ইউজারের সকল কুইজ এটেম্পট ও ডিলিট হয়ে যাবে।');">ডিলিট</a>
+                                    <a href="manage_users.php?action=delete&user_id=<?php echo $user['id']; ?>&<?php echo $filter_query_string; ?>" class="btn btn-sm btn-danger mb-1" onclick="return confirm('আপনি কি নিশ্চিতভাবে এই ইউজারকে ডিলিট করতে চান? এই ইউজারের সকল কুইজ এটেম্পট ও ডিলিট হয়ে যাবে।');">ডিলিট</a>
                                 <?php else: ?>
                                     <span class="badge bg-secondary">এটি আপনি</span>
                                 <?php endif; ?>
@@ -242,8 +245,10 @@ if (!empty($search_term)) {
                     </tbody>
                 </table>
             </div>
-            <?php elseif (empty($search_term)): ?>
-            <p class="text-center">এখনও কোনো ইউজার রেজিস্টার করেনি।</p>
+            <?php elseif (empty($search_term) && empty($status_filter)): ?>
+                <p class="text-center">এখনও কোনো ইউজার রেজিস্টার করেনি।</p>
+            <?php else: ?>
+                <p class="text-center">আপনার ফিল্টার অনুযায়ী কোনো ফলাফল পাওয়া যায়নি।</p>
             <?php endif; ?>
         </div>
     </div>
@@ -292,4 +297,4 @@ document.addEventListener('DOMContentLoaded', function() {
 <?php
 $conn->close();
 require_once 'includes/footer.php';
-?>a
+?>
