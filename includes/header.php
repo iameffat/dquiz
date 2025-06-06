@@ -45,6 +45,7 @@ $og_image_to_display = isset($page_og_image) ? htmlspecialchars($page_og_image) 
     <link rel="apple-touch-icon" sizes="180x180" href="<?php echo $base_url; ?>assets/images/icons/apple-touch-icon.png">
     <link rel="icon" type="image/png" sizes="32x32" href="<?php echo $base_url; ?>assets/images/icons/favicon-32x32.png">
     <link rel="icon" type="image/png" sizes="16x16" href="<?php echo $base_url; ?>assets/images/icons/favicon-16x16.png">
+    <link rel="manifest" href="<?php echo $base_url; ?>assets/images/icons/site.webmanifest"> 
     <meta name="theme-color" content="#ffffff"> 
 
     <meta name="description" content="<?php echo $page_description_to_display; ?>">
