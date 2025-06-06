@@ -44,6 +44,7 @@ $stmt_quiz_info->close();
 
 // Handle All Actions (Cancel/Reinstate/Delete Attempt, Ban/Unban User)
 if (isset($_GET['action']) && (isset($_GET['attempt_id']) || isset($_GET['user_id']))) {
+    // ... (এই অংশের কোডে কোনো পরিবর্তন নেই)
     $action = $_GET['action'];
     $attempt_id_to_manage = isset($_GET['attempt_id']) ? intval($_GET['attempt_id']) : 0;
     $user_id_to_manage = isset($_GET['user_id']) ? intval($_GET['user_id']) : 0;
@@ -196,16 +197,22 @@ if (!empty($attempts_data)) {
     }
 }
 
-// ### নতুন কোড শুরু ###
-// "ইমেইল কপি করুন" বাটনের জন্য সকল ইউনিক ইমেইলের একটি স্ট্রিং তৈরি করা হচ্ছে
+// ### পরিবর্তিত কোড শুরু ###
+// "ইমেইল কপি করুন" বাটনের জন্য শুধুমাত্র সক্রিয় অংশগ্রহণকারীদের (যাদের ফলাফল বাতিল হয়নি) ইউনিক ইমেইলের একটি স্ট্রিং তৈরি করা হচ্ছে
 $all_emails_string = '';
 if (!empty($attempts_data)) {
-    $emails_array = array_column($attempts_data, 'user_email');
-    $unique_emails = array_unique(array_filter($emails_array)); // array_filter() খালি ইমেইল বাদ দেয়
+    $emails_array = [];
+    foreach ($attempts_data as $attempt) {
+        // শুধুমাত্র যাদের ফলাফল বাতিল করা হয়নি, তাদের ইমেইল যুক্ত করা হবে
+        if (!$attempt['is_cancelled']) {
+            $emails_array[] = $attempt['user_email'];
+        }
+    }
+    // খালি ইমেইল বাদ দিয়ে ইউনিক ইমেইলের তালিকা তৈরি করা হচ্ছে
+    $unique_emails = array_unique(array_filter($emails_array));
     $all_emails_string = implode(', ', $unique_emails);
 }
-// ### নতুন কোড শেষ ###
-
+// ### পরিবর্তিত কোড শেষ ###
 
 function mask_phone_for_print($phone) { if(empty($phone)) return 'N/A'; $l=strlen($phone); return $l>7?substr($phone,0,3).str_repeat('*',$l-6).substr($phone,-3):str_repeat('*',$l); }
 
@@ -228,7 +235,6 @@ require_once 'includes/header.php';
         .print-only-phone, .print-only-name, .attempt-user-email { display: none !important; }
         body.print-privacy .print-only-phone { display: table-cell !important; } 
         body:not(.print-privacy) .print-only-name { display: table-cell !important; }
-        tr.cancelled-attempt-for-print { display: none !important; }
         .participant-details-print-hide { display: none !important; }
         .table tbody tr { page-break-inside: avoid; }
         .rank-gold-row td, .rank-silver-row td, .rank-bronze-row td {
@@ -242,6 +248,11 @@ require_once 'includes/header.php';
         .print-rank-gold { color: #856404 !important; font-weight: bold; }
         .print-rank-silver { color: #383d41 !important; font-weight: bold; }
         .print-rank-bronze { color: #8B4513 !important; font-weight: bold; }
+
+        /* নতুন CSS নিয়ম: বাতিল করা ফলাফল প্রিন্টে দেখানো হবে না */
+        tr.table-danger {
+             display: none !important;
+        }
     }
     .print-only-phone { display: none; }
     .ip-alert-icon { cursor: help; }
@@ -263,7 +274,6 @@ require_once 'includes/header.php';
     .table-info-user td { background-color: var(--bs-table-active-bg) !important; color: var(--bs-table-active-color) !important; }
     body.dark-mode .table-info-user td { background-color: var(--bs-info-bg-subtle) !important; color: var(--bs-info-text-emphasis) !important; }
 </style>
-
 <div class="container-fluid" id="main-content-area">
     <h1 class="print-title" style="display:none;"><?php echo $page_title; ?></h1>
 
@@ -278,6 +288,7 @@ require_once 'includes/header.php';
             <a href="manage_quizzes.php" class="btn btn-outline-secondary">সকল কুইজে ফিরে যান</a>
         </div>
     </div>
+    
     <div class="card my-3 no-print">
         <div class="card-body">
             <form action="view_quiz_attempts.php" method="get" class="row g-2 align-items-center">
@@ -342,6 +353,7 @@ require_once 'includes/header.php';
                                 }
 
                                 if($attempt['is_cancelled']) {
+                                    // বাতিল করা ফলাফলের জন্য এই ক্লাসটি যোগ করা হয়, যা প্রিন্টে সারি লুকাতে ব্যবহৃত হবে
                                     $row_class .= ' table-danger opacity-75';
                                 }
 
@@ -443,6 +455,7 @@ require_once 'includes/header.php';
         });
     }
 </script>
+
 <?php
 if (isset($conn)) { $conn->close(); }
 require_once 'includes/footer.php';
