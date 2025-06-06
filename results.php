@@ -164,14 +164,14 @@ function prepare_results_data($conn, $current_attempt_id, $current_quiz_id, $cur
         }
 
 
+        // FIX: The SQL query for review is updated to prevent duplicate question rows.
         $sql_review = "
             SELECT
                 q.id AS question_id, q.question_text, q.image_url, q.explanation,
-                ua.selected_option_id AS user_selected_option_id,
+                (SELECT ua.selected_option_id FROM user_answers ua WHERE ua.question_id = q.id AND ua.attempt_id = ? ORDER BY ua.id DESC LIMIT 1) AS user_selected_option_id,
                 (SELECT GROUP_CONCAT(CONCAT(o.id, '::', o.option_text, '::', o.is_correct) SEPARATOR '||')
                  FROM options o WHERE o.question_id = q.id ORDER BY o.id) AS all_options_details
             FROM questions q
-            LEFT JOIN user_answers ua ON q.id = ua.question_id AND ua.attempt_id = ?
             WHERE q.quiz_id = ?
             ORDER BY q.order_number ASC, q.id ASC
         ";
@@ -216,6 +216,21 @@ function prepare_results_data($conn, $current_attempt_id, $current_quiz_id, $cur
 if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['quiz_id']) && isset($_POST['attempt_id'])) {
     $quiz_id = intval($_POST['quiz_id']);
     $attempt_id = intval($_POST['attempt_id']);
+
+    // Check if this attempt has already been scored to prevent re-processing.
+    $sql_check_score = "SELECT score FROM quiz_attempts WHERE id = ?";
+    $stmt_check_score = $conn->prepare($sql_check_score);
+    $stmt_check_score->bind_param("i", $attempt_id);
+    $stmt_check_score->execute();
+    $result_check_score = $stmt_check_score->get_result();
+    $attempt_score_data = $result_check_score->fetch_assoc();
+    $stmt_check_score->close();
+
+    if ($attempt_score_data && $attempt_score_data['score'] !== null) {
+        // This attempt has already been processed. Redirect to the GET view.
+        header("Location: results.php?attempt_id=" . $attempt_id . "&quiz_id=" . $quiz_id);
+        exit;
+    }
 
     // Calculate time taken
     $end_time_dt = new DateTime();
@@ -658,7 +673,7 @@ require_once 'includes/header.php';
             <div class="text-center mt-4">
                 <button onclick="printAnswerSheet()" class="btn btn-outline-primary">উত্তরপত্র প্রিন্ট করুন</button>
                 <a href="quizzes.php" class="btn btn-secondary">সকল কুইজে ফিরে যান</a>
-                <a href="profile.php" class="btn btn-outline-primary">আমার প্রোফাইল</a>
+                <a href="profile.php" class="btn btn-outline-info">আমার প্রোফাইল</a>
             </div>
         </div>
     </div>
