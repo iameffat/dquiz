@@ -108,6 +108,12 @@ $page_specific_styles = "
     .quiz-meta-item { display: inline-flex; align-items: center; margin-right: 1rem; }
     .quiz-meta-item svg { margin-right: 0.3rem; }
     .status-badge { font-size: 0.75rem; font-weight: 700; padding: .35em .65em; }
+    .action-buttons .btn {
+        margin-right: 0.5rem;
+    }
+    .action-buttons .btn:last-child {
+        margin-right: 0;
+    }
 ";
 
 require_once 'includes/header.php';
@@ -174,8 +180,8 @@ require_once 'includes/header.php';
                 <div class="col-12">
                     <div class="card quiz-card status-<?php echo $effective_status; ?>">
                         <div class="card-body">
-                            <div class="d-flex justify-content-between align-items-start">
-                                <div>
+                            <div class="d-md-flex justify-content-between align-items-center">
+                                <div class="mb-3 mb-md-0">
                                     <h5 class="card-title quiz-title mb-1"><?php echo escape_html($quiz['title']); ?></h5>
                                     <div class="quiz-meta">
                                         <span class="quiz-meta-item">
@@ -188,9 +194,16 @@ require_once 'includes/header.php';
                                         </span>
                                     </div>
                                 </div>
-                                <div class="text-end">
-                                    <span class="badge rounded-pill text-bg-<?php echo $status_class; ?> status-badge"><?php echo $status_text; ?></span>
-                                    <div class="mt-2">
+                                <div class="text-md-end">
+                                    <span class="badge rounded-pill text-bg-<?php echo $status_class; ?> status-badge mb-2"><?php echo $status_text; ?></span>
+                                    <div class="action-buttons">
+                                        <button type="button" class="btn btn-sm btn-outline-secondary syllabus-btn" 
+                                                data-bs-toggle="modal" 
+                                                data-bs-target="#syllabusModal"
+                                                data-quiz-title="<?php echo escape_html($quiz['title']); ?>"
+                                                data-quiz-description="<?php echo escape_html($quiz['description']); ?>">
+                                            সিলেবাস
+                                        </button>
                                         <?php if ($effective_status == 'draft' || $effective_status == 'upcoming'): ?>
                                             <button class="btn btn-sm btn-secondary" disabled>অংশগ্রহণ করুন</button>
                                         <?php else: ?>
@@ -221,6 +234,49 @@ require_once 'includes/header.php';
     </div>
 
 </div>
+
+<div class="modal fade" id="syllabusModal" tabindex="-1" aria-labelledby="syllabusModalLabel" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered modal-lg modal-dialog-scrollable">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title" id="syllabusModalLabel">কুইজের সিলেবাস</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body" id="syllabusModalBody">
+        </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">বন্ধ করুন</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const syllabusModal = document.getElementById('syllabusModal');
+    if (syllabusModal) {
+        syllabusModal.addEventListener('show.bs.modal', function(event) {
+            const button = event.relatedTarget; // Button that triggered the modal
+            const quizTitle = button.getAttribute('data-quiz-title');
+            let quizDescription = button.getAttribute('data-quiz-description');
+
+            const modalTitle = syllabusModal.querySelector('.modal-title');
+            const modalBody = syllabusModal.querySelector('.modal-body');
+
+            modalTitle.textContent = 'সিলেবাস: ' + quizTitle;
+
+            // Check if description is empty or just contains empty HTML tags
+            const tempDiv = document.createElement('div');
+            tempDiv.innerHTML = quizDescription;
+            if (!quizDescription || tempDiv.textContent.trim() === '') {
+                quizDescription = '<p class="text-muted">এই কুইজের জন্য কোনো সিলেবাস বা বিবরণ যোগ করা হয়নি।</p>';
+            }
+            
+            modalBody.innerHTML = quizDescription;
+        });
+    }
+});
+</script>
 
 <?php
 if ($conn) {
