@@ -106,7 +106,7 @@ $page_specific_styles = "
     }
     .quiz-card.status-upcoming { 
         border-left-color: var(--bs-info); 
-        background-color: var(--bs-info-bg-subtle); /* আপকামিং কুইজের জন্য হালকা ব্যাকগ্রাউন্ড */
+        background-color: var(--bs-info-bg-subtle);
     }
     .quiz-card.status-archived { border-left-color: var(--bs-secondary); }
     .quiz-card.status-draft { border-left-color: var(--bs-warning); }
@@ -184,7 +184,7 @@ require_once 'includes/header.php';
         </div>
     </div>
 
-    <div class="row g-4">
+    <div class="row g-3">
         <?php if (!empty($all_quizzes)): ?>
             <?php foreach ($all_quizzes as $quiz): ?>
                 <?php
