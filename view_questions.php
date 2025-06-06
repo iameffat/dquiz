@@ -34,6 +34,9 @@ $stmt_cat->close();
 // Pagination logic
 $records_per_page = 30;
 $current_page = isset($_GET['page']) ? intval($_GET['page']) : 1;
+if ($current_page < 1) {
+    $current_page = 1;
+}
 $offset = ($current_page - 1) * $records_per_page;
 
 // Count total questions for pagination
@@ -76,7 +79,7 @@ if ($result_questions) {
             $options[] = $opt_row;
         }
         $q_row['options'] = $options;
-        questions[] = $q_row;
+        $questions[] = $q_row; // corrected line
         $stmt_options->close();
     }
 }
