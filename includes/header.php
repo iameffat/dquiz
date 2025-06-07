@@ -40,6 +40,12 @@ $og_image_to_display = isset($page_og_image) ? htmlspecialchars($page_og_image) 
     
     <title><?php echo $page_title_to_display; ?></title>
 
+    <?php if (isset($no_index_page) && $no_index_page === true): ?>
+    <meta name="robots" content="noindex, nofollow">
+    <?php else: ?>
+    <meta name="robots" content="index, follow">
+    <?php endif; ?>
+
     <link rel="icon" href="<?php echo $base_url; ?>assets/images/icons/favicon.ico" type="image/x-icon">
     <link rel="shortcut icon" href="<?php echo $base_url; ?>assets/images/icons/favicon.ico" type="image/x-icon">
     <link rel="apple-touch-icon" sizes="180x180" href="<?php echo $base_url; ?>assets/images/icons/apple-touch-icon.png">
@@ -51,7 +57,7 @@ $og_image_to_display = isset($page_og_image) ? htmlspecialchars($page_og_image) 
     <meta name="description" content="<?php echo $page_description_to_display; ?>">
     <meta name="keywords" content="<?php echo $page_keywords_to_display; ?>">
     <meta name="author" content="দ্বীনিলাইফ টিম"> 
-    <meta name="robots" content="index, follow">
+    
     <link rel="canonical" href="<?php echo $current_page_url; ?>" />
 
     <meta property="og:type" content="website">
