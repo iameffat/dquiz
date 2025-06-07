@@ -4,7 +4,7 @@ require_once 'includes/db_connect.php';
 
 // --- Configuration ---
 // ! গুরুত্বপূর্ণ: এই লাইনটি পরিবর্তন করে আপনার ওয়েবসাইটের সঠিক ডোমেইন দিন।
-$base_url = "https://yourdomain.com"; 
+$base_url = "https://quiz.deenelife.com"; 
 
 // --- Do not edit below this line ---
 
