@@ -53,6 +53,16 @@ if ($stmt_quiz_details_basic) {
 $can_take_quiz = false;
 $access_message = '';
 $show_quiz_interface = false; // Flag to indicate if quiz UI should be shown
+$no_index_page = false; // SEO: Initialize noindex flag
+
+// SEO: Set noindex for live, upcoming, draft quizzes to prevent search engines from indexing the quiz interface
+if (isset($quiz_info_for_display['status'])) {
+    $status = $quiz_info_for_display['status'];
+    if ($status === 'live' || $status === 'upcoming' || $status === 'draft') {
+        $no_index_page = true;
+    }
+}
+
 
 if (!isset($_SESSION["loggedin"]) || $_SESSION["loggedin"] !== true) {
     // User is NOT logged in.
