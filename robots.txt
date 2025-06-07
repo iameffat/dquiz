@@ -14,4 +14,4 @@ Disallow: /practice_results.php
 
 Allow: /
 
-Sitemap: https://quiz.deenelife.com/sitemap.xml
+Sitemap: https://quiz.deenelife.com/sitemap.php
