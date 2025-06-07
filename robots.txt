@@ -1,0 +1,17 @@
+User-agent: *
+Disallow: /admin/
+Disallow: /includes/
+Disallow: /assets/js/
+Disallow: /assets/css/
+Disallow: /login.php
+Disallow: /register.php
+Disallow: /profile.php
+Disallow: /edit_profile.php
+Disallow: /change_password.php
+Disallow: /forgot_password.php
+Disallow: /practice_quiz.php
+Disallow: /practice_results.php
+
+Allow: /
+
+Sitemap: https://quiz.deenelife.com/sitemap.xml

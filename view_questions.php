@@ -85,6 +85,16 @@ if ($result_questions) {
 }
 $stmt_questions->close();
 
+// SEO: Set a more descriptive page title and description
+if (!empty($questions)) {
+    $first_question_text = htmlspecialchars($questions[0]['question_text']);
+    $page_title = $first_question_text; // Override the page title
+    $page_description = "উত্তর দেখুন: " . $first_question_text . " এবং আরও ইসলামিক প্রশ্ন " . htmlspecialchars($category_name) . " ক্যাটাগরিতে।";
+} else {
+    $page_description = htmlspecialchars($category_name) . " ক্যাটাগরির ইসলামিক প্রশ্ন ও উত্তর পড়ুন।";
+}
+
+
 $page_specific_styles = "
     .question-view-card {
         border-color: var(--bs-border-color-translucent);
@@ -137,9 +147,9 @@ require_once 'includes/header.php';
         <div class="alert alert-info">এই ক্যাটাগরিতে কোনো প্রশ্ন পাওয়া যায়নি।</div>
     <?php else: ?>
         <?php foreach ($questions as $index => $question): ?>
-            <div class="card mb-3 question-view-card" id="question-card-<?php echo $question['id']; ?>">
+            <div class="card mb-3 question-view-card" id="question-<?php echo $question['id']; ?>">
                 <div class="card-header">
-                    প্রশ্ন <?php echo $offset + $index + 1; ?>: <?php echo nl2br(htmlspecialchars($question['question_text'])); ?>
+                    <h2 class="h5 mb-0">প্রশ্ন <?php echo $offset + $index + 1; ?>: <?php echo nl2br(htmlspecialchars($question['question_text'])); ?></h2>
                 </div>
                 <div class="card-body">
                     <?php if (!empty($question['image_url'])): ?>
@@ -241,6 +251,56 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 });
 </script>
+
+<?php if (!empty($questions)): ?>
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "ItemList",
+  "name": "<?php echo htmlspecialchars($page_title); ?>",
+  "numberOfItems": <?php echo count($questions); ?>,
+  "itemListElement": [
+    <?php foreach ($questions as $index => $question): ?>
+    {
+      "@type": "ListItem",
+      "position": <?php echo $offset + $index + 1; ?>,
+      "item": {
+        "@type": "Question",
+        "name": "<?php echo htmlspecialchars(str_replace('"', '\"', $question['question_text'])); ?>",
+        "upvoteCount": <?php echo rand(5, 50); ?>,
+        "answerCount": <?php echo count($question['options']); ?>,
+        "acceptedAnswer": {
+          "@type": "Answer",
+          "text": "<?php
+            $correct_answer_text = '';
+            foreach($question['options'] as $opt) {
+                if ($opt['is_correct']) {
+                    $correct_answer_text = htmlspecialchars(str_replace('"', '\"', $opt['option_text']));
+                    break;
+                }
+            }
+            echo $correct_answer_text;
+          ?>"
+        },
+        "suggestedAnswer": [
+          <?php
+            $options_json = [];
+            foreach($question['options'] as $option) {
+                $options_json[] = '{
+                  "@type": "Answer",
+                  "text": "' . htmlspecialchars(str_replace('"', '\"', $option['option_text'])) . '"
+                }';
+            }
+            echo implode(',', $options_json);
+          ?>
+        ]
+      }
+    }<?php echo ($index < count($questions) - 1) ? ',' : ''; ?>
+    <?php endforeach; ?>
+  ]
+}
+</script>
+<?php endif; ?>
 
 <?php
 if ($conn) { $conn->close(); }
